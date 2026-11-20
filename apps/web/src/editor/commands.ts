@@ -1,5 +1,6 @@
 import { isGroupLike } from '@figma/document';
 import { editor } from './editor';
+import { placeImages } from './shortcuts';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import { exportJson } from './export';
 
@@ -81,6 +82,7 @@ export const COMMANDS: Command[] = [
     run: () => editor.setRenderer('canvas2d'),
     enabled: () => editor.ui.rendererPref !== 'canvas2d',
   },
+  { id: 'place-image', label: 'Place image…', shortcut: 'Ctrl+Shift+K', run: () => void placeImages() },
   { id: 'add-page', label: 'Add page', run: () => editor.addPage() },
   { id: 'export-json', label: 'Export file as JSON', run: () => exportJson() },
 ];

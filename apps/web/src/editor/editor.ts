@@ -1,6 +1,7 @@
 import { DesignDocument, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
+import { importImages } from './images';
 import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
 import { useUI, type ToolId, type UIState, type Viewport } from './store';
@@ -61,7 +62,9 @@ export class Editor {
   // ------------------------------------------------------------ selection
 
   select(ids: NodeId[]): void {
-    this.setUI({ selection: ids });
+    const pe = this.ui.paintEdit;
+    const keep = pe && pe.ids.length === ids.length && pe.ids.every((id) => ids.includes(id));
+    this.setUI({ selection: ids, ...(keep ? {} : { paintEdit: null }) });
   }
 
   toggleSelected(id: NodeId): void {
@@ -155,15 +158,22 @@ export class Editor {
   }
 
   async copy(): Promise<void> {
-    const ids = this.topLevelSelection();
-    if (!ids.length) return;
-    const data = serializeNodes(this.doc, ids);
-    this.internalClipboard = data;
+    const text = this.copyText();
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(JSON.stringify(data));
+      await navigator.clipboard.writeText(text);
     } catch {
       // Clipboard permission denied: the internal clipboard still works.
     }
+  }
+
+  /** Serializes the selection for the clipboard (and keeps an internal copy). */
+  copyText(): string | null {
+    const ids = this.topLevelSelection();
+    if (!ids.length) return null;
+    const data = serializeNodes(this.doc, ids);
+    this.internalClipboard = data;
+    return JSON.stringify(data);
   }
 
   async cut(): Promise<void> {
@@ -171,14 +181,27 @@ export class Editor {
     this.deleteSelection();
   }
 
+  /** Menu "Paste": reads the system clipboard (images first, then layers). */
   async paste(): Promise<void> {
-    let data = this.internalClipboard;
+    let text = '';
     try {
-      const text = await navigator.clipboard.readText();
-      data = parseClipboard(text) ?? data;
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith('image/'));
+        if (type) {
+          await importImages([await item.getType(type)]);
+          return;
+        }
+        if (item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+      }
     } catch {
-      // fall back to the internal clipboard
+      // No clipboard permission: fall back to the internal clipboard.
     }
+    this.pasteText(text);
+  }
+
+  /** Pastes layers from clipboard text (our format), or the internal clipboard. */
+  pasteText(text: string): void {
+    const data = parseClipboard(text) ?? this.internalClipboard;
     if (!data) return;
     const clip = data;
     const sel = this.selectedNodes();

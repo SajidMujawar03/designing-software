@@ -53,7 +53,47 @@ export interface SolidPaint {
   visible: boolean;
 }
 
-export type Paint = SolidPaint;
+export interface ColorStop {
+  /** 0–1 along the gradient. */
+  position: number;
+  color: RGB;
+  opacity: number;
+}
+
+export type GradientType = 'GRADIENT_LINEAR' | 'GRADIENT_RADIAL' | 'GRADIENT_ANGULAR' | 'GRADIENT_DIAMOND';
+
+/**
+ * Gradient handles in the node's unit box (0–1 on each axis):
+ * [start/center, end (first axis), width (second axis)].
+ */
+export interface GradientPaint {
+  type: GradientType;
+  stops: ColorStop[];
+  handles: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+  opacity: number;
+  visible: boolean;
+}
+
+export type ImageScaleMode = 'FILL' | 'FIT' | 'TILE';
+
+export interface ImagePaint {
+  type: 'IMAGE';
+  /** Key of the image bytes in the document's image store. */
+  imageHash: string;
+  imageWidth: number;
+  imageHeight: number;
+  scaleMode: ImageScaleMode;
+  /** Tile size relative to the image's natural size (TILE mode). */
+  scale: number;
+  opacity: number;
+  visible: boolean;
+}
+
+export type Paint = SolidPaint | GradientPaint | ImagePaint;
+
+export type StrokeAlign = 'INSIDE' | 'CENTER' | 'OUTSIDE';
+export type StrokeCap = 'NONE' | 'ROUND' | 'SQUARE';
+export type StrokeJoin = 'MITER' | 'BEVEL' | 'ROUND';
 
 export type TextAlign = 'LEFT' | 'CENTER' | 'RIGHT';
 export type TextAutoResize = 'WIDTH_AND_HEIGHT' | 'HEIGHT' | 'NONE';
@@ -80,6 +120,12 @@ export interface SceneNode {
   fills: Paint[];
   strokes: Paint[];
   strokeWeight: number;
+  /** Closed shapes only; open paths always stroke centered. */
+  strokeAlign?: StrokeAlign;
+  strokeCap?: StrokeCap;
+  strokeJoin?: StrokeJoin;
+  /** Alternating dash and gap lengths; empty = solid line. */
+  dashPattern?: number[];
   cornerRadius: number;
 
   // FRAME

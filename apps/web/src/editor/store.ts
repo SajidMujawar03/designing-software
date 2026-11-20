@@ -50,6 +50,16 @@ export interface UIState {
   vectorEdit: { id: NodeId; selected: PointRef[] } | null;
   /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
   penPreview: { from: Vec2; c1: Vec2; to: Vec2 } | null;
+  /** Paint being edited in the paint popover (and on canvas, for gradients). */
+  paintEdit: {
+    ids: NodeId[];
+    prop: 'fills' | 'strokes';
+    index: number;
+    /** Selected gradient stop. */
+    stop: number;
+    /** Where the popover opens (window coords of the paint row). */
+    anchor: { x: number; y: number };
+  } | null;
   /** Renderer the user prefers; CanvasKit falls back to Canvas 2D if it cannot start. */
   rendererPref: 'canvaskit' | 'canvas2d';
   /** Renderer actually drawing the canvas. */
@@ -82,6 +92,7 @@ export const useUI = create<UIState>()(() => ({
   paletteOpen: false,
   vectorEdit: null,
   penPreview: null,
+  paintEdit: null,
   rendererPref: storedRenderer(),
   activeRenderer: null,
 }));

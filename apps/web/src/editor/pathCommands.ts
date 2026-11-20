@@ -132,7 +132,13 @@ export async function outlineStrokeSelection(ed: Editor): Promise<void> {
   const result: NodeId[] = [];
   doc.change(() => {
     for (const n of targets) {
-      const sk = strokeOutline(ck, mapPaths(shapePaths(n), worldTransform(doc, n.id)), n.strokeWeight);
+      const closed = n.type !== 'LINE' && (n.type !== 'VECTOR' || (n.vectorPaths ?? []).every((p) => p.closed));
+      const sk = strokeOutline(ck, mapPaths(shapePaths(n), worldTransform(doc, n.id)), n.strokeWeight, {
+        align: closed ? n.strokeAlign : 'CENTER',
+        cap: n.strokeCap,
+        join: n.strokeJoin,
+        dash: n.dashPattern,
+      });
       if (!sk) continue;
       const paths = fromSkPath(ck, sk);
       sk.delete();

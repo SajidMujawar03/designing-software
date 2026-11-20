@@ -1,5 +1,6 @@
 import type { BooleanOperation } from '@figma/document';
 import { editor } from './editor';
+import { importImages, pickImageFiles } from './images';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import type { ToolId } from './store';
 
@@ -44,7 +45,7 @@ export function installShortcuts(): () => void {
       fn();
     };
 
-    if (mod && (key === '/' || key === 'k')) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
+    if (mod && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
 
     if (mod && e.altKey) {
@@ -76,9 +77,8 @@ export function installShortcuts(): () => void {
       if (key === 'backspace') return run(() => editor.ungroupSelection());
       if (key === 'z' && !e.shiftKey) return run(() => editor.undo());
       if ((key === 'z' && e.shiftKey) || key === 'y') return run(() => editor.redo());
-      if (key === 'c') return run(() => void editor.copy());
-      if (key === 'x') return run(() => void editor.cut());
-      if (key === 'v') return run(() => void editor.paste());
+      // Copy, cut and paste arrive as clipboard events (below), which can also carry images.
+      if (e.shiftKey && key === 'k') return run(() => void placeImages());
       if (key === 'd') return run(() => editor.duplicateSelection());
       if (key === 'a') return run(() => editor.selectAll());
       if (key === ']') return run(() => editor.reorder(e.shiftKey ? 'front' : 'forward'));
@@ -139,12 +139,39 @@ export function installShortcuts(): () => void {
   };
   const onBlur = () => editor.setUI({ spaceHeld: false });
 
+  const onCopy = (e: ClipboardEvent) => {
+    if (isTyping(e.target) || !e.clipboardData) return;
+    const text = editor.copyText();
+    if (!text) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', text);
+    if (e.type === 'cut') editor.deleteSelection();
+  };
+  const onPaste = (e: ClipboardEvent) => {
+    if (isTyping(e.target) || !e.clipboardData) return;
+    e.preventDefault();
+    const images = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+    if (images.length) void importImages(images);
+    else editor.pasteText(e.clipboardData.getData('text/plain'));
+  };
+  window.addEventListener('copy', onCopy);
+  window.addEventListener('cut', onCopy);
+  window.addEventListener('paste', onPaste);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', onBlur);
   return () => {
+    window.removeEventListener('copy', onCopy);
+    window.removeEventListener('cut', onCopy);
+    window.removeEventListener('paste', onPaste);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('blur', onBlur);
   };
+}
+
+/** Ctrl+Shift+K: choose image files and place them in the middle of the view. */
+export async function placeImages(): Promise<void> {
+  const files = await pickImageFiles();
+  if (files.length) await importImages(files);
 }

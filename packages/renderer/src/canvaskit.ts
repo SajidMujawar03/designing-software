@@ -1,5 +1,6 @@
 import {
   localTransform,
+  paintColor,
   pathData,
   shapePaths,
   worldBounds,
@@ -20,11 +21,10 @@ import type {
   Surface,
   TypefaceFontProvider,
 } from 'canvaskit-wasm';
+import { CkPaints, toCk } from './ckpaint';
 import { booleanKey, booleanPath } from './pathops';
 import type { FontRegistry, SceneOptions, SceneRenderer } from './types';
 
-/** Mat2D [a, b, c, d, e, f] → CanvasKit 3×3 row-major matrix. */
-const toCk = (m: Mat2D): number[] => [m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1];
 
 interface CachedParagraph {
   key: string;
@@ -53,6 +53,7 @@ export class CanvasKitRenderer implements SceneRenderer {
   private paths = new Map<NodeId, { d: string; path: Path }>();
   /** Document being drawn (boolean results need the whole subtree). */
   private doc: DesignDocument | null = null;
+  private paints: CkPaints;
   private unsubscribeFonts: () => void;
 
   constructor(
@@ -63,6 +64,7 @@ export class CanvasKitRenderer implements SceneRenderer {
   ) {
     this.paint = new ck.Paint();
     this.paint.setAntiAlias(true);
+    this.paints = new CkPaints(ck);
     this.fontProvider = ck.TypefaceFontProvider.Make();
     this.unsubscribeFonts = fonts.onLoad(() => {
       // Paragraphs laid out with a fallback must be rebuilt with the real font.
@@ -123,6 +125,7 @@ export class CanvasKitRenderer implements SceneRenderer {
     for (const { path } of this.paths.values()) path.delete();
     this.paths.clear();
     this.paint.delete();
+    this.paints.dispose();
     this.fontProvider.delete();
     this.surface?.delete();
     this.surface = null;
@@ -249,28 +252,58 @@ export class CanvasKitRenderer implements SceneRenderer {
     else c.clipRect(rect, ck.ClipOp.Intersect, true);
   }
 
-  private setColor(p: DocPaint): void {
-    this.paint.setColor(this.ck.Color4f(p.color.r, p.color.g, p.color.b, p.opacity));
+  /** The area a paint spans: the node's box, or a boolean's result bounds. */
+  private paintBox(n: SceneNode): Rect {
+    if (n.type === 'BOOLEAN') {
+      const b = this.vectorPath(n)?.computeTightBounds();
+      if (b) return { x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1] };
+    }
+    return { x: 0, y: 0, width: n.width, height: n.height };
+  }
+
+  /** Draws the node's geometry once per visible paint. */
+  private drawPaints(c: Canvas, n: SceneNode, paints: DocPaint[]): void {
+    const box = this.paintBox(n);
+    for (const p of paints) {
+      if (!p.visible) continue;
+      const shader = this.paints.apply(this.paint, p, box, this.doc!);
+      if (shader === false) continue;
+      this.geometry(c, n, this.paint);
+      shader?.delete();
+    }
+    this.paint.setShader(null);
   }
 
   private fill(c: Canvas, n: SceneNode): void {
     this.paint.setStyle(this.ck.PaintStyle.Fill);
-    for (const f of n.fills) {
-      if (!f.visible) continue;
-      this.setColor(f);
-      this.geometry(c, n, this.paint);
-    }
+    this.drawPaints(c, n, n.fills);
   }
 
   private stroke(c: Canvas, n: SceneNode): void {
-    if (n.strokeWeight <= 0) return;
-    this.paint.setStyle(this.ck.PaintStyle.Stroke);
-    this.paint.setStrokeWidth(n.strokeWeight);
-    for (const s of n.strokes) {
-      if (!s.visible) continue;
-      this.setColor(s);
-      this.geometry(c, n, this.paint);
+    if (n.strokeWeight <= 0 || !n.strokes.some((s) => s.visible)) return;
+    const ck = this.ck;
+    const paint = this.paint;
+    paint.setStyle(ck.PaintStyle.Stroke);
+    paint.setStrokeCap(n.strokeCap === 'ROUND' ? ck.StrokeCap.Round : n.strokeCap === 'SQUARE' ? ck.StrokeCap.Square : ck.StrokeCap.Butt);
+    paint.setStrokeJoin(n.strokeJoin === 'ROUND' ? ck.StrokeJoin.Round : n.strokeJoin === 'BEVEL' ? ck.StrokeJoin.Bevel : ck.StrokeJoin.Miter);
+    const dash = (n.dashPattern ?? []).filter((v) => v > 0);
+    const effect = dash.length ? ck.PathEffect.MakeDash(dash.length % 2 ? [...dash, ...dash] : dash, 0) : null;
+    paint.setPathEffect(effect);
+
+    // Inside/outside strokes: draw twice as wide, clipped to the inside or outside of the shape.
+    const align = isClosedShape(n) ? (n.strokeAlign ?? 'CENTER') : 'CENTER';
+    const clipPath = align === 'CENTER' ? null : this.vectorPath(n);
+    if (clipPath) {
+      c.save();
+      c.clipPath(clipPath, align === 'INSIDE' ? ck.ClipOp.Intersect : ck.ClipOp.Difference, true);
+      paint.setStrokeWidth(n.strokeWeight * 2);
+    } else {
+      paint.setStrokeWidth(n.strokeWeight);
     }
+    this.drawPaints(c, n, n.strokes);
+    if (clipPath) c.restore();
+    paint.setPathEffect(null);
+    effect?.delete();
   }
 
   // ------------------------------------------------------------ text
@@ -282,8 +315,10 @@ export class CanvasKitRenderer implements SceneRenderer {
 
   /** Lays out (and caches) a text node's paragraph; null while its font is loading. */
   private paragraph(n: SceneNode): Paragraph | null {
-    const fill = [...n.fills].reverse().find((f) => f.visible);
-    if (!fill || !(n.characters ?? '')) return null;
+    const top = [...n.fills].reverse().find((f) => f.visible);
+    if (!top || !(n.characters ?? '')) return null;
+    // Text uses one flat color for now (gradient and image text come with rich text).
+    const fill = paintColor(top);
     const family = n.fontFamily ?? 'Inter';
     const font = this.fonts.get(family, n.fontWeight ?? 400);
     if (!font) return null;
@@ -379,4 +414,11 @@ export class CanvasKitRenderer implements SceneRenderer {
 export async function loadCanvasKit(wasmUrl: string): Promise<CanvasKit> {
   const { default: CanvasKitInit } = await import('canvaskit-wasm');
   return CanvasKitInit({ locateFile: () => wasmUrl });
+}
+
+/** Shapes whose stroke can sit inside or outside (open paths always stroke centered). */
+function isClosedShape(n: SceneNode): boolean {
+  if (n.type === 'LINE' || n.type === 'TEXT') return false;
+  if (n.type === 'VECTOR') return (n.vectorPaths ?? []).every((p) => p.closed);
+  return true;
 }

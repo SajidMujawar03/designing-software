@@ -85,3 +85,28 @@ describe('shapePaths', () => {
     expect(b.height).toBeCloseTo(60);
   });
 });
+
+describe('stroke outline options', () => {
+  const square = [{ closed: true, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }] }];
+  const boundsOf = (p: ReturnType<typeof strokeOutline>) => {
+    const b = pathsBounds(fromSkPath(ck, p!))!;
+    p!.delete();
+    return b;
+  };
+
+  it('keeps inside strokes within the shape', () => {
+    expect(boundsOf(strokeOutline(ck, square, 10, { align: 'INSIDE' }))).toEqual({ x: 0, y: 0, width: 100, height: 100 });
+  });
+
+  it('puts outside strokes around the shape', () => {
+    expect(boundsOf(strokeOutline(ck, square, 10, { align: 'OUTSIDE' }))).toEqual({ x: -10, y: -10, width: 120, height: 120 });
+  });
+
+  it('splits dashed strokes into pieces', () => {
+    const line = [{ closed: false, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] }];
+    const p = strokeOutline(ck, line, 4, { dash: [10, 10] })!;
+    const pieces = fromSkPath(ck, p);
+    p.delete();
+    expect(pieces.length).toBe(5);
+  });
+});

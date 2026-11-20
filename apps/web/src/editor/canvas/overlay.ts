@@ -7,6 +7,7 @@ import { traceVector } from '@figma/renderer';
 import type { PointRef } from '../store';
 import { visibleHandles } from '../tools/vector';
 import { worldPathsOf } from '../transforms';
+import { drawGradientHandles } from './gradientHandles';
 import { drawRulers } from './rulers';
 
 export const BLUE = '#0D99FF';
@@ -182,6 +183,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(w), Math.round(h));
   }
 
+  drawGradientHandles(ctx, ed);
   if (ed.ui.showRulers) drawRulers(ctx, ed);
 
   ctx.restore();

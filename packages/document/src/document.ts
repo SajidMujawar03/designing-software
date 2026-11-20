@@ -39,6 +39,8 @@ export class DesignDocument {
   readonly ydoc: Y.Doc;
   readonly yNodes: Y.Map<YNode>;
   readonly undoManager: Y.UndoManager;
+  /** Image files by content hash. Kept outside undo history; nodes refer to them by hash. */
+  readonly yImages: Y.Map<Uint8Array>;
 
   private nodes = new Map<NodeId, SceneNode>();
   private childrenCache = new Map<NodeId, NodeId[]>();
@@ -49,6 +51,7 @@ export class DesignDocument {
   constructor(ydoc: Y.Doc = new Y.Doc()) {
     this.ydoc = ydoc;
     this.yNodes = ydoc.getMap<YNode>('nodes');
+    this.yImages = ydoc.getMap<Uint8Array>('images');
     this.undoManager = new Y.UndoManager(this.yNodes, {
       trackedOrigins: new Set([LOCAL_ORIGIN]),
       captureTimeout: Number.POSITIVE_INFINITY,
@@ -145,6 +148,16 @@ export class DesignDocument {
     };
     walk(id);
     return out;
+  }
+
+  /** Encoded bytes of a stored image, if present. */
+  getImage(hash: string): Uint8Array | undefined {
+    return this.yImages.get(hash);
+  }
+
+  /** Stores image bytes under their hash (no-op if already stored). */
+  addImage(hash: string, bytes: Uint8Array): void {
+    if (!this.yImages.has(hash)) this.ydoc.transact(() => this.yImages.set(hash, bytes));
   }
 
   // ---------------------------------------------------------------- writing

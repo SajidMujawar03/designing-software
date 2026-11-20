@@ -149,16 +149,43 @@ export function booleanKey(doc: DesignDocument, id: NodeId): string {
   ]);
 }
 
-/** Outline of a stroke as a filled path (outline stroke). Caller deletes it. */
-export function strokeOutline(ck: CanvasKit, paths: VectorPath[], width: number): Path | null {
-  const p = toSkPath(ck, paths);
-  if (!p) return null;
-  const stroked = p.makeStroked({ width, join: ck.StrokeJoin.Miter, cap: ck.StrokeCap.Butt });
-  p.delete();
-  if (!stroked) return null;
-  // Union with itself merges overlapping stroke contours into one clean outline.
-  const simple = ck.Path.MakeFromOp(stroked, stroked, ck.PathOp.Union);
+export interface StrokeOutlineOptions {
+  align?: 'INSIDE' | 'CENTER' | 'OUTSIDE';
+  cap?: 'NONE' | 'ROUND' | 'SQUARE';
+  join?: 'MITER' | 'BEVEL' | 'ROUND';
+  dash?: number[];
+}
+
+/**
+ * Outline of a stroke as a filled path (outline stroke), honoring dashes,
+ * ends, corners and inside/outside position. Caller deletes it.
+ */
+export function strokeOutline(ck: CanvasKit, paths: VectorPath[], width: number, opts: StrokeOutlineOptions = {}): Path | null {
+  const shape = toSkPath(ck, paths);
+  if (!shape) return null;
+  const align = opts.align ?? 'CENTER';
+  let src: Path = shape;
+  const dash = (opts.dash ?? []).filter((v) => v > 0);
+  if (dash.length >= 1) {
+    const [on, off] = [dash[0], dash[1] ?? dash[0]];
+    src = shape.makeDashed(on, off, 0) ?? shape;
+  }
+  const stroked = src.makeStroked({
+    width: align === 'CENTER' ? width : width * 2,
+    cap: opts.cap === 'ROUND' ? ck.StrokeCap.Round : opts.cap === 'SQUARE' ? ck.StrokeCap.Square : ck.StrokeCap.Butt,
+    join: opts.join === 'ROUND' ? ck.StrokeJoin.Round : opts.join === 'BEVEL' ? ck.StrokeJoin.Bevel : ck.StrokeJoin.Miter,
+  });
+  if (src !== shape) src.delete();
+  if (!stroked) {
+    shape.delete();
+    return null;
+  }
+  // Union with itself merges overlapping stroke contours into one clean outline;
+  // inside/outside strokes keep only the half on that side of the shape.
+  const op = align === 'INSIDE' ? ck.PathOp.Intersect : align === 'OUTSIDE' ? ck.PathOp.Difference : ck.PathOp.Union;
+  const result = ck.Path.MakeFromOp(stroked, align === 'CENTER' ? stroked : shape, op);
   stroked.delete();
-  return simple;
+  shape.delete();
+  return result;
 }
 

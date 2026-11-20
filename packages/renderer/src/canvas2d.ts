@@ -1,6 +1,8 @@
 import {
+  gradientMatrix,
   isGroupLike,
   localTransform,
+  paintColor,
   rgbaCss,
   segmentsOf,
   shapePaths,
@@ -12,6 +14,7 @@ import {
   type SceneNode,
 } from '@figma/document';
 import { multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '@figma/geometry';
+import { imageMatrix } from './ckpaint';
 import { drawText, layoutText } from './text';
 import type { SceneOptions, SceneRenderer } from './types';
 
@@ -27,7 +30,87 @@ export interface RenderOptions {
   hidden?: Set<NodeId>;
 }
 
-const paintStyle = (p: Paint): string => rgbaCss(p.color, p.opacity);
+/** Flat CSS color of any paint (used where gradients/images are not supported). */
+const paintStyle = (p: Paint): string => {
+  const c = paintColor(p);
+  return rgbaCss(c.color, c.opacity);
+};
+
+// ------------------------------------------------------------ images (decoded asynchronously)
+
+const bitmaps = new Map<string, ImageBitmap | 'loading' | 'failed'>();
+const imageListeners = new Set<() => void>();
+
+/** Decoded image for a hash, or null while it decodes (listeners are told when ready). */
+function bitmap(hash: string, doc: DesignDocument): ImageBitmap | null {
+  const b = bitmaps.get(hash);
+  if (b instanceof ImageBitmap) return b;
+  if (b) return null;
+  const bytes = doc.getImage(hash);
+  if (!bytes) return null;
+  bitmaps.set(hash, 'loading');
+  createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>])).then(
+    (bmp) => {
+      bitmaps.set(hash, bmp);
+      for (const l of imageListeners) l();
+    },
+    () => bitmaps.set(hash, 'failed'),
+  );
+  return null;
+}
+
+/**
+ * Fills or strokes the current path with a paint. Linear gradients and
+ * images work for both; radial, angular and diamond gradients need a
+ * transformed coordinate space, which only fills can use, so strokes fall
+ * back to the gradient's first color. Diamond is approximated as radial.
+ */
+function paintPath(ctx: CanvasRenderingContext2D, n: SceneNode, p: Paint, doc: DesignDocument, mode: 'fill' | 'stroke'): void {
+  const finish = (style: string | CanvasGradient | CanvasPattern) => {
+    if (mode === 'fill') {
+      ctx.fillStyle = style;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = style;
+      ctx.stroke();
+    }
+  };
+  if (p.type === 'SOLID') return finish(rgbaCss(p.color, p.opacity));
+
+  ctx.save();
+  ctx.globalAlpha *= p.opacity;
+  if (p.type === 'IMAGE') {
+    const bmp = bitmap(p.imageHash, doc);
+    if (bmp) {
+      const pattern = ctx.createPattern(bmp, p.scaleMode === 'TILE' ? 'repeat' : 'no-repeat');
+      if (pattern) {
+        const m = imageMatrix(p, { x: 0, y: 0, width: n.width, height: n.height }, bmp.width, bmp.height);
+        pattern.setTransform(new DOMMatrix([m[0], m[1], m[2], m[3], m[4], m[5]]));
+        finish(pattern);
+      }
+    }
+    ctx.restore();
+    return;
+  }
+
+  const m = gradientMatrix(p, n.width, n.height);
+  const stops = [...p.stops].sort((a, b) => a.position - b.position);
+  const addStops = (g: CanvasGradient) => {
+    for (const st of stops) g.addColorStop(Math.max(0, Math.min(1, st.position)), rgbaCss(st.color, st.opacity));
+    return g;
+  };
+  if (p.type === 'GRADIENT_LINEAR') {
+    finish(addStops(ctx.createLinearGradient(m[4], m[5], m[0] + m[4], m[1] + m[5])));
+  } else if (mode === 'stroke') {
+    finish(paintStyle({ ...p, opacity: 1 }));
+  } else {
+    // Gradient space → box: the path is already built, so changing the transform only moves the gradient.
+    ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    const g = p.type === 'GRADIENT_ANGULAR' ? ctx.createConicGradient(0, 0, 0) : ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    finish(addStops(g));
+  }
+  ctx.restore();
+}
 
 /** Draws a page with the Canvas 2D API. */
 export function renderPage(
@@ -83,7 +166,7 @@ function drawNode(
   ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
   ctx.globalAlpha *= n.opacity;
 
-  if (!culled && !opts.hidden?.has(n.id)) drawShape(ctx, n);
+  if (!culled && !opts.hidden?.has(n.id)) drawShape(ctx, doc, n);
 
   if (n.type === 'FRAME') {
     if (n.clipsContent) {
@@ -93,14 +176,14 @@ function drawNode(
     for (const c of doc.children(n.id)) drawNode(ctx, doc, c, m, world, opts);
     if (n.clipsContent && !culled) {
       ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
-      strokeShape(ctx, n);
+      strokeShape(ctx, doc, n);
     }
   }
   ctx.restore();
 }
 
-function shapePath(ctx: CanvasRenderingContext2D, n: SceneNode): void {
-  ctx.beginPath();
+function shapePath(ctx: CanvasRenderingContext2D, n: SceneNode, begin = true): void {
+  if (begin) ctx.beginPath();
   switch (n.type) {
     case 'ELLIPSE':
       ctx.ellipse(n.width / 2, n.height / 2, Math.abs(n.width / 2), Math.abs(n.height / 2), 0, 0, Math.PI * 2);
@@ -132,7 +215,7 @@ export function traceVector(ctx: CanvasRenderingContext2D | Path2D, n: SceneNode
   }
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, n: SceneNode): void {
+function drawShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneNode): void {
   if (n.type === 'TEXT') {
     const layout = layoutText(n, ctx);
     for (const f of n.fills) if (f.visible) drawText(ctx, n, layout, paintStyle(f));
@@ -140,25 +223,37 @@ function drawShape(ctx: CanvasRenderingContext2D, n: SceneNode): void {
   }
   shapePath(ctx, n);
   if (n.type !== 'LINE') {
-    for (const f of n.fills) {
-      if (!f.visible) continue;
-      ctx.fillStyle = paintStyle(f);
-      ctx.fill();
-    }
+    for (const f of n.fills) if (f.visible) paintPath(ctx, n, f, doc, 'fill');
   }
   // Clipped frames stroke after their children so the border stays on top.
-  if (!(n.type === 'FRAME' && n.clipsContent)) strokeShape(ctx, n);
+  if (!(n.type === 'FRAME' && n.clipsContent)) strokeShape(ctx, doc, n);
 }
 
-function strokeShape(ctx: CanvasRenderingContext2D, n: SceneNode): void {
+const isClosedShape = (n: SceneNode): boolean =>
+  n.type !== 'LINE' && n.type !== 'TEXT' && (n.type !== 'VECTOR' || (n.vectorPaths ?? []).every((p) => p.closed));
+
+function strokeShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneNode): void {
   const strokes = n.strokes.filter((s) => s.visible);
   if (strokes.length === 0 || n.strokeWeight <= 0) return;
-  shapePath(ctx, n);
-  ctx.lineWidth = n.strokeWeight;
-  for (const s of strokes) {
-    ctx.strokeStyle = paintStyle(s);
-    ctx.stroke();
+  ctx.save();
+  const align = isClosedShape(n) ? (n.strokeAlign ?? 'CENTER') : 'CENTER';
+  // Inside/outside: twice the width, clipped to one side of the outline.
+  if (align === 'INSIDE') {
+    shapePath(ctx, n);
+    ctx.clip();
+  } else if (align === 'OUTSIDE') {
+    ctx.beginPath();
+    ctx.rect(-1e6, -1e6, 2e6, 2e6);
+    shapePath(ctx, n, false);
+    ctx.clip('evenodd');
   }
+  shapePath(ctx, n);
+  ctx.lineWidth = align === 'CENTER' ? n.strokeWeight : n.strokeWeight * 2;
+  ctx.lineCap = n.strokeCap === 'ROUND' ? 'round' : n.strokeCap === 'SQUARE' ? 'square' : 'butt';
+  ctx.lineJoin = n.strokeJoin === 'ROUND' ? 'round' : n.strokeJoin === 'BEVEL' ? 'bevel' : 'miter';
+  ctx.setLineDash((n.dashPattern ?? []).filter((v) => v > 0));
+  for (const s of strokes) paintPath(ctx, n, s, doc, 'stroke');
+  ctx.restore();
 }
 
 /**
@@ -189,8 +284,16 @@ export class Canvas2DRenderer implements SceneRenderer {
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  private unsubscribe: () => void;
+
+  /** `onChange` is called when something new can be drawn (an image finished decoding). */
+  constructor(
+    private canvas: HTMLCanvasElement,
+    onChange: () => void = () => {},
+  ) {
     this.ctx = canvas.getContext('2d')!;
+    imageListeners.add(onChange);
+    this.unsubscribe = () => imageListeners.delete(onChange);
   }
 
   resize(width: number, height: number, dpr: number): void {
@@ -208,7 +311,9 @@ export class Canvas2DRenderer implements SceneRenderer {
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
   }
 
-  dispose(): void {}
+  dispose(): void {
+    this.unsubscribe();
+  }
 }
 
 const COMPOSITE: Record<string, GlobalCompositeOperation> = {

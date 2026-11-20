@@ -1,18 +1,24 @@
-import { hitTest, selectableAncestor } from '@figma/document';
+import { hitTest, paintColor, selectableAncestor } from '@figma/document';
 import { Canvas2DRenderer, CanvasKitRenderer, type SceneRenderer } from '@figma/renderer';
 import type { CanvasKit } from 'canvaskit-wasm';
 import { useEffect, useRef, useState } from 'react';
 import { canvasKitIfLoaded, getCanvasKit } from '../canvaskit';
 import { editor } from '../editor';
 import { fonts } from '../fonts';
+import { importImages } from '../images';
 import { useUI } from '../store';
 import { createTools, createVectorEditTool, type Tool, type ToolEvent } from '../tools';
 import { snapPx } from '../tools/types';
 import { drawOverlay } from './overlay';
+import { hitGradientHandle, moveGradientHandle } from './gradientHandles';
 import { hitGuide, RULER } from './rulers';
 import { TextEditor } from './TextEditor';
 
 const CANVAS_BG = { r: 245 / 255, g: 245 / 255, b: 245 / 255 };
+const pageBackground = () => {
+  const f = editor.doc.get(editor.pageId)?.fills[0];
+  return f ? paintColor(f).color : CANVAS_BG;
+};
 const tools = createTools(editor);
 const vectorEditTool = createVectorEditTool(editor);
 
@@ -68,7 +74,7 @@ export function CanvasView() {
       if (!frame) frame = requestAnimationFrame(draw);
     };
     const renderer: SceneRenderer =
-      backend === 'canvaskit' && ck ? new CanvasKitRenderer(ck, scene, fonts, schedule) : new Canvas2DRenderer(scene);
+      backend === 'canvaskit' && ck ? new CanvasKitRenderer(ck, scene, fonts, schedule) : new Canvas2DRenderer(scene, schedule);
     editor.renderer = renderer;
     editor.setUI({ activeRenderer: renderer.kind });
 
@@ -85,7 +91,7 @@ export function CanvasView() {
           width: width / viewport.zoom,
           height: height / viewport.zoom,
         },
-        background: editor.doc.get(editor.pageId)?.fills[0]?.color ?? CANVAS_BG,
+        background: pageBackground(),
         hidden: editingTextId ? new Set([editingTextId]) : undefined,
       });
       octx.setTransform(1, 0, 0, 1, 0, 0);
@@ -132,6 +138,8 @@ export function CanvasView() {
     let active: Tool | null = null;
     /** Guide being dragged (from a ruler, or an existing one). */
     let guide: { index: number; axis: 'x' | 'y' } | null = null;
+    /** Gradient handle being dragged (paint editor open). */
+    let gradientHandle: number | null = null;
 
     const toEvent = (e: PointerEvent | MouseEvent): ToolEvent => {
       const r = canvas.getBoundingClientRect();
@@ -153,6 +161,12 @@ export function CanvasView() {
       canvas.setPointerCapture(e.pointerId);
       const ui = editor.ui;
       const ev = toEvent(e);
+      const gradHit = e.button === 0 && !ui.spaceHeld ? hitGradientHandle(editor, ev.screen) : null;
+      if (gradHit !== null) {
+        editor.doc.endGesture();
+        gradientHandle = gradHit;
+        return;
+      }
       const gh = e.button === 0 && !ui.spaceHeld ? hitGuide(editor, ev.screen) : null;
       if (gh) {
         editor.doc.endGesture();
@@ -165,17 +179,28 @@ export function CanvasView() {
     };
     const onMove = (e: PointerEvent) => {
       const ev = toEvent(e);
+      if (gradientHandle !== null) {
+        moveGradientHandle(editor, gradientHandle, ev.world);
+        return;
+      }
       if (guide) {
         editor.moveGuide(guide.index, ev.px[guide.axis]);
         return;
       }
       if (active) return active.move(ev);
       currentTool().hover?.(ev);
+      if (hitGradientHandle(editor, ev.screen) !== null) return editor.setUI({ cursor: 'move', hoverId: null });
       const gh = hitGuide(editor, ev.screen);
       if (gh?.kind === 'guide') editor.setUI({ cursor: gh.axis === 'x' ? 'ew-resize' : 'ns-resize', hoverId: null });
       else if (gh?.kind === 'ruler') editor.setUI({ cursor: 'default', hoverId: null });
     };
     const onUp = (e: PointerEvent) => {
+      if (gradientHandle !== null) {
+        gradientHandle = null;
+        editor.doc.endGesture();
+        if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        return;
+      }
       if (guide) {
         // Dropping a guide back on its ruler (or off-canvas) deletes it.
         const ev = toEvent(e);
@@ -247,7 +272,20 @@ export function CanvasView() {
   const css = panning ? 'grabbing' : spaceHeld || tool === 'hand' ? 'grab' : tool === 'select' ? cursor : tools[tool].cursor;
 
   return (
-    <div className="canvas-wrap" ref={wrapRef}>
+    <div
+      className="canvas-wrap"
+      ref={wrapRef}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+        if (!files.length) return;
+        e.preventDefault();
+        const r = wrapRef.current!.getBoundingClientRect();
+        void importImages(files, editor.screenToWorld({ x: e.clientX - r.left, y: e.clientY - r.top }));
+      }}
+    >
       {/* A fresh element per backend: a canvas cannot switch between WebGL and 2D contexts. */}
       <canvas key={backend} ref={sceneRef} className="scene-canvas" data-renderer={backend} />
       <canvas ref={canvasRef} className="overlay-canvas" style={{ cursor: css }} data-testid="canvas" />
