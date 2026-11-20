@@ -18,6 +18,7 @@ import {
 } from '@figma/geometry';
 import type { DesignDocument } from './document';
 import { hasOwnTransform, type NodeId, type SceneNode } from './types';
+import { vectorContainsPoint } from './vector';
 
 const DEG = Math.PI / 180;
 
@@ -87,6 +88,8 @@ export function shapeContainsPoint(doc: DesignDocument, n: SceneNode, p: Vec2, t
       return ellipseContainsPoint(grown, local);
     case 'LINE':
       return distanceToSegment(local, { x: 0, y: 0 }, { x: n.width, y: 0 }) <= Math.max(tolerance, n.strokeWeight / 2);
+    case 'VECTOR':
+      return vectorContainsPoint(n, local, tolerance);
     default:
       return rectContainsPoint(grown, local);
   }

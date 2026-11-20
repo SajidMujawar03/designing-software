@@ -26,6 +26,7 @@ const NAMES: Record<NodeType, string> = {
   RECTANGLE: 'Rectangle',
   ELLIPSE: 'Ellipse',
   LINE: 'Line',
+  VECTOR: 'Vector',
   TEXT: 'Text',
 };
 
@@ -39,6 +40,10 @@ export function defaultProps(type: NodeType): NodeProps {
     case 'RECTANGLE':
     case 'ELLIPSE':
       p.fills = [solid('#D9D9D9')];
+      break;
+    case 'VECTOR':
+      p.strokes = [solid('#000000')];
+      p.vectorPaths = [];
       break;
     case 'LINE':
       p.height = 0;

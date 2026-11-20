@@ -22,6 +22,10 @@ export class Editor {
   renderer: SceneRenderer | null = null;
   /** Aborts the in-progress pointer gesture (set by the canvas view). */
   cancelGesture: () => void = () => {};
+  /** Lets the active tool handle a key first (set by the canvas view). */
+  toolKey: (e: KeyboardEvent) => boolean = () => false;
+  /** Tells the previous tool it is no longer active (set by the canvas view). */
+  toolDeactivated: (tool: ToolId) => void = () => {};
   private internalClipboard: ClipboardData | null = null;
 
   constructor() {
@@ -103,6 +107,16 @@ export class Editor {
     if (hoverId && !this.doc.has(hoverId)) patch.hoverId = null;
     if (editingTextId && !this.doc.has(editingTextId)) patch.editingTextId = null;
     if (pageId && !this.doc.has(pageId)) patch.pageId = this.doc.pages()[0]?.id ?? null;
+    const ve = this.ui.vectorEdit;
+    if (ve) {
+      // Undo/redo or remote edits can remove points: drop stale references.
+      const paths = this.doc.get(ve.id)?.vectorPaths;
+      if (!paths) patch.vectorEdit = null;
+      else {
+        const valid = ve.selected.filter(([p, i]) => i < (paths[p]?.points.length ?? 0));
+        if (valid.length !== ve.selected.length) patch.vectorEdit = { ...ve, selected: valid };
+      }
+    }
     if (Object.keys(patch).length) this.setUI(patch);
   }
 
@@ -500,7 +514,24 @@ export class Editor {
 
   setTool(tool: ToolId): void {
     this.commitTextEdit();
+    const prev = this.ui.tool;
+    if (prev !== tool) this.toolDeactivated(prev);
+    if (this.ui.vectorEdit && tool !== 'select') this.exitVectorEdit();
     this.setUI({ tool });
+  }
+
+  /** Enter (or double-click): edit the points of the selected vector. */
+  enterVectorEdit(id: NodeId): void {
+    if (this.doc.get(id)?.type !== 'VECTOR') return;
+    this.doc.endGesture();
+    this.setUI({ vectorEdit: { id, selected: [] }, selection: [id], tool: 'select' });
+  }
+
+  exitVectorEdit(): void {
+    const ve = this.ui.vectorEdit;
+    if (!ve) return;
+    this.doc.endGesture();
+    this.setUI({ vectorEdit: null, selection: this.doc.has(ve.id) ? [ve.id] : [] });
   }
 
   /** `isNew`: the node was just created, so creation and typing undo together. */

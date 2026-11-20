@@ -341,5 +341,6 @@ export class SelectTool implements Tool {
       return;
     }
     if (hit.type === 'TEXT') this.ed.startTextEdit(hit.id);
+    else if (hit.type === 'VECTOR') this.ed.enterVectorEdit(hit.id);
   }
 }

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor';
 import { fonts } from '../fonts';
 import { useUI } from '../store';
-import { createTools, type Tool, type ToolEvent } from '../tools';
+import { createTools, createVectorEditTool, type Tool, type ToolEvent } from '../tools';
 import { snapPx } from '../tools/types';
 import { drawOverlay } from './overlay';
 import { hitGuide, RULER } from './rulers';
@@ -14,6 +14,12 @@ import { TextEditor } from './TextEditor';
 
 const CANVAS_BG = { r: 245 / 255, g: 245 / 255, b: 245 / 255 };
 const tools = createTools(editor);
+const vectorEditTool = createVectorEditTool(editor);
+
+/** The tool receiving pointer and key input: vector edit mode takes over the Move tool. */
+const currentTool = (): Tool => (editor.ui.vectorEdit && editor.ui.tool === 'select' ? vectorEditTool : tools[editor.ui.tool]);
+editor.toolKey = (e) => currentTool().key?.(e) ?? false;
+editor.toolDeactivated = (t) => tools[t].deactivate?.();
 
 /** CanvasKit loads once per session; failures fall back to Canvas 2D. */
 let ckPromise: Promise<CanvasKit> | null = null;
@@ -159,7 +165,7 @@ export function CanvasView() {
         guide = { index, axis: gh.axis };
         return;
       }
-      active = e.button === 1 || ui.spaceHeld ? tools.hand : tools[ui.tool];
+      active = e.button === 1 || ui.spaceHeld ? tools.hand : currentTool();
       active.down(toEvent(e));
     };
     const onMove = (e: PointerEvent) => {
@@ -169,7 +175,7 @@ export function CanvasView() {
         return;
       }
       if (active) return active.move(ev);
-      tools[editor.ui.tool].hover?.(ev);
+      currentTool().hover?.(ev);
       const gh = hitGuide(editor, ev.screen);
       if (gh?.kind === 'guide') editor.setUI({ cursor: gh.axis === 'x' ? 'ew-resize' : 'ns-resize', hoverId: null });
       else if (gh?.kind === 'ruler') editor.setUI({ cursor: 'default', hoverId: null });
@@ -191,7 +197,7 @@ export function CanvasView() {
       t.up(toEvent(e));
       if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
     };
-    const onDbl = (e: MouseEvent) => tools[editor.ui.tool].doubleClick?.(toEvent(e));
+    const onDbl = (e: MouseEvent) => currentTool().doubleClick?.(toEvent(e));
     const onLeave = () => {
       if (!active) editor.setUI({ hoverId: null });
     };

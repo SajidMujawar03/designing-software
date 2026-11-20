@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { defaultProps } from './defaults';
 import type { NodeId, NodePatch, NodeType, SceneNode } from './types';
+import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
 
@@ -178,6 +179,7 @@ export class DesignDocument {
   updateNode(id: NodeId, patch: NodePatch): void {
     const y = this.yNodes.get(id);
     if (!y) return;
+    patch = this.withScaledPaths(id, patch);
     this.change(() => {
       for (const [k, v] of Object.entries(patch)) {
         if (v === undefined) continue;
@@ -285,6 +287,16 @@ export class DesignDocument {
   }
 
   // ---------------------------------------------------------------- internals
+
+  /** Resizing a vector's box scales its paths with it (unless new paths are given). */
+  private withScaledPaths(id: NodeId, patch: NodePatch): NodePatch {
+    const n = this.nodes.get(id);
+    if (n?.type !== 'VECTOR' || patch.vectorPaths || (patch.width === undefined && patch.height === undefined)) return patch;
+    const w1 = patch.width ?? n.width;
+    const h1 = patch.height ?? n.height;
+    if (w1 === n.width && h1 === n.height) return patch;
+    return { ...patch, vectorPaths: scalePaths(n.vectorPaths ?? [], n.width, n.height, w1, h1) };
+  }
 
   /** Groups only exist to hold children: an empty group is removed (and so on upward). */
   private pruneEmptyGroup(id: NodeId): void {

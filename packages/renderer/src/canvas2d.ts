@@ -1,6 +1,7 @@
 import {
   localTransform,
   rgbaCss,
+  segmentsOf,
   worldBounds,
   worldTransform,
   type DesignDocument,
@@ -102,11 +103,24 @@ function shapePath(ctx: CanvasRenderingContext2D, n: SceneNode): void {
       ctx.moveTo(0, 0);
       ctx.lineTo(n.width, 0);
       break;
+    case 'VECTOR':
+      traceVector(ctx, n);
+      break;
     default: {
       const r = Math.max(0, Math.min(n.cornerRadius || 0, Math.abs(n.width) / 2, Math.abs(n.height) / 2));
       if (r > 0) ctx.roundRect(0, 0, n.width, n.height, r);
       else ctx.rect(0, 0, n.width, n.height);
     }
+  }
+}
+
+/** Adds a vector's paths to the current Canvas 2D path (also used by the overlay). */
+export function traceVector(ctx: CanvasRenderingContext2D | Path2D, n: SceneNode): void {
+  for (const path of n.vectorPaths ?? []) {
+    if (!path.points.length) continue;
+    ctx.moveTo(path.points[0].x, path.points[0].y);
+    for (const s of segmentsOf(path)) ctx.bezierCurveTo(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.p3.x, s.p3.y);
+    if (path.closed) ctx.closePath();
   }
 }
 

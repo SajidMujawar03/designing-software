@@ -61,6 +61,23 @@ describe('DesignDocument', () => {
     expect(doc.get(ids[1])!.index < doc.get(ids[2])!.index).toBe(true);
   });
 
+  it('scales vector paths when the box is resized', () => {
+    const { doc, page } = setup();
+    const id = doc.change(() =>
+      doc.createNode({
+        type: 'VECTOR',
+        parentId: page.id,
+        width: 100,
+        height: 50,
+        vectorPaths: [{ closed: false, points: [{ x: 0, y: 0, out: { x: 10, y: 10 } }, { x: 100, y: 50 }] }],
+      }),
+    );
+    doc.change(() => doc.updateNode(id, { width: 200 }));
+    const pts = doc.get(id)!.vectorPaths![0].points;
+    expect(pts[1]).toEqual({ x: 200, y: 50 });
+    expect(pts[0].out).toEqual({ x: 20, y: 10 });
+  });
+
   it('deletes descendants', () => {
     const { doc, page } = setup();
     const f = doc.change(() => doc.createNode({ type: 'FRAME', parentId: page.id }));

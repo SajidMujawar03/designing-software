@@ -1,5 +1,5 @@
 import type { NodeId, NodeType, SceneNode } from '@figma/document';
-import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import { useEffect, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -13,6 +13,7 @@ const ICONS: Partial<Record<NodeType, typeof Square>> = {
   ELLIPSE: Circle,
   LINE: Minus,
   TEXT: Type,
+  VECTOR: PenTool,
 };
 
 export function LayersPanel() {

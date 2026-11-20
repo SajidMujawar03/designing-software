@@ -1,6 +1,23 @@
 export type NodeId = string;
 
-export type NodeType = 'DOCUMENT' | 'PAGE' | 'FRAME' | 'GROUP' | 'RECTANGLE' | 'ELLIPSE' | 'LINE' | 'TEXT';
+export type NodeType = 'DOCUMENT' | 'PAGE' | 'FRAME' | 'GROUP' | 'RECTANGLE' | 'ELLIPSE' | 'LINE' | 'TEXT' | 'VECTOR';
+
+/** A point on a vector path, in the node's box coordinates. */
+export interface VectorVertex {
+  x: number;
+  y: number;
+  /** Incoming and outgoing curve handles, as offsets from the point. */
+  in?: { x: number; y: number };
+  out?: { x: number; y: number };
+  /** Smooth points keep their handles in line (and the same length when 'angle-length'). */
+  mirror?: 'none' | 'angle' | 'angle-length';
+}
+
+/** One contour of a vector. A vector can hold several. */
+export interface VectorPath {
+  closed: boolean;
+  points: VectorVertex[];
+}
 
 /** A ruler guide on a page, in canvas coordinates. */
 export interface Guide {
@@ -56,6 +73,9 @@ export interface SceneNode {
 
   // PAGE
   guides?: Guide[];
+
+  // VECTOR
+  vectorPaths?: VectorPath[];
 
   // TEXT
   characters?: string;

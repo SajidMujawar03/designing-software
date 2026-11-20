@@ -1,5 +1,6 @@
 import {
   localTransform,
+  pathData,
   worldBounds,
   worldTransform,
   type DesignDocument,
@@ -14,6 +15,7 @@ import type {
   FontWeight,
   Paint,
   Paragraph,
+  Path,
   Surface,
   TypefaceFontProvider,
 } from 'canvaskit-wasm';
@@ -46,6 +48,7 @@ export class CanvasKitRenderer implements SceneRenderer {
   /** "family/weight" → registered. */
   private registered = new Set<string>();
   private paragraphs = new Map<NodeId, CachedParagraph>();
+  private paths = new Map<NodeId, { d: string; path: Path }>();
   private unsubscribeFonts: () => void;
 
   constructor(
@@ -111,6 +114,8 @@ export class CanvasKitRenderer implements SceneRenderer {
   dispose(): void {
     this.unsubscribeFonts();
     this.clearParagraphs();
+    for (const { path } of this.paths.values()) path.delete();
+    this.paths.clear();
     this.paint.delete();
     this.fontProvider.delete();
     this.surface?.delete();
@@ -190,12 +195,29 @@ export class CanvasKitRenderer implements SceneRenderer {
       case 'LINE':
         c.drawLine(0, 0, n.width, 0, paint);
         break;
+      case 'VECTOR': {
+        const path = this.vectorPath(n);
+        if (path) c.drawPath(path, paint);
+        break;
+      }
       default: {
         const r = Math.max(0, Math.min(n.cornerRadius || 0, n.width / 2, n.height / 2));
         if (r > 0) c.drawRRect(ck.RRectXY(rect, r, r), paint);
         else c.drawRect(rect, paint);
       }
     }
+  }
+
+  /** Skia path for a vector node, cached until its paths change. */
+  private vectorPath(n: SceneNode): Path | null {
+    const d = pathData(n.vectorPaths ?? []);
+    const cached = this.paths.get(n.id);
+    if (cached?.d === d) return cached.path;
+    cached?.path.delete();
+    const path = d ? this.ck.Path.MakeFromSVGString(d) : null;
+    if (path) this.paths.set(n.id, { d, path });
+    else this.paths.delete(n.id);
+    return path;
   }
 
   private clip(c: Canvas, n: SceneNode): void {
@@ -315,8 +337,14 @@ export class CanvasKitRenderer implements SceneRenderer {
     this.paragraphs.clear();
   }
 
-  /** Frees paragraphs of deleted nodes. */
+  /** Frees paragraphs and paths of deleted nodes. */
   private pruneParagraphs(doc: DesignDocument): void {
+    for (const [id, { path }] of this.paths) {
+      if (!doc.has(id)) {
+        path.delete();
+        this.paths.delete(id);
+      }
+    }
     for (const [id, { paragraph }] of this.paragraphs) {
       if (!doc.has(id)) {
         paragraph.delete();

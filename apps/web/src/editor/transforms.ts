@@ -1,11 +1,13 @@
 import {
+  pathsBounds,
   worldBounds,
   worldTransform,
+  type VectorPath,
   type DesignDocument,
   type NodeId,
   type NodePatch,
 } from '@figma/document';
-import { applyToPoint, invert, rectUnion, type Rect, type Vec2 } from '@figma/geometry';
+import { applyToPoint, invert, rectUnion, type Mat2D, type Rect, type Vec2 } from '@figma/geometry';
 import { layoutText } from '@figma/renderer';
 
 /** Normalizes degrees to (-180, 180]. */
@@ -155,4 +157,42 @@ export function scaleBounds(doc: DesignDocument, ids: NodeId[], from: Rect, to: 
     doc.updateNode(id, placementIn(doc, n.parentId!, nc, worldRotation(doc, id), n.width * Math.abs(sx), height));
     fitText(doc, id);
   }
+}
+
+/** Applies a matrix to paths: points fully, handles (offsets) by the linear part only. */
+export function mapPaths(paths: VectorPath[], m: Mat2D): VectorPath[] {
+  const lin = (v: Vec2) => ({ x: m[0] * v.x + m[2] * v.y, y: m[1] * v.x + m[3] * v.y });
+  return paths.map((path) => ({
+    closed: path.closed,
+    points: path.points.map((v) => {
+      const p = applyToPoint(m, v);
+      return { ...v, x: p.x, y: p.y, in: v.in && lin(v.in), out: v.out && lin(v.out) };
+    }),
+  }));
+}
+
+/** A vector's paths in canvas coordinates. */
+export function worldPathsOf(doc: DesignDocument, id: NodeId): VectorPath[] {
+  const n = doc.get(id);
+  if (!n?.vectorPaths) return [];
+  return mapPaths(n.vectorPaths, worldTransform(doc, id));
+}
+
+/**
+ * Writes a vector's paths from canvas coordinates and refits its box tightly
+ * around them, keeping its rotation.
+ */
+export function setVectorWorld(doc: DesignDocument, id: NodeId, world: VectorPath[]): void {
+  const n = doc.get(id);
+  if (!n?.parentId) return;
+  const m = worldTransform(doc, id);
+  const local = mapPaths(world, invert(m));
+  const b = pathsBounds(local) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const shifted = local.map((path) => ({
+    closed: path.closed,
+    points: path.points.map((v) => ({ ...v, x: round(v.x - b.x), y: round(v.y - b.y) })),
+  }));
+  const center = applyToPoint(m, { x: b.x + b.width / 2, y: b.y + b.height / 2 });
+  const place = placementIn(doc, n.parentId, center, worldRotation(doc, id), b.width, b.height);
+  doc.updateNode(id, { ...place, width: b.width, height: b.height, vectorPaths: shifted });
 }

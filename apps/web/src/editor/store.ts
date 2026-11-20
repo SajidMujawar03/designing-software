@@ -1,9 +1,12 @@
 import type { NodeId } from '@figma/document';
-import type { Rect } from '@figma/geometry';
+import type { Rect, Vec2 } from '@figma/geometry';
 import { create } from 'zustand';
 import type { SnapGuides } from './snapping';
 
-export type ToolId = 'select' | 'frame' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'hand';
+export type ToolId = 'select' | 'frame' | 'rectangle' | 'ellipse' | 'line' | 'pen' | 'pencil' | 'text' | 'hand';
+
+/** A point on a vector path: [path index, point index]. */
+export type PointRef = [number, number];
 
 /** screen = world * zoom + (x, y) */
 export interface Viewport {
@@ -32,6 +35,10 @@ export interface UIState {
   /** Open context menu position (CSS px in the window). */
   contextMenu: { x: number; y: number } | null;
   paletteOpen: boolean;
+  /** Editing a vector's points and handles. */
+  vectorEdit: { id: NodeId; selected: PointRef[] } | null;
+  /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
+  penPreview: { from: Vec2; c1: Vec2; to: Vec2 } | null;
   /** Renderer the user prefers; CanvasKit falls back to Canvas 2D if it cannot start. */
   rendererPref: 'canvaskit' | 'canvas2d';
   /** Renderer actually drawing the canvas. */
@@ -62,6 +69,8 @@ export const useUI = create<UIState>()(() => ({
   showRulers: true,
   contextMenu: null,
   paletteOpen: false,
+  vectorEdit: null,
+  penPreview: null,
   rendererPref: storedRenderer(),
   activeRenderer: null,
 }));

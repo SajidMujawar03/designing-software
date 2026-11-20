@@ -1,4 +1,4 @@
-import { rgbToHex, worldBounds, worldTransform, type DesignDocument, type NodeId, type Paint, type SceneNode } from '@figma/document';
+import { pathData, rgbToHex, worldBounds, worldTransform, type DesignDocument, type NodeId, type Paint, type SceneNode } from '@figma/document';
 import { multiply, translation } from '@figma/geometry';
 import { layoutText } from './text';
 
@@ -50,6 +50,9 @@ function nodeToSvg(doc: DesignDocument, n: SceneNode, defs: string[]): string {
     }
     case 'ELLIPSE':
       body = `<ellipse cx="${n.width / 2}" cy="${n.height / 2}" rx="${n.width / 2}" ry="${n.height / 2}"${paintAttrs(n)}/>`;
+      break;
+    case 'VECTOR':
+      body = `<path d="${pathData(n.vectorPaths ?? [])}"${paintAttrs(n)}/>`;
       break;
     case 'LINE':
       body = `<line x1="0" y1="0" x2="${n.width}" y2="0"${paintAttrs(n)}/>`;

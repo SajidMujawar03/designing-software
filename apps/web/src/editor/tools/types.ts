@@ -23,6 +23,10 @@ export interface Tool {
   doubleClick?(e: ToolEvent): void;
   /** Escape or tool switch mid-gesture. */
   cancel?(): void;
+  /** The tool is being switched away from (finish any multi-click work). */
+  deactivate?(): void;
+  /** Keyboard input while this tool is active; return true if handled. */
+  key?(e: KeyboardEvent): boolean;
   cursor: string;
 }
 

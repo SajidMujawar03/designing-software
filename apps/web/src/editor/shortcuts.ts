@@ -8,6 +8,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
   r: 'rectangle',
   o: 'ellipse',
   l: 'line',
+  p: 'pen',
   t: 'text',
   h: 'hand',
 };
@@ -22,6 +23,10 @@ function isTyping(target: EventTarget | null): boolean {
 export function installShortcuts(): () => void {
   const onKeyDown = (e: KeyboardEvent) => {
     if (isTyping(e.target)) return;
+    if (!editor.ui.paletteOpen && editor.toolKey(e)) {
+      e.preventDefault();
+      return;
+    }
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     const ui = editor.ui;
@@ -82,6 +87,7 @@ export function installShortcuts(): () => void {
 
     if (e.shiftKey && !e.altKey) {
       if (e.code === 'KeyR') return run(() => editor.setUI({ showRulers: !ui.showRulers }));
+      if (e.code === 'KeyP') return run(() => editor.setTool('pencil'));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());
@@ -101,6 +107,7 @@ export function installShortcuts(): () => void {
         return run(() => {
           const sel = editor.selectedNodes();
           if (sel.length === 1 && sel[0].type === 'TEXT') editor.startTextEdit(sel[0].id);
+          else if (sel.length === 1 && sel[0].type === 'VECTOR') editor.enterVectorEdit(sel[0].id);
           else editor.selectChildren();
         });
       case 'ArrowLeft':
