@@ -8,6 +8,7 @@ import type { PointRef } from '../store';
 import { visibleHandles } from '../tools/vector';
 import { worldPathsOf } from '../transforms';
 import { drawGradientHandles } from './gradientHandles';
+import { textEngine } from '../textEngine';
 import { drawRulers } from './rulers';
 
 export const BLUE = '#0D99FF';
@@ -183,6 +184,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(w), Math.round(h));
   }
 
+  drawTextEditing(ctx, ed, dpr);
   drawGradientHandles(ctx, ed);
   if (ed.ui.showRulers) drawRulers(ctx, ed);
 
@@ -274,4 +276,33 @@ function drawVectorEdit(ctx: CanvasRenderingContext2D, ed: Editor, paths: Vector
       ctx.stroke();
     }),
   );
+}
+
+/** Selection highlight and blinking caret for the text being edited. */
+function drawTextEditing(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number): void {
+  const id = ed.ui.editingTextId;
+  const sel = ed.ui.textSelection;
+  const n = ed.doc.get(id);
+  const eng = textEngine();
+  if (!n || !sel || !eng) return;
+  const v = ed.ui.viewport;
+  const m = multiply([dpr, 0, 0, dpr, 0, 0], multiply([v.zoom, 0, 0, v.zoom, v.x, v.y], worldTransform(ed.doc, n.id)));
+  ctx.save();
+  ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+  const start = Math.min(sel.anchor, sel.focus);
+  const end = Math.max(sel.anchor, sel.focus);
+  if (end > start) {
+    ctx.fillStyle = 'rgba(13, 153, 255, 0.3)';
+    for (const r of eng.selectionRects(n, ed.doc, start, end)) ctx.fillRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
+  } else {
+    // Solid right after a move, then blinking.
+    const solid = Date.now() - ed.ui.caretTick < 500;
+    if (solid || ed.ui.caretBlink) {
+      const c = eng.caret(n, ed.doc, sel.focus);
+      const w = 1.5 / (v.zoom * dpr) * dpr;
+      ctx.fillStyle = '#1E1E1E';
+      ctx.fillRect(c.x - w / 2, c.y, w, c.height);
+    }
+  }
+  ctx.restore();
 }

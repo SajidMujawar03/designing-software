@@ -341,7 +341,7 @@ export class SelectTool implements Tool {
       if (child) this.ed.select([child]);
       return;
     }
-    if (hit.type === 'TEXT') this.ed.startTextEdit(hit.id);
+    if (hit.type === 'TEXT') this.ed.startTextEdit(hit.id, false, e.world);
     else if (hit.type === 'VECTOR') this.ed.enterVectorEdit(hit.id);
   }
 }

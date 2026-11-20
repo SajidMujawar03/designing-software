@@ -179,7 +179,7 @@ export class TextTool implements Tool {
 
     const existing = hitTest(doc, this.ed.pageId, s.world);
     if (existing?.type === 'TEXT') {
-      this.ed.startTextEdit(existing.id);
+      this.ed.startTextEdit(existing.id, false, s.world);
       return;
     }
 

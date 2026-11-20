@@ -1,4 +1,5 @@
 import {
+  baseTextStyle,
   gradientMatrix,
   isGroupLike,
   paintColor,
@@ -25,6 +26,8 @@ const num = (v: number) => String(Math.round(v * 1000) / 1000);
 export interface SvgOptions {
   /** SVG path data for a boolean operation's result, in the boolean's space. */
   booleanPathData?: (id: NodeId) => string | null;
+  /** Positioned, styled text spans (from the Skia layout) for rich text. */
+  textSpans?: (n: SceneNode) => Array<{ text: string; x: number; y: number; style: ReturnType<typeof baseTextStyle> }> | null;
 }
 
 /** State for one export: collected <defs> and a counter for unique ids. */
@@ -230,7 +233,27 @@ function nodeToSvg(c: SvgContext, n: SceneNode): string {
   const children = () => childrenSvg(c, doc.children(n.id));
   let body = '';
 
-  if (n.type === 'TEXT') {
+  const spans = n.type === 'TEXT' ? c.options.textSpans?.(n) : null;
+  if (n.type === 'TEXT' && spans) {
+    const top = [...n.fills].reverse().find((f) => f.visible);
+    const layer = top ? paintColor(top) : null;
+    const tspans = spans
+      .map((s) => {
+        const color = s.style.color
+          ? { hex: s.style.color.slice(0, 6), a: s.style.color.length >= 8 ? parseInt(s.style.color.slice(6, 8), 16) / 255 : 1 }
+          : layer
+            ? { hex: rgbToHex(layer.color), a: layer.opacity }
+            : null;
+        const deco = s.style.textDecoration === 'UNDERLINE' ? ' text-decoration="underline"' : s.style.textDecoration === 'STRIKETHROUGH' ? ' text-decoration="line-through"' : '';
+        return (
+          `<tspan x="${num(s.x)}" y="${num(s.y)}" font-family="${esc(s.style.fontFamily)}" font-size="${num(s.style.fontSize)}" font-weight="${s.style.fontWeight}"` +
+          `${s.style.italic ? ' font-style="italic"' : ''}${s.style.letterSpacing ? ` letter-spacing="${num(s.style.letterSpacing)}"` : ''}${deco}` +
+          ` fill="${color ? '#' + color.hex : 'none'}"${color && color.a < 1 ? ` fill-opacity="${num(color.a)}"` : ''}>${esc(s.text)}</tspan>`
+        );
+      })
+      .join('');
+    body = `<text xml:space="preserve">${tspans}</text>`;
+  } else if (n.type === 'TEXT') {
     const layout = layoutText(n);
     const top = [...n.fills].reverse().find((f) => f.visible);
     const color = top ? paintColor(top) : null;

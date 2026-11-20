@@ -2,7 +2,6 @@ import {
   effectOutset,
   isGroupLike,
   localTransform,
-  paintColor,
   pathData,
   shapePaths,
   worldBounds,
@@ -19,22 +18,15 @@ import { IDENTITY, multiply, rectIntersects, transformRect, type Mat2D, type Rec
 import type {
   Canvas,
   CanvasKit,
-  FontWeight,
   Paint,
-  Paragraph,
   Path,
   Surface,
-  TypefaceFontProvider,
 } from 'canvaskit-wasm';
 import { CkPaints, toCk } from './ckpaint';
 import { booleanKey, booleanPath } from './pathops';
+import { SkText } from './textlayout';
 import type { FontRegistry, SceneOptions, SceneRenderer } from './types';
 
-
-interface CachedParagraph {
-  key: string;
-  paragraph: Paragraph;
-}
 
 interface DrawContext {
   /** Visible area in canvas space, for culling. */
@@ -51,31 +43,29 @@ export class CanvasKitRenderer implements SceneRenderer {
   private surface: Surface | null = null;
   private dpr = 1;
   private paint: Paint;
-  private fontProvider: TypefaceFontProvider;
-  /** "family/weight" → registered. */
-  private registered = new Set<string>();
-  private paragraphs = new Map<NodeId, CachedParagraph>();
   private paths = new Map<NodeId, { d: string; path: Path }>();
   /** Document being drawn (boolean results need the whole subtree). */
   private doc: DesignDocument | null = null;
   private paints: CkPaints;
   private unsubscribeFonts: () => void;
+  /** Text layout, shared with the editor (caret and selection) when it passes one in. */
+  private text: SkText;
+  private ownsText: boolean;
 
   constructor(
     private ck: CanvasKit,
     private canvas: HTMLCanvasElement,
-    private fonts: FontRegistry,
+    fonts: FontRegistry,
     onFontsChanged: () => void,
+    text?: SkText,
   ) {
     this.paint = new ck.Paint();
     this.paint.setAntiAlias(true);
     this.paints = new CkPaints(ck);
-    this.fontProvider = ck.TypefaceFontProvider.Make();
-    this.unsubscribeFonts = fonts.onLoad(() => {
-      // Paragraphs laid out with a fallback must be rebuilt with the real font.
-      this.clearParagraphs();
-      onFontsChanged();
-    });
+    this.text = text ?? new SkText(ck, fonts);
+    this.ownsText = !text;
+    // Layouts made with a fallback font are rebuilt once the real font arrives.
+    this.unsubscribeFonts = fonts.onLoad(onFontsChanged);
   }
 
   resize(width: number, height: number, dpr: number): void {
@@ -99,7 +89,7 @@ export class CanvasKitRenderer implements SceneRenderer {
     this.drawChildren(c, doc, doc.children(pageId), IDENTITY, ctx);
     c.restore();
     surface.flush();
-    this.pruneParagraphs(doc);
+    this.prune(doc);
   }
 
   async exportPng(doc: DesignDocument, id: NodeId, scale: number): Promise<Blob | null> {
@@ -126,12 +116,11 @@ export class CanvasKitRenderer implements SceneRenderer {
 
   dispose(): void {
     this.unsubscribeFonts();
-    this.clearParagraphs();
+    if (this.ownsText) this.text.dispose();
     for (const { path } of this.paths.values()) path.delete();
     this.paths.clear();
     this.paint.delete();
     this.paints.dispose();
-    this.fontProvider.delete();
     this.surface?.delete();
     this.surface = null;
   }
@@ -452,102 +441,18 @@ export class CanvasKitRenderer implements SceneRenderer {
   // ------------------------------------------------------------ text
 
   private drawText(c: Canvas, n: SceneNode): void {
-    const p = this.paragraph(n);
-    if (p) c.drawParagraph(p, 0, 0);
+    if (!(n.characters ?? '')) return;
+    const layout = this.text.layout(n, this.doc!);
+    c.drawParagraph(layout.paragraph, 0, layout.offsetY);
   }
 
-  /** Lays out (and caches) a text node's paragraph; null while its font is loading. */
-  private paragraph(n: SceneNode): Paragraph | null {
-    const top = [...n.fills].reverse().find((f) => f.visible);
-    if (!top || !(n.characters ?? '')) return null;
-    // Text uses one flat color for now (gradient and image text come with rich text).
-    const fill = paintColor(top);
-    const family = n.fontFamily ?? 'Inter';
-    const font = this.fonts.get(family, n.fontWeight ?? 400);
-    if (!font) return null;
-    const regKey = `${family}/${font.resolvedWeight}`;
-    if (!this.registered.has(regKey)) {
-      this.fontProvider.registerFont(font.data, family);
-      this.registered.add(regKey);
-    }
-
-    const key = JSON.stringify([
-      n.characters,
-      family,
-      font.resolvedWeight,
-      n.fontSize,
-      n.lineHeight,
-      n.letterSpacing,
-      n.textAlign,
-      n.textAutoResize,
-      n.width,
-      fill,
-    ]);
-    const cached = this.paragraphs.get(n.id);
-    if (cached?.key === key) return cached.paragraph;
-    cached?.paragraph.delete();
-
-    const ck = this.ck;
-    const align = n.textAlign === 'CENTER' ? ck.TextAlign.Center : n.textAlign === 'RIGHT' ? ck.TextAlign.Right : ck.TextAlign.Left;
-    const style = new ck.ParagraphStyle({
-      textAlign: align,
-      textStyle: {
-        color: ck.Color4f(fill.color.r, fill.color.g, fill.color.b, fill.opacity),
-        fontFamilies: [family],
-        fontSize: n.fontSize ?? 16,
-        fontStyle: { weight: this.weight(font.resolvedWeight) },
-        letterSpacing: n.letterSpacing ?? 0,
-        heightMultiplier: n.lineHeight ?? 1.2,
-        halfLeading: true,
-      },
-    });
-    const builder = ck.ParagraphBuilder.MakeFromFontProvider(style, this.fontProvider);
-    builder.addText(n.characters ?? '');
-    const paragraph = builder.build();
-    builder.delete();
-
-    if (n.textAutoResize === 'WIDTH_AND_HEIGHT') {
-      // Auto-width text never wraps: lay out wide, then at its natural width
-      // (or the box width, whichever is larger) so alignment matches the box.
-      paragraph.layout(1e6);
-      paragraph.layout(Math.max(n.width, Math.ceil(paragraph.getMaxIntrinsicWidth())) + 0.01);
-    } else {
-      paragraph.layout(Math.max(1, n.width));
-    }
-    this.paragraphs.set(n.id, { key, paragraph });
-    return paragraph;
-  }
-
-  private weight(w: number): FontWeight {
-    const W = this.ck.FontWeight;
-    if (w <= 100) return W.Thin;
-    if (w <= 200) return W.ExtraLight;
-    if (w <= 300) return W.Light;
-    if (w <= 400) return W.Normal;
-    if (w <= 500) return W.Medium;
-    if (w <= 600) return W.SemiBold;
-    if (w <= 700) return W.Bold;
-    if (w <= 800) return W.ExtraBold;
-    return W.Black;
-  }
-
-  private clearParagraphs(): void {
-    for (const { paragraph } of this.paragraphs.values()) paragraph.delete();
-    this.paragraphs.clear();
-  }
-
-  /** Frees paragraphs and paths of deleted nodes. */
-  private pruneParagraphs(doc: DesignDocument): void {
+  /** Frees layouts and paths of deleted nodes. */
+  private prune(doc: DesignDocument): void {
+    this.text.prune(doc);
     for (const [id, { path }] of this.paths) {
       if (!doc.has(id)) {
         path.delete();
         this.paths.delete(id);
-      }
-    }
-    for (const [id, { paragraph }] of this.paragraphs) {
-      if (!doc.has(id)) {
-        paragraph.delete();
-        this.paragraphs.delete(id);
       }
     }
   }

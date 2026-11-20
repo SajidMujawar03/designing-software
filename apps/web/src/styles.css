@@ -991,3 +991,23 @@ button.swatch {
   flex: 1;
   min-width: 0;
 }
+
+/* Invisible keyboard target for on-canvas text editing (kept at the caret for IME windows). */
+.text-input {
+  position: absolute;
+  width: 1px;
+  height: 1em;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  opacity: 0;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  caret-color: transparent;
+}
+
+.case-select {
+  width: 104px;
+}

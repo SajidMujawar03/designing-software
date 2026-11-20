@@ -2,7 +2,7 @@ import { generateKeyBetween } from 'fractional-indexing';
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { defaultProps } from './defaults';
-import { isGroupLike, type NodeId, type NodePatch, type NodeType, type SceneNode } from './types';
+import { isGroupLike, type NodeId, type NodePatch, type NodeType, type SceneNode, type TextRun, type TextStyleProps } from './types';
 import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
@@ -195,7 +195,11 @@ export class DesignDocument {
     patch = this.withScaledPaths(id, patch);
     this.change(() => {
       for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined) continue;
+        if (v === undefined || k === 'textRuns') continue;
+        if (k === 'characters') {
+          this.replaceText(y, v as string);
+          continue;
+        }
         if (!shallowEqual(y.get(k), v)) y.set(k, v);
       }
       this.refresh(id, 'parentId' in patch || 'index' in patch);
@@ -299,6 +303,74 @@ export class DesignDocument {
     return [...this.nodes.values()];
   }
 
+  // ---------------------------------------------------------------- text editing
+
+  /** The node's text, upgrading a plain string (older files) to Y.Text. */
+  private yText(id: NodeId): Y.Text | null {
+    const y = this.yNodes.get(id);
+    if (!y) return null;
+    const v = y.get('characters');
+    if (v instanceof Y.Text) return v;
+    const t = new Y.Text();
+    t.insert(0, typeof v === 'string' ? v : '');
+    y.set('characters', t);
+    return t;
+  }
+
+  private replaceText(y: YNode, text: string): void {
+    const t = y.get('characters');
+    if (!(t instanceof Y.Text)) {
+      const fresh = new Y.Text();
+      fresh.insert(0, text);
+      y.set('characters', fresh);
+      return;
+    }
+    const old = t.toString();
+    if (old === text) return;
+    // Keep formatting where possible: replace only the part that changed.
+    let a = 0;
+    while (a < old.length && a < text.length && old[a] === text[a]) a++;
+    let b = 0;
+    while (b < old.length - a && b < text.length - a && old[old.length - 1 - b] === text[text.length - 1 - b]) b++;
+    if (old.length - a - b > 0) t.delete(a, old.length - a - b);
+    if (text.length - a - b > 0) t.insert(a, text.slice(a, text.length - b));
+  }
+
+  /**
+   * Inserts text at a character index. Without `style`, it takes the style
+   * of the character before it (as typing does); `style` sets it exactly.
+   */
+  insertText(id: NodeId, index: number, text: string, style?: TextStyleProps): void {
+    this.change(() => {
+      const t = this.yText(id);
+      if (!t || !text) return;
+      const at = Math.max(0, Math.min(index, t.length));
+      if (style) t.insert(at, text, cleanStyle(style));
+      else t.insert(at, text);
+      this.refresh(id, false);
+    }, { merge: true });
+  }
+
+  deleteText(id: NodeId, index: number, length: number): void {
+    this.change(() => {
+      const t = this.yText(id);
+      if (!t || length <= 0) return;
+      const at = Math.max(0, Math.min(index, t.length));
+      t.delete(at, Math.min(length, t.length - at));
+      this.refresh(id, false);
+    }, { merge: true });
+  }
+
+  /** Sets (or, with null values, clears) character styles on a range. */
+  formatText(id: NodeId, index: number, length: number, style: { [K in keyof TextStyleProps]?: TextStyleProps[K] | null }): void {
+    this.change(() => {
+      const t = this.yText(id);
+      if (!t || length <= 0) return;
+      t.format(index, length, style as Record<string, unknown>);
+      this.refresh(id, false);
+    }, { merge: true });
+  }
+
   // ---------------------------------------------------------------- internals
 
   /** Resizing a vector's box scales its paths with it (unless new paths are given). */
@@ -339,7 +411,8 @@ export class DesignDocument {
         for (const key of e.changes.keys.keys()) changed.add(key);
         this.childrenDirty = true;
       } else {
-        const id = (e.target as YNode).get('id') as NodeId | undefined;
+        const target = e.target instanceof Y.Text ? (e.target.parent as YNode) : (e.target as YNode);
+        const id = target?.get('id') as NodeId | undefined;
         if (id) changed.add(id);
         if (e instanceof Y.YMapEvent && (e.keysChanged.has('parentId') || e.keysChanged.has('index'))) {
           this.childrenDirty = true;
@@ -398,16 +471,51 @@ function indexAboveIn(siblings: NodeId[], nodes: Map<NodeId, SceneNode>, aboveId
 
 function toY(obj: Record<string, unknown>): YNode {
   const y = new Y.Map<unknown>();
-  for (const [k, v] of Object.entries(obj)) if (v !== undefined) y.set(k, v);
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined || k === 'textRuns') continue;
+    if (k === 'characters' && typeof v === 'string') {
+      const t = new Y.Text();
+      t.insert(0, v);
+      // Runs given at creation (paste, duplicate) become formatting.
+      for (const r of (obj.textRuns as TextRun[] | undefined) ?? []) t.format(r.start, r.end - r.start, runAttrs(r));
+      y.set(k, t);
+    } else y.set(k, v);
+  }
   return y;
 }
 
+/** Style attributes of a run (without its range). */
+function runAttrs(r: TextRun): Record<string, unknown> {
+  const { start: _s, end: _e, ...style } = r;
+  return style;
+}
+
 function snapshot(id: NodeId, y: YNode): SceneNode {
-  return { ...(y.toJSON() as SceneNode), id };
+  const n = { ...(y.toJSON() as SceneNode), id };
+  const t = y.get('characters');
+  if (t instanceof Y.Text) n.textRuns = runsOf(t);
+  return n;
+}
+
+/** Formatted ranges of a Y.Text (only those with attributes). */
+function runsOf(t: Y.Text): TextRun[] {
+  const runs: TextRun[] = [];
+  let pos = 0;
+  for (const op of t.toDelta() as Array<{ insert: string; attributes?: Record<string, unknown> }>) {
+    const len = typeof op.insert === 'string' ? op.insert.length : 1;
+    if (op.attributes && Object.keys(op.attributes).length) runs.push({ start: pos, end: pos + len, ...(op.attributes as TextStyleProps) });
+    pos += len;
+  }
+  return runs;
 }
 
 function shallowEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a === 'object' && typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
   return false;
+}
+
+/** Drops undefined values (Yjs stores them as real attributes). */
+function cleanStyle(style: TextStyleProps): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined));
 }
