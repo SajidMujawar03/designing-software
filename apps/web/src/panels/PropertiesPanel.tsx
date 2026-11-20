@@ -34,7 +34,8 @@ import { useState } from 'react';
 import { editor } from '../editor/editor';
 import { exportJson, exportPng, exportSvgFile } from '../editor/export';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from '../editor/pathCommands';
-import { FONT_FAMILIES, weightsOf } from '../editor/fonts';
+import { rememberFont, weightsOf } from '../editor/fonts';
+import { FontPicker } from './FontPicker';
 import { useDocVersion } from '../editor/hooks';
 import * as TextEdit from '../editor/textEditing';
 import { useUI } from '../editor/store';
@@ -233,17 +234,13 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
 
   return (
     <Section title={editing && TextEdit.range().end > TextEdit.range().start ? 'Text · selection' : 'Text'}>
-      <select
-        className="select"
-        value={family === MIXED ? '' : family}
-        onChange={(e) => setStyle({ fontFamily: e.target.value })}
-        aria-label="Font family"
-      >
-        {family === MIXED && <option value="">Mixed</option>}
-        {FONT_FAMILIES.map((f) => (
-          <option key={f}>{f}</option>
-        ))}
-      </select>
+      <FontPicker
+        value={family === MIXED ? null : family}
+        onPick={(f) => {
+          rememberFont(f);
+          setStyle({ fontFamily: f });
+        }}
+      />
       <div className="grid2">
         <select
           className="select"

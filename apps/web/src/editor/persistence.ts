@@ -1,5 +1,6 @@
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { editor } from './editor';
+import { fonts } from './fonts';
 
 const FILE_KEY = 'figma-clone:file:default';
 
@@ -12,6 +13,8 @@ export function startPersistence(): Promise<void> {
       if (done) return;
       done = true;
       editor.onReady();
+      // Google Fonts used in the file need the catalog to load.
+      void fonts.loadCatalog();
       resolve();
     };
     provider.once('synced', finish);

@@ -1011,3 +1011,136 @@ button.swatch {
 .case-select {
   width: 104px;
 }
+
+/* ---------- font picker ---------- */
+
+.font-picker {
+  position: relative;
+}
+
+.font-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.font-button .font-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+.font-button .missing {
+  color: #e8a400;
+  flex-shrink: 0;
+}
+
+.font-list {
+  position: absolute;
+  right: 0;
+  top: 32px;
+  z-index: 45;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+.font-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.font-search input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.font-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chip {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.chip.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.font-rows {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.font-heading {
+  padding: 8px 12px 4px;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.font-row {
+  display: block;
+  width: 100%;
+  padding: 5px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.font-row.active {
+  background: var(--hover);
+}
+
+.font-row.current {
+  color: var(--blue);
+}
+
+.font-footer {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.font-footer .btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+}
