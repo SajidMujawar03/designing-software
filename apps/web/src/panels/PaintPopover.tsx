@@ -36,6 +36,15 @@ function writePaint(next: Paint, live: boolean): void {
   const pe = editor.ui.paintEdit;
   if (!pe) return;
   const doc = editor.doc;
+  if (pe.styleId) {
+    const style = doc.getStyle(pe.styleId);
+    if (style?.type !== 'FILL') return;
+    const paints = [...style.paints];
+    paints[pe.index] = next;
+    if (live) doc.updateStyle(pe.styleId, { paints });
+    else doc.change(() => doc.updateStyle(pe.styleId!, { paints }));
+    return;
+  }
   const run = () => {
     for (const id of pe.ids) {
       const n = doc.get(id);
@@ -85,7 +94,8 @@ export function PaintPopover() {
   }, [pe]);
 
   const node = pe && editor.doc.get(pe.ids[0]);
-  const paint = node?.[pe!.prop][pe!.index];
+  const editedStyle = pe?.styleId ? editor.doc.getStyle(pe.styleId) : undefined;
+  const paint = editedStyle?.type === 'FILL' ? editedStyle.paints[pe!.index] : node?.[pe!.prop][pe!.index];
   // The layer or paint went away (undo, delete): close.
   useEffect(() => {
     if (pe && !paint) editor.setUI({ paintEdit: null });
@@ -116,13 +126,14 @@ export function PaintPopover() {
     <div ref={ref} className="paint-popover" style={{ top, right: 252 }} role="dialog" aria-label="Edit paint">
       <div className="popover-head">
         <select className="select" value={paint.type} onChange={(e) => void changeKind(e.target.value as Kind)} aria-label="Paint type">
-          {KINDS.filter(([k]) => node!.type !== 'PAGE' || k === 'SOLID').map(([k, label]) => (
+          {KINDS.filter(([k]) => node?.type !== 'PAGE' || k === 'SOLID').map(([k, label]) => (
             <option key={k} value={k}>
               {label}
             </option>
           ))}
         </select>
         <span className="spacer" />
+        {editedStyle && <span className="hint">{editedStyle.name}</span>}
         <IconButton title="Close" onClick={() => editor.setUI({ paintEdit: null })}>
           <X size={14} />
         </IconButton>
@@ -246,7 +257,8 @@ function GradientEditor({ paint }: { paint: GradientPaint }) {
 
 function ImageEditor() {
   const pe = useUI((s) => s.paintEdit)!;
-  const paint = editor.doc.get(pe.ids[0])?.[pe.prop][pe.index];
+  const st = pe.styleId ? editor.doc.getStyle(pe.styleId) : undefined;
+  const paint = st?.type === 'FILL' ? st.paints[pe.index] : editor.doc.get(pe.ids[0])?.[pe.prop][pe.index];
   if (!paint || paint.type !== 'IMAGE') return null;
   const replace = async () => {
     const [file] = await pickImageFiles(false);

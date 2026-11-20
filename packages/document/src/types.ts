@@ -152,6 +152,8 @@ export interface TextStyleProps {
   textCase?: TextCase;
   /** Range color as 8-digit hex (RRGGBBAA); the layer's fills otherwise. */
   color?: string;
+  /** Shared text style this range uses (null once detached). */
+  textStyleId?: string | null;
 }
 
 /** A range of characters [start, end) with style overrides. */
@@ -228,7 +230,41 @@ export interface SceneNode {
   textAutoResize?: TextAutoResize;
   /** Ranges whose style differs from the layer's (derived from the text; read-only). */
   textRuns?: TextRun[];
+
+  // Shared styles in use (null once detached).
+  fillStyleId?: string | null;
+  strokeStyleId?: string | null;
+  effectStyleId?: string | null;
+  textStyleId?: string | null;
 }
+
+/** Text properties a text style controls (color comes from fills, as in Figma). */
+export type TextStyleValues = Required<Omit<TextStyleProps, 'color' | 'textStyleId'>>;
+
+interface StyleBase {
+  id: string;
+  /** Slashes group styles into folders, e.g. "Brand/Primary". */
+  name: string;
+  description?: string;
+}
+
+export interface FillStyle extends StyleBase {
+  type: 'FILL';
+  paints: Paint[];
+}
+
+export interface TextStyle extends StyleBase {
+  type: 'TEXT';
+  text: TextStyleValues;
+}
+
+export interface EffectStyle extends StyleBase {
+  type: 'EFFECT';
+  effects: Effect[];
+}
+
+export type SharedStyle = FillStyle | TextStyle | EffectStyle;
+export type StyleType = SharedStyle['type'];
 
 export type NodeProps = Omit<SceneNode, 'id' | 'parentId' | 'index'>;
 export type NodePatch = Partial<NodeProps>;

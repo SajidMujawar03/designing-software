@@ -1,4 +1,4 @@
-import { baseTextStyle, defaultEffect, hexToRgb, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
+import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   AlignJustify,
   ArrowDownToLine,
@@ -41,6 +41,7 @@ import * as TextEdit from '../editor/textEditing';
 import { useUI } from '../editor/store';
 import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
 import { ColorPicker } from './ColorPicker';
+import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -232,8 +233,56 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const resize = nodeVal('textAutoResize');
   const weightList = weightOptions(family === MIXED ? MIXED : family);
 
+  // The text style in use: the selected range's while editing, the layer's otherwise.
+  const textStyleId = editing
+    ? (() => {
+        const n = nodes[0];
+        const r = TextEdit.range();
+        const at = r.start === r.end ? Math.max(0, r.start - 1) : r.start;
+        const run = (n.textRuns ?? []).find((x) => at >= x.start && at < x.end);
+        return run?.textStyleId ?? n.textStyleId ?? null;
+      })()
+    : common(nodes.map((n) => n.textStyleId ?? null));
+  const textStyle = textStyleId && textStyleId !== MIXED ? editor.doc.getStyle(textStyleId) : undefined;
+  const applyTextStyleHere = (sid: string) => {
+    editor.doc.change(() => {
+      const r = TextEdit.range();
+      for (const n of nodes) {
+        editor.doc.applyTextStyle(n.id, sid, editing && r.end > r.start ? r : undefined);
+        fitText(editor.doc, n.id);
+      }
+    });
+  };
+
   return (
-    <Section title={editing && TextEdit.range().end > TextEdit.range().start ? 'Text · selection' : 'Text'}>
+    <Section
+      title={editing && TextEdit.range().end > TextEdit.range().start ? 'Text · selection' : 'Text'}
+      actions={
+        <StyleMenu
+          type="TEXT"
+          title="Text styles"
+          onPick={(sid) => applyTextStyleHere(sid)}
+          onCreate={(name) =>
+            editor.doc.change(() => {
+              const values = textStyleValues(editing ? TextEdit.currentStyle()! : baseTextStyle(nodes[0]));
+              const sid = editor.doc.createStyle({ type: 'TEXT', name, text: values });
+              applyTextStyleHere(sid);
+            })
+          }
+        />
+      }
+    >
+      {textStyle && (
+        <StyleRow
+          style={textStyle}
+          onDetach={() => {
+            if (editing) {
+              const r = TextEdit.range();
+              if (r.end > r.start) editor.doc.change(() => editor.doc.formatText(nodes[0].id, r.start, r.end - r.start, { textStyleId: null }));
+            } else apply(ids, { textStyleId: null });
+          }}
+        />
+      )}
       <FontPicker
         value={family === MIXED ? null : family}
         onPick={(f) => {
@@ -398,17 +447,56 @@ function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]
     });
   const set = (next: Paint[], live: boolean) => apply(ids, { [prop]: next } as NodePatch, live);
   const paintEdit = useUI((s) => s.paintEdit);
+  const styleKey = prop === 'fills' ? 'fillStyleId' : 'strokeStyleId';
+  const styleId = common(nodes.map((n) => n[styleKey] ?? null));
+  const style = styleId !== MIXED ? editor.doc.getStyle(styleId) : undefined;
 
   return (
     <Section
       title={title}
       actions={
-        <IconButton title={`Add ${title.toLowerCase()}`} onClick={add}>
-          <Plus size={14} />
-        </IconButton>
+        <>
+          <StyleMenu
+            type="FILL"
+            title={`${title} styles`}
+            onPick={(sid) => editor.doc.change(() => ids.forEach((id) => editor.doc.applyStyle(id, sid, prop)))}
+            onCreate={
+              paints !== MIXED && paints.length
+                ? (name) =>
+                    editor.doc.change(() => {
+                      const sid = editor.doc.createStyle({ type: 'FILL', name, paints });
+                      ids.forEach((id) => editor.doc.applyStyle(id, sid, prop));
+                    })
+                : undefined
+            }
+          />
+          {!style && (
+            <IconButton title={`Add ${title.toLowerCase()}`} onClick={add}>
+              <Plus size={14} />
+            </IconButton>
+          )}
+        </>
       }
     >
-      {paints === MIXED ? (
+      {style ? (
+        <StyleRow
+          style={style}
+          onDetach={() => apply(ids, { [styleKey]: null } as NodePatch)}
+          onEdit={() => {
+            const row = document.activeElement?.closest('.paint-row')?.getBoundingClientRect();
+            editor.setUI({
+              paintEdit: {
+                ids: [],
+                prop,
+                index: Math.max(0, (style.type === 'FILL' ? style.paints.length : 1) - 1),
+                stop: 0,
+                anchor: { x: row?.left ?? 800, y: row?.top ?? 200 },
+                styleId: style.id,
+              },
+            });
+          }}
+        />
+      ) : paints === MIXED ? (
         <div className="hint">Mixed — click + to replace</div>
       ) : (
         [...paints]
@@ -487,6 +575,7 @@ function PageProperties() {
           onRemove={() => apply([page.id], { fills: [] })}
         />
       </Section>
+      <LocalStyles />
       <Section title="File">
         <button type="button" className="btn" onClick={exportJson}>
           Export file as JSON
@@ -854,23 +943,45 @@ function EffectsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const list = effects === MIXED ? [] : effects;
   const update = (i: number, patch: Partial<Effect>, live = false) =>
     set(list.map((e, j) => (j === i ? ({ ...e, ...patch } as Effect) : e)), live);
+  const effectStyleId = common(nodes.map((n) => n.effectStyleId ?? null));
+  const effectStyle = effectStyleId !== MIXED ? editor.doc.getStyle(effectStyleId) : undefined;
 
   return (
     <Section
       title="Effects"
       actions={
-        <IconButton
-          title="Add effect"
-          onClick={() => {
-            set([...(effects === MIXED ? [] : effects), defaultEffect('DROP_SHADOW')]);
-            setOpen(list.length);
-          }}
-        >
-          <Plus size={14} />
-        </IconButton>
+        <>
+          <StyleMenu
+            type="EFFECT"
+            title="Effect styles"
+            onPick={(sid) => editor.doc.change(() => ids.forEach((id) => editor.doc.applyStyle(id, sid, 'effects')))}
+            onCreate={
+              list.length
+                ? (name) =>
+                    editor.doc.change(() => {
+                      const sid = editor.doc.createStyle({ type: 'EFFECT', name, effects: list });
+                      ids.forEach((id) => editor.doc.applyStyle(id, sid, 'effects'));
+                    })
+                : undefined
+            }
+          />
+          {!effectStyle && (
+            <IconButton
+              title="Add effect"
+              onClick={() => {
+                set([...(effects === MIXED ? [] : effects), defaultEffect('DROP_SHADOW')]);
+                setOpen(list.length);
+              }}
+            >
+              <Plus size={14} />
+            </IconButton>
+          )}
+        </>
       }
     >
-      {effects === MIXED ? (
+      {effectStyle ? (
+        <StyleRow style={effectStyle} onDetach={() => apply(ids, { effectStyleId: null })} />
+      ) : effects === MIXED ? (
         <div className="hint">Mixed — click + to replace</div>
       ) : (
         list.map((e, i) => (

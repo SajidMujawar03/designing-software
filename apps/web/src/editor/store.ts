@@ -59,6 +59,8 @@ export interface UIState {
     stop: number;
     /** Where the popover opens (window coords of the paint row). */
     anchor: { x: number; y: number };
+    /** Editing a color style's paint instead of layers' paints. */
+    styleId?: string;
   } | null;
   /** Caret (anchor = focus) or selection while editing text. */
   textSelection: { anchor: number; focus: number } | null;

@@ -1144,3 +1144,96 @@ button.swatch {
   width: 100%;
   justify-content: center;
 }
+
+/* ---------- styles ---------- */
+
+.style-menu {
+  position: relative;
+}
+
+.style-list {
+  position: absolute;
+  right: 0;
+  top: 28px;
+  z-index: 45;
+  width: 240px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+  font-weight: 400;
+}
+
+.style-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.style-item:hover {
+  background: var(--hover);
+}
+
+.style-item.create {
+  color: var(--blue);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.style-create {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.style-preview {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.style-preview.text {
+  display: grid;
+  place-items: center;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.style-preview.effect {
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.style-row .paint-label {
+  font-weight: 500;
+}
+
+.local-style .name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.style-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0 8px 26px;
+}
+
+.font-heading.flush {
+  padding-left: 0;
+}

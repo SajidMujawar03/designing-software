@@ -2,7 +2,19 @@ import { generateKeyBetween } from 'fractional-indexing';
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { defaultProps } from './defaults';
-import { isGroupLike, type NodeId, type NodePatch, type NodeType, type SceneNode, type TextRun, type TextStyleProps } from './types';
+import {
+  isGroupLike,
+  type EffectStyle,
+  type FillStyle,
+  type NodeId,
+  type NodePatch,
+  type NodeType,
+  type SceneNode,
+  type SharedStyle,
+  type TextRun,
+  type TextStyle,
+  type TextStyleProps,
+} from './types';
 import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
@@ -41,6 +53,9 @@ export class DesignDocument {
   readonly undoManager: Y.UndoManager;
   /** Image files by content hash. Kept outside undo history; nodes refer to them by hash. */
   readonly yImages: Y.Map<Uint8Array>;
+  /** Shared color, text and effect styles by id. */
+  readonly yStyles: Y.Map<Y.Map<unknown>>;
+  private stylesById = new Map<string, SharedStyle>();
 
   private nodes = new Map<NodeId, SceneNode>();
   private childrenCache = new Map<NodeId, NodeId[]>();
@@ -52,13 +67,23 @@ export class DesignDocument {
     this.ydoc = ydoc;
     this.yNodes = ydoc.getMap<YNode>('nodes');
     this.yImages = ydoc.getMap<Uint8Array>('images');
-    this.undoManager = new Y.UndoManager(this.yNodes, {
+    this.yStyles = ydoc.getMap<Y.Map<unknown>>('styles');
+    this.undoManager = new Y.UndoManager([this.yNodes, this.yStyles], {
       trackedOrigins: new Set([LOCAL_ORIGIN]),
       captureTimeout: Number.POSITIVE_INFINITY,
     });
 
     this.yNodes.forEach((y, id) => this.nodes.set(id, snapshot(id, y)));
     this.yNodes.observeDeep((events) => this.onYEvents(events));
+    this.yStyles.forEach((y, id) => this.stylesById.set(id, { ...(y.toJSON() as SharedStyle), id }));
+    this.yStyles.observeDeep((events) => {
+      for (const e of events) {
+        const ids = e.target === this.yStyles ? [...e.changes.keys.keys()] : [(e.target as Y.Map<unknown>).get('id') as string];
+        for (const id of ids) this.refreshStyle(id);
+      }
+      this._version++;
+      for (const l of this.listeners) l();
+    });
   }
 
   /** Ensures the root and at least one page exist. Call after loading persisted state. */
@@ -192,7 +217,7 @@ export class DesignDocument {
   updateNode(id: NodeId, patch: NodePatch): void {
     const y = this.yNodes.get(id);
     if (!y) return;
-    patch = this.withScaledPaths(id, patch);
+    patch = this.withDetachedStyles(id, this.withScaledPaths(id, patch));
     this.change(() => {
       for (const [k, v] of Object.entries(patch)) {
         if (v === undefined || k === 'textRuns') continue;
@@ -361,8 +386,12 @@ export class DesignDocument {
     }, { merge: true });
   }
 
-  /** Sets (or, with null values, clears) character styles on a range. */
+  /**
+   * Sets (or, with null values, clears) character styles on a range.
+   * Changing text-style properties directly detaches the range from its text style.
+   */
   formatText(id: NodeId, index: number, length: number, style: { [K in keyof TextStyleProps]?: TextStyleProps[K] | null }): void {
+    if (!('textStyleId' in style) && TEXT_STYLE_KEYS.some((k) => k in style)) style = { ...style, textStyleId: null };
     this.change(() => {
       const t = this.yText(id);
       if (!t || length <= 0) return;
@@ -371,7 +400,151 @@ export class DesignDocument {
     }, { merge: true });
   }
 
+  // ---------------------------------------------------------------- shared styles
+
+  styles(): SharedStyle[] {
+    return [...this.stylesById.values()];
+  }
+
+  getStyle(id: string | null | undefined): SharedStyle | undefined {
+    return id ? this.stylesById.get(id) : undefined;
+  }
+
+  createStyle(style: Omit<FillStyle, 'id'> | Omit<TextStyle, 'id'> | Omit<EffectStyle, 'id'>): string {
+    return this.change(() => {
+      const id = nanoid();
+      const y = new Y.Map<unknown>();
+      for (const [k, v] of Object.entries({ ...style, id })) if (v !== undefined) y.set(k, v);
+      this.yStyles.set(id, y);
+      this.refreshStyle(id);
+      return id;
+    }, { merge: true });
+  }
+
+  /**
+   * Changes a style and every layer (and text range) using it. Returns the
+   * text layers whose size may need refitting.
+   */
+  updateStyle(id: string, patch: Partial<Pick<FillStyle, 'name' | 'description' | 'paints'>> | Partial<Pick<TextStyle, 'name' | 'description' | 'text'>> | Partial<Pick<EffectStyle, 'name' | 'description' | 'effects'>>): NodeId[] {
+    const y = this.yStyles.get(id);
+    if (!y) return [];
+    return this.change(() => {
+      for (const [k, v] of Object.entries(patch)) if (v !== undefined) y.set(k, v);
+      this.refreshStyle(id);
+      const s = this.stylesById.get(id)!;
+      const touched: NodeId[] = [];
+      for (const n of this.nodes.values()) {
+        if (s.type === 'FILL') {
+          if (n.fillStyleId === id) this.updateNode(n.id, { fills: s.paints });
+          if (n.strokeStyleId === id) this.updateNode(n.id, { strokes: s.paints });
+        } else if (s.type === 'EFFECT') {
+          if (n.effectStyleId === id) this.updateNode(n.id, { effects: s.effects });
+        } else if (n.type === 'TEXT') {
+          let used = false;
+          if (n.textStyleId === id) {
+            this.updateNode(n.id, s.text);
+            used = true;
+          }
+          for (const r of n.textRuns ?? []) {
+            if (r.textStyleId !== id) continue;
+            this.formatText(n.id, r.start, r.end - r.start, { ...s.text, textStyleId: id });
+            used = true;
+          }
+          if (used) touched.push(n.id);
+        }
+      }
+      return touched;
+    }, { merge: true });
+  }
+
+  /** Removes a style; layers keep its values but are detached from it. */
+  deleteStyle(id: string): void {
+    this.change(() => {
+      for (const n of this.nodes.values()) {
+        const patch: Record<string, null> = {};
+        for (const k of ['fillStyleId', 'strokeStyleId', 'effectStyleId', 'textStyleId'] as const) if (n[k] === id) patch[k] = null;
+        if (Object.keys(patch).length) this.updateNode(n.id, patch as NodePatch);
+        for (const r of n.textRuns ?? []) if (r.textStyleId === id) this.formatText(n.id, r.start, r.end - r.start, { textStyleId: null });
+      }
+      this.yStyles.delete(id);
+      this.refreshStyle(id);
+    }, { merge: true });
+  }
+
+  /** Applies a color/effect style to a layer's fills, strokes or effects. */
+  applyStyle(nodeId: NodeId, styleId: string, target: 'fills' | 'strokes' | 'effects'): void {
+    const s = this.stylesById.get(styleId);
+    if (!s) return;
+    if (s.type === 'FILL' && target === 'fills') this.updateNode(nodeId, { fills: s.paints, fillStyleId: styleId });
+    if (s.type === 'FILL' && target === 'strokes') this.updateNode(nodeId, { strokes: s.paints, strokeStyleId: styleId });
+    if (s.type === 'EFFECT' && target === 'effects') this.updateNode(nodeId, { effects: s.effects, effectStyleId: styleId });
+  }
+
+  /** Applies a text style to a whole text layer (replacing range overrides of its properties) or to a range. */
+  applyTextStyle(nodeId: NodeId, styleId: string, range?: { start: number; end: number }): void {
+    const s = this.stylesById.get(styleId);
+    const n = this.nodes.get(nodeId);
+    if (s?.type !== 'TEXT' || n?.type !== 'TEXT') return;
+    this.change(() => {
+      if (range && range.end > range.start) {
+        this.formatText(nodeId, range.start, range.end - range.start, { ...s.text, textStyleId: styleId });
+        return;
+      }
+      this.updateNode(nodeId, { ...s.text, textStyleId: styleId });
+      const len = n.characters?.length ?? 0;
+      const clear = Object.fromEntries([...TEXT_STYLE_KEYS, 'textStyleId'].map((k) => [k, null]));
+      if (len) this.formatText(nodeId, 0, len, clear);
+    }, { merge: true });
+  }
+
+  /** Layers (and text ranges) using a style. */
+  usesOf(styleId: string): NodeId[] {
+    return [...this.nodes.values()]
+      .filter(
+        (n) =>
+          n.fillStyleId === styleId ||
+          n.strokeStyleId === styleId ||
+          n.effectStyleId === styleId ||
+          n.textStyleId === styleId ||
+          (n.textRuns ?? []).some((r) => r.textStyleId === styleId),
+      )
+      .map((n) => n.id);
+  }
+
   // ---------------------------------------------------------------- internals
+
+  private refreshStyle(id: string): void {
+    const y = this.yStyles.get(id);
+    if (y) this.stylesById.set(id, { ...(y.toJSON() as SharedStyle), id });
+    else this.stylesById.delete(id);
+  }
+
+  /**
+   * Editing a styled property directly detaches the layer from that style
+   * (unless the new value is the style's own, as when the style propagates).
+   */
+  private withDetachedStyles(id: NodeId, patch: NodePatch): NodePatch {
+    const n = this.nodes.get(id);
+    if (!n) return patch;
+    const out: NodePatch = { ...patch };
+    const check = (prop: 'fills' | 'strokes' | 'effects', key: 'fillStyleId' | 'strokeStyleId' | 'effectStyleId') => {
+      if (!(prop in patch) || key in patch || !n[key]) return;
+      const s = this.stylesById.get(n[key]!);
+      const value = s?.type === 'FILL' ? s.paints : s?.type === 'EFFECT' ? s.effects : undefined;
+      if (JSON.stringify(value) !== JSON.stringify(patch[prop])) out[key] = null;
+    };
+    check('fills', 'fillStyleId');
+    check('strokes', 'strokeStyleId');
+    check('effects', 'effectStyleId');
+    if (n.textStyleId && !('textStyleId' in patch)) {
+      const s = this.stylesById.get(n.textStyleId);
+      const differs = TEXT_STYLE_KEYS.some(
+        (k) => k in patch && (s?.type !== 'TEXT' || JSON.stringify(s.text[k]) !== JSON.stringify((patch as Record<string, unknown>)[k])),
+      );
+      if (differs) out.textStyleId = null;
+    }
+    return out;
+  }
 
   /** Resizing a vector's box scales its paths with it (unless new paths are given). */
   private withScaledPaths(id: NodeId, patch: NodePatch): NodePatch {
@@ -519,3 +692,6 @@ function shallowEqual(a: unknown, b: unknown): boolean {
 function cleanStyle(style: TextStyleProps): Record<string, unknown> {
   return Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined));
 }
+
+/** Properties a text style controls. */
+const TEXT_STYLE_KEYS = ['fontFamily', 'fontWeight', 'fontSize', 'italic', 'lineHeight', 'letterSpacing', 'textDecoration', 'textCase'] as const;

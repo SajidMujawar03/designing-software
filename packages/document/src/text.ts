@@ -1,4 +1,4 @@
-import type { SceneNode, TextRun, TextStyleProps } from './types';
+import type { SceneNode, TextRun, TextStyleProps, TextStyleValues } from './types';
 
 const STYLE_KEYS: Array<keyof TextStyleProps> = [
   'fontFamily',
@@ -12,8 +12,14 @@ const STYLE_KEYS: Array<keyof TextStyleProps> = [
   'color',
 ];
 
+/** A text style's values taken from a resolved style (for "create style from selection"). */
+export function textStyleValues(s: ReturnType<typeof baseTextStyle>): TextStyleValues {
+  const { color: _c, ...rest } = s;
+  return rest;
+}
+
 /** The layer-level character style of a text node (with defaults). */
-export function baseTextStyle(n: SceneNode): Required<Omit<TextStyleProps, 'color'>> & { color?: string } {
+export function baseTextStyle(n: SceneNode): TextStyleValues & { color?: string } {
   return {
     fontFamily: n.fontFamily ?? 'Inter',
     fontWeight: n.fontWeight ?? 400,
