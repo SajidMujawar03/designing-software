@@ -1,0 +1,128 @@
+import { worldTransform, type NodeId } from '@figma/document';
+import { applyToPoint, multiply, type Mat2D } from '@figma/geometry';
+import type { Editor } from '../editor';
+import { CORNERS, getSelectionFrame, handleWorldPoint } from './handles';
+
+export const BLUE = '#0D99FF';
+
+/** Draws selection, hover, handles, marquee and frame labels in screen space. */
+export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number): void {
+  const { viewport, selection, hoverId, marquee, editingTextId } = ed.ui;
+  const view: Mat2D = [viewport.zoom, 0, 0, viewport.zoom, viewport.x, viewport.y];
+  const screen: Mat2D = [dpr, 0, 0, dpr, 0, 0];
+  const doc = ed.doc;
+  const pageId = ed.pageId;
+  const selected = new Set(selection);
+
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Frame name labels for top-level frames.
+  ctx.font = '11px Inter, system-ui, sans-serif';
+  ctx.textBaseline = 'bottom';
+  for (const n of doc.children(pageId)) {
+    if (n.type !== 'FRAME' || !n.visible) continue;
+    const p = ed.worldToScreen(applyToPoint(worldTransform(doc, n.id), { x: 0, y: 0 }));
+    const maxW = n.width * viewport.zoom;
+    if (maxW < 20) continue;
+    ctx.fillStyle = selected.has(n.id) || hoverId === n.id ? BLUE : '#8C8C8C';
+    ctx.fillText(ellipsize(ctx, n.name, maxW), p.x, p.y - 4);
+  }
+
+  const outline = (id: NodeId, width: number) => {
+    const n = doc.get(id);
+    if (!n) return;
+    const m = multiply(screen, multiply(view, worldTransform(doc, id)));
+    ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    ctx.beginPath();
+    if (n.type === 'ELLIPSE') ctx.ellipse(n.width / 2, n.height / 2, n.width / 2, n.height / 2, 0, 0, Math.PI * 2);
+    else if (n.type === 'LINE') {
+      ctx.moveTo(0, 0);
+      ctx.lineTo(n.width, 0);
+    } else ctx.rect(0, 0, n.width, n.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = BLUE;
+    ctx.stroke();
+  };
+
+  if (hoverId && !selected.has(hoverId)) outline(hoverId, 1.5);
+  for (const id of selection) if (id !== editingTextId) outline(id, 1);
+
+  const frame = getSelectionFrame(ed);
+  if (frame && !editingTextId) {
+    if (frame.line) {
+      for (const p of frame.line) drawHandle(ctx, ed.worldToScreen(p), true);
+    } else {
+      const corners = CORNERS.map((h) => ed.worldToScreen(handleWorldPoint(frame, h)));
+      if (frame.ids.length > 1) {
+        ctx.beginPath();
+        corners.forEach((c, i) => (i ? ctx.lineTo(c.x, c.y) : ctx.moveTo(c.x, c.y)));
+        ctx.closePath();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = BLUE;
+        ctx.stroke();
+      }
+      for (const c of corners) drawHandle(ctx, c, false);
+    }
+
+    // Size label under the selection.
+    const node = frame.ids.length === 1 ? doc.get(frame.ids[0]) : null;
+    const w = node?.type === 'LINE' ? node.width : frame.width;
+    const label = node?.type === 'LINE' ? `${fmt(w)}` : `${fmt(frame.width)} × ${fmt(frame.height)}`;
+    const pts = frame.line ?? CORNERS.map((h) => handleWorldPoint(frame, h));
+    const sp = pts.map((p) => ed.worldToScreen(p));
+    const bottom = Math.max(...sp.map((p) => p.y));
+    const cx = (Math.min(...sp.map((p) => p.x)) + Math.max(...sp.map((p) => p.x))) / 2;
+    drawPill(ctx, label, cx, bottom + 8);
+  }
+
+  if (marquee) {
+    const a = ed.worldToScreen({ x: marquee.x, y: marquee.y });
+    const w = marquee.width * viewport.zoom;
+    const h = marquee.height * viewport.zoom;
+    ctx.fillStyle = 'rgba(13, 153, 255, 0.08)';
+    ctx.fillRect(a.x, a.y, w, h);
+    ctx.strokeStyle = BLUE;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(w), Math.round(h));
+  }
+
+  ctx.restore();
+}
+
+function drawHandle(ctx: CanvasRenderingContext2D, p: { x: number; y: number }, round: boolean): void {
+  const s = 8;
+  ctx.beginPath();
+  if (round) ctx.arc(p.x, p.y, s / 2, 0, Math.PI * 2);
+  else ctx.rect(Math.round(p.x - s / 2) + 0.5, Math.round(p.y - s / 2) + 0.5, s - 1, s - 1);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = BLUE;
+  ctx.stroke();
+}
+
+function drawPill(ctx: CanvasRenderingContext2D, text: string, cx: number, top: number): void {
+  ctx.font = '500 11px Inter, system-ui, sans-serif';
+  const w = ctx.measureText(text).width + 10;
+  const h = 18;
+  ctx.beginPath();
+  ctx.roundRect(Math.round(cx - w / 2), Math.round(top), w, h, 3);
+  ctx.fillStyle = BLUE;
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, cx, top + h / 2 + 0.5);
+  ctx.textAlign = 'left';
+}
+
+const fmt = (v: number) => String(Math.round(v * 100) / 100);
+
+function ellipsize(ctx: CanvasRenderingContext2D, s: string, max: number): string {
+  if (ctx.measureText(s).width <= max) return s;
+  let t = s;
+  while (t.length > 1 && ctx.measureText(t + '…').width > max) t = t.slice(0, -1);
+  return t + '…';
+}
