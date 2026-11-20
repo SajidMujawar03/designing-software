@@ -1,4 +1,5 @@
 import {
+  effectOutset,
   gradientMatrix,
   isGroupLike,
   localTransform,
@@ -6,14 +7,15 @@ import {
   rgbaCss,
   segmentsOf,
   shapePaths,
-  worldBounds,
   worldTransform,
   type DesignDocument,
   type NodeId,
   type Paint,
+  type BlendMode,
   type SceneNode,
 } from '@figma/document';
 import { multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '@figma/geometry';
+import { renderBounds } from './canvaskit';
 import { imageMatrix } from './ckpaint';
 import { drawText, layoutText } from './text';
 import type { SceneOptions, SceneRenderer } from './types';
@@ -126,7 +128,7 @@ export function renderPage(
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const base: Mat2D = multiply([dpr, 0, 0, dpr, 0, 0], view);
-  for (const child of doc.children(pageId)) drawNode(ctx, doc, child, base, [1, 0, 0, 1, 0, 0], opts);
+  drawChildren(ctx, doc, doc.children(pageId), base, [1, 0, 0, 1, 0, 0], opts);
 }
 
 function drawNode(
@@ -146,14 +148,15 @@ function drawNode(
     // Groups have no transform; children live in the group's parent space.
     ctx.save();
     ctx.globalAlpha *= n.opacity;
-    for (const c of doc.children(n.id)) drawNode(ctx, doc, c, screenParent, worldParent, opts);
+    applyLayerEffects(ctx, n, Math.hypot(screenParent[0], screenParent[1]));
+    drawChildren(ctx, doc, doc.children(n.id), screenParent, worldParent, opts);
     ctx.restore();
     return;
   }
   const local = localTransform(n);
   const world = multiply(worldParent, local);
   const bounds = transformRect(world, { x: 0, y: 0, width: n.width, height: n.height });
-  const pad = n.strokeWeight + 2;
+  const pad = n.strokeWeight * 2 + effectOutset(n) + 2;
   const culled = !rectIntersects(
     { x: bounds.x - pad, y: bounds.y - pad, width: bounds.width + pad * 2, height: bounds.height + pad * 2 },
     opts.visible,
@@ -165,15 +168,16 @@ function drawNode(
   ctx.save();
   ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
   ctx.globalAlpha *= n.opacity;
+  applyLayerEffects(ctx, n, Math.hypot(m[0], m[1]));
 
-  if (!culled && !opts.hidden?.has(n.id)) drawShape(ctx, doc, n);
+  if (!culled && !opts.hidden?.has(n.id)) drawShape(ctx, doc, n, Math.hypot(m[0], m[1]));
 
   if (n.type === 'FRAME') {
     if (n.clipsContent) {
       shapePath(ctx, n);
       ctx.clip();
     }
-    for (const c of doc.children(n.id)) drawNode(ctx, doc, c, m, world, opts);
+    drawChildren(ctx, doc, doc.children(n.id), m, world, opts);
     if (n.clipsContent && !culled) {
       ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
       strokeShape(ctx, doc, n);
@@ -215,7 +219,7 @@ export function traceVector(ctx: CanvasRenderingContext2D | Path2D, n: SceneNode
   }
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneNode): void {
+function drawShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneNode, scale = 1): void {
   if (n.type === 'TEXT') {
     const layout = layoutText(n, ctx);
     for (const f of n.fills) if (f.visible) drawText(ctx, n, layout, paintStyle(f));
@@ -223,7 +227,16 @@ function drawShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneN
   }
   shapePath(ctx, n);
   if (n.type !== 'LINE') {
+    // The first drop shadow is cast by the fills (Canvas 2D shadows work per draw call).
+    const shadow = (n.effects ?? []).find((e) => e.visible && e.type === 'DROP_SHADOW');
+    if (shadow && shadow.type === 'DROP_SHADOW') {
+      ctx.shadowColor = rgbaCss(shadow.color, shadow.opacity);
+      ctx.shadowBlur = shadow.radius * scale;
+      ctx.shadowOffsetX = shadow.offset.x * scale;
+      ctx.shadowOffsetY = shadow.offset.y * scale;
+    }
     for (const f of n.fills) if (f.visible) paintPath(ctx, n, f, doc, 'fill');
+    ctx.shadowColor = 'transparent';
   }
   // Clipped frames stroke after their children so the border stays on top.
   if (!(n.type === 'FRAME' && n.clipsContent)) strokeShape(ctx, doc, n);
@@ -262,7 +275,7 @@ function strokeShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: Scen
  */
 export function renderNodeToCanvas(doc: DesignDocument, id: NodeId, scale = 1): HTMLCanvasElement {
   const n = doc.get(id)!;
-  const b = worldBounds(doc, id);
+  const b = renderBounds(doc, id);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(b.width * scale));
   canvas.height = Math.max(1, Math.ceil(b.height * scale));
@@ -357,4 +370,64 @@ function drawBoolean2D(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: Sc
   ctx.globalAlpha *= n.opacity;
   ctx.drawImage(layer, 0, 0);
   ctx.restore();
+}
+
+const CSS_BLEND: Record<BlendMode, GlobalCompositeOperation> = {
+  NORMAL: 'source-over',
+  DARKEN: 'darken',
+  MULTIPLY: 'multiply',
+  COLOR_BURN: 'color-burn',
+  LIGHTEN: 'lighten',
+  SCREEN: 'screen',
+  COLOR_DODGE: 'color-dodge',
+  OVERLAY: 'overlay',
+  SOFT_LIGHT: 'soft-light',
+  HARD_LIGHT: 'hard-light',
+  DIFFERENCE: 'difference',
+  EXCLUSION: 'exclusion',
+  HUE: 'hue',
+  SATURATION: 'saturation',
+  COLOR: 'color',
+  LUMINOSITY: 'luminosity',
+};
+
+/**
+ * Blend mode and layer blur for everything the layer draws next. (Canvas 2D
+ * applies them per draw call, an approximation of Figma's whole-layer effect.)
+ */
+function applyLayerEffects(ctx: CanvasRenderingContext2D, n: SceneNode, scale: number): void {
+  if (n.blendMode && n.blendMode !== 'NORMAL') ctx.globalCompositeOperation = CSS_BLEND[n.blendMode];
+  const blur = (n.effects ?? []).find((e) => e.visible && e.type === 'LAYER_BLUR');
+  if (blur) ctx.filter = `blur(${(blur.radius / 2) * scale}px)`;
+}
+
+/** Siblings bottom to top; a mask layer clips the siblings above it to its shape. */
+function drawChildren(
+  ctx: CanvasRenderingContext2D,
+  doc: DesignDocument,
+  kids: SceneNode[],
+  screenParent: Mat2D,
+  worldParent: Mat2D,
+  opts: RenderOptions,
+): void {
+  for (let i = 0; i < kids.length; i++) {
+    const k = kids[i];
+    if (!(k.isMask && k.visible)) {
+      drawNode(ctx, doc, k, screenParent, worldParent, opts);
+      continue;
+    }
+    const { width, height } = ctx.canvas;
+    if (!width || !height) return;
+    // Draw the masked siblings on their own layer, keep only where the mask is, then composite.
+    const layer = new OffscreenCanvas(width, height);
+    const l = layer.getContext('2d')! as unknown as CanvasRenderingContext2D;
+    drawChildren(l, doc, kids.slice(i + 1), screenParent, worldParent, opts);
+    l.globalCompositeOperation = 'destination-in';
+    drawNode(l, doc, { ...k, isMask: false }, screenParent, worldParent, opts);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(layer, 0, 0);
+    ctx.restore();
+    return;
+  }
 }

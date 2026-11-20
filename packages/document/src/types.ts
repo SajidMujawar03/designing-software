@@ -92,6 +92,44 @@ export interface ImagePaint {
 export type Paint = SolidPaint | GradientPaint | ImagePaint;
 
 export type StrokeAlign = 'INSIDE' | 'CENTER' | 'OUTSIDE';
+
+export type BlendMode =
+  | 'NORMAL'
+  | 'DARKEN'
+  | 'MULTIPLY'
+  | 'COLOR_BURN'
+  | 'LIGHTEN'
+  | 'SCREEN'
+  | 'COLOR_DODGE'
+  | 'OVERLAY'
+  | 'SOFT_LIGHT'
+  | 'HARD_LIGHT'
+  | 'DIFFERENCE'
+  | 'EXCLUSION'
+  | 'HUE'
+  | 'SATURATION'
+  | 'COLOR'
+  | 'LUMINOSITY';
+
+export interface ShadowEffect {
+  type: 'DROP_SHADOW' | 'INNER_SHADOW';
+  color: RGB;
+  opacity: number;
+  offset: { x: number; y: number };
+  /** Blur radius in px. */
+  radius: number;
+  /** Grows (or shrinks, if negative) the shadow's shape. */
+  spread: number;
+  visible: boolean;
+}
+
+export interface BlurEffect {
+  type: 'LAYER_BLUR' | 'BACKGROUND_BLUR';
+  radius: number;
+  visible: boolean;
+}
+
+export type Effect = ShadowEffect | BlurEffect;
 export type StrokeCap = 'NONE' | 'ROUND' | 'SQUARE';
 export type StrokeJoin = 'MITER' | 'BEVEL' | 'ROUND';
 
@@ -117,6 +155,10 @@ export interface SceneNode {
   rotation: number;
 
   opacity: number;
+  blendMode?: BlendMode;
+  effects?: Effect[];
+  /** Masks the siblings above it (within the same parent). */
+  isMask?: boolean;
   fills: Paint[];
   strokes: Paint[];
   strokeWeight: number;

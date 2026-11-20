@@ -53,6 +53,7 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyG') return run(() => editor.frameSelection());
       if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));
       if (e.code === 'KeyO') return run(() => void outlineStrokeSelection(editor));
+      if (e.code === 'KeyM') return run(() => editor.useAsMask());
     }
     if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') return run(() => void flattenSelection(editor));
 

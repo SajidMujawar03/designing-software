@@ -5,14 +5,16 @@ import {
   pathData,
   rgbToHex,
   shapePaths,
-  worldBounds,
   worldTransform,
   type DesignDocument,
   type NodeId,
   type Paint,
+  type BlendMode,
   type SceneNode,
+  type ShadowEffect,
 } from '@figma/document';
 import { multiply, translation } from '@figma/geometry';
+import { renderBounds } from './canvaskit';
 import { imageMatrix } from './ckpaint';
 import { layoutText } from './text';
 
@@ -161,11 +163,71 @@ function transformAttr(n: SceneNode): string {
   return ` transform="${t}"`;
 }
 
+/** Drop shadows and layer blur as an SVG filter (inner shadows and background blur are not exported). */
+function effectsFilter(c: SvgContext, n: SceneNode): string {
+  const effects = (n.effects ?? []).filter((e) => e.visible);
+  const shadows = effects.filter((e): e is ShadowEffect => e.type === 'DROP_SHADOW');
+  const blur = effects.find((e) => e.type === 'LAYER_BLUR');
+  if (!shadows.length && !blur) return '';
+  const id = uid(c, 'fx');
+  let f = `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">`;
+  shadows.forEach((e, i) => {
+    let src = 'SourceAlpha';
+    if (e.spread) {
+      f += `<feMorphology in="SourceAlpha" operator="${e.spread > 0 ? 'dilate' : 'erode'}" radius="${num(Math.abs(e.spread))}" result="m${i}"/>`;
+      src = `m${i}`;
+    }
+    f +=
+      `<feGaussianBlur in="${src}" stdDeviation="${num(e.radius / 2)}" result="b${i}"/>` +
+      `<feOffset in="b${i}" dx="${num(e.offset.x)}" dy="${num(e.offset.y)}" result="o${i}"/>` +
+      `<feFlood flood-color="#${rgbToHex(e.color)}" flood-opacity="${num(e.opacity)}"/>` +
+      `<feComposite in2="o${i}" operator="in" result="s${i}"/>`;
+  });
+  f += `<feMerge result="merged">${shadows.map((_, i) => `<feMergeNode in="s${i}"/>`).join('')}<feMergeNode in="SourceGraphic"/></feMerge>`;
+  if (blur) f += `<feGaussianBlur in="merged" stdDeviation="${num(blur.radius / 2)}"/>`;
+  c.defs.push(f + '</filter>');
+  return ` filter="url(#${id})"`;
+}
+
+const CSS_BLEND: Partial<Record<BlendMode, string>> = {
+  DARKEN: 'darken',
+  MULTIPLY: 'multiply',
+  COLOR_BURN: 'color-burn',
+  LIGHTEN: 'lighten',
+  SCREEN: 'screen',
+  COLOR_DODGE: 'color-dodge',
+  OVERLAY: 'overlay',
+  SOFT_LIGHT: 'soft-light',
+  HARD_LIGHT: 'hard-light',
+  DIFFERENCE: 'difference',
+  EXCLUSION: 'exclusion',
+  HUE: 'hue',
+  SATURATION: 'saturation',
+  COLOR: 'color',
+  LUMINOSITY: 'luminosity',
+};
+
+/** Children bottom to top; a mask layer becomes an SVG mask over the siblings above it. */
+function childrenSvg(c: SvgContext, kids: SceneNode[]): string {
+  let out = '';
+  for (let i = 0; i < kids.length; i++) {
+    const k = kids[i];
+    if (k.isMask && k.visible) {
+      const id = uid(c, 'mask');
+      c.defs.push(`<mask id="${id}" style="mask-type:alpha">${nodeToSvg(c, { ...k, isMask: false })}</mask>`);
+      return out + `<g mask="url(#${id})">${childrenSvg(c, kids.slice(i + 1))}</g>`;
+    }
+    out += nodeToSvg(c, k);
+  }
+  return out;
+}
+
 function nodeToSvg(c: SvgContext, n: SceneNode): string {
   if (!n.visible) return '';
   const doc = c.doc;
-  const opacity = n.opacity < 1 ? ` opacity="${num(n.opacity)}"` : '';
-  const children = () => doc.children(n.id).map((k) => nodeToSvg(c, k)).join('');
+  const blend = n.blendMode && CSS_BLEND[n.blendMode] ? ` style="mix-blend-mode:${CSS_BLEND[n.blendMode]}"` : '';
+  const opacity = (n.opacity < 1 ? ` opacity="${num(n.opacity)}"` : '') + blend + effectsFilter(c, n);
+  const children = () => childrenSvg(c, doc.children(n.id));
   let body = '';
 
   if (n.type === 'TEXT') {
@@ -205,7 +267,7 @@ function nodeToSvg(c: SvgContext, n: SceneNode): string {
 /** Serializes a node (and its children) to a standalone SVG covering its on-canvas bounds. */
 export function exportSvg(doc: DesignDocument, id: NodeId, options: SvgOptions = {}): string {
   const n = doc.get(id)!;
-  const b = worldBounds(doc, id);
+  const b = renderBounds(doc, id);
   const c: SvgContext = { doc, defs: [], options, next: 0 };
   const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : translation(0, 0);
   const m = multiply(translation(-b.x, -b.y), parentWorld);

@@ -347,6 +347,27 @@ export class Editor {
     this.zoomToRect({ x, y, width, height }, 1);
   }
 
+  /**
+   * Ctrl+Alt+M: one layer toggles being a mask; several are grouped with the
+   * bottom one masking the rest, like Figma.
+   */
+  useAsMask(): void {
+    const ids = this.sortByZ(this.topLevelSelection());
+    if (!ids.length) return;
+    if (ids.length === 1) {
+      const n = this.doc.get(ids[0])!;
+      this.doc.change(() => this.doc.updateNode(n.id, { isMask: !n.isMask }));
+      return;
+    }
+    this.groupSelection();
+    const group = this.ui.selection[0];
+    const bottom = this.doc.childIds(group)[0];
+    this.doc.change(() => {
+      this.doc.updateNode(bottom, { isMask: true });
+      this.doc.updateNode(group, { name: this.nextName('Mask group', 'GROUP') });
+    });
+  }
+
   /** Ctrl+Alt+G: wraps the selection in a frame of the same size. */
   frameSelection(): void {
     const ids = this.sortByZ(this.topLevelSelection());

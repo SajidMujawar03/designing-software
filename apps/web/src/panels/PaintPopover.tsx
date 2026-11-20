@@ -1,23 +1,21 @@
 import {
   defaultGradient,
-  hexToRgb,
   paintColor,
   rgbaCss,
-  rgbToHex,
   sampleGradient,
   stopsCss,
   type GradientPaint,
   type GradientType,
   type NodePatch,
   type Paint,
-  type RGB,
 } from '@figma/document';
 import { ImagePlus, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { pickImageFiles, imagePaint, storeImage } from '../editor/images';
 import { useUI } from '../editor/store';
+import { ColorPicker } from './ColorPicker';
 import { IconButton, NumberField } from './controls';
 
 type Kind = 'SOLID' | GradientType | 'IMAGE';
@@ -60,6 +58,12 @@ export function PaintPopover() {
   useDocVersion();
   const pe = useUI((s) => s.paintEdit);
   const ref = useRef<HTMLDivElement>(null);
+  // Keep the whole popover on screen: measure it after each render.
+  const [height, setHeight] = useState(380);
+  useLayoutEffect(() => {
+    const h = ref.current?.offsetHeight;
+    if (h && Math.abs(h - height) > 1) setHeight(h);
+  });
 
   // Close on outside click (but not when clicking the canvas, where gradient handles live) or Escape.
   useEffect(() => {
@@ -88,7 +92,7 @@ export function PaintPopover() {
   }, [pe, paint]);
   if (!pe || !paint) return null;
 
-  const top = Math.max(8, Math.min(pe.anchor.y - 12, window.innerHeight - 380));
+  const top = Math.max(8, Math.min(pe.anchor.y - 12, window.innerHeight - height - 8));
   const changeKind = async (kind: Kind) => {
     if (kind === paint.type) return;
     const base = paintColor(paint);
@@ -112,7 +116,7 @@ export function PaintPopover() {
     <div ref={ref} className="paint-popover" style={{ top, right: 252 }} role="dialog" aria-label="Edit paint">
       <div className="popover-head">
         <select className="select" value={paint.type} onChange={(e) => void changeKind(e.target.value as Kind)} aria-label="Paint type">
-          {KINDS.map(([k, label]) => (
+          {KINDS.filter(([k]) => node!.type !== 'PAGE' || k === 'SOLID').map(([k, label]) => (
             <option key={k} value={k}>
               {label}
             </option>
@@ -124,7 +128,7 @@ export function PaintPopover() {
         </IconButton>
       </div>
       {paint.type === 'SOLID' && (
-        <ColorFields
+        <ColorPicker
           color={paint.color}
           opacity={paint.opacity}
           onChange={(color, opacity, live) => writePaint({ ...paint, color, opacity }, live)}
@@ -132,49 +136,6 @@ export function PaintPopover() {
       )}
       {isGradient(paint) && <GradientEditor paint={paint} />}
       {paint.type === 'IMAGE' && <ImageEditor />}
-    </div>
-  );
-}
-
-/** Color input, hex field and opacity. (A full color picker replaces the native input next.) */
-function ColorFields(props: { color: RGB; opacity: number; onChange: (c: RGB, opacity: number, live: boolean) => void }) {
-  const { color, opacity, onChange } = props;
-  const hex = rgbToHex(color);
-  const [text, setText] = useState(hex);
-  useEffect(() => setText(hex), [hex]);
-  return (
-    <div className="color-fields">
-      <label className="swatch large" onPointerDown={() => editor.doc.endGesture()}>
-        <span className="swatch-color" style={{ background: rgbaCss(color, opacity) }} />
-        <input
-          type="color"
-          value={`#${hex.toLowerCase()}`}
-          onChange={(e) => onChange(hexToRgb(e.target.value), opacity, true)}
-          onBlur={() => editor.doc.endGesture()}
-        />
-      </label>
-      <input
-        className="hex-input"
-        value={text}
-        aria-label="Hex color"
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          if (/^#?[0-9a-f]{3}([0-9a-f]{3})?$/i.test(text.trim())) onChange(hexToRgb(text), opacity, false);
-          else setText(hex);
-        }}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      />
-      <div className="paint-opacity">
-        <NumberField
-          label=""
-          value={Math.round(opacity * 100)}
-          suffix="%"
-          min={0}
-          max={100}
-          precision={0}
-          onChange={(v, live) => onChange(color, v / 100, live)}
-        />
-      </div>
     </div>
   );
 }
@@ -260,7 +221,7 @@ function GradientEditor({ paint }: { paint: GradientPaint }) {
           <Trash2 size={13} />
         </IconButton>
       </div>
-      <ColorFields
+      <ColorPicker
         color={stop.color}
         opacity={stop.opacity}
         onChange={(color, opacity, live) =>

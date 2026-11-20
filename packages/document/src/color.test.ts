@@ -31,3 +31,18 @@ describe('gradients', () => {
     expect(paintColor(g)).toEqual({ color: blue, opacity: 0.5 });
   });
 });
+
+describe('color spaces', () => {
+  it('round-trips through HSV and HSL', async () => {
+    const { hsvToRgb, rgbToHsv, hslToRgb, rgbToHsl } = await import('./color');
+    const c = { r: 0.2, g: 0.6, b: 0.9 };
+    const back = hsvToRgb(rgbToHsv(c));
+    const back2 = hslToRgb(rgbToHsl(c));
+    for (const k of ['r', 'g', 'b'] as const) {
+      expect(back[k]).toBeCloseTo(c[k]);
+      expect(back2[k]).toBeCloseTo(c[k]);
+    }
+    expect(rgbToHsv({ r: 1, g: 0, b: 0 })).toEqual({ h: 0, s: 1, v: 1 });
+    expect(rgbToHsl({ r: 0, g: 0, b: 1 }).h).toBeCloseTo(240);
+  });
+});

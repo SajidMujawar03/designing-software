@@ -42,6 +42,7 @@ export const COMMANDS: Command[] = [
   { id: 'subtract', label: 'Subtract selection', shortcut: 'Ctrl+Alt+S', run: () => booleanSelection(editor, 'SUBTRACT'), enabled: canBoolean },
   { id: 'intersect', label: 'Intersect selection', shortcut: 'Ctrl+Alt+I', run: () => booleanSelection(editor, 'INTERSECT'), enabled: canBoolean },
   { id: 'exclude', label: 'Exclude selection', shortcut: 'Ctrl+Alt+X', run: () => booleanSelection(editor, 'EXCLUDE'), enabled: canBoolean },
+  { id: 'use-as-mask', label: 'Use as mask', shortcut: 'Ctrl+Alt+M', run: () => editor.useAsMask(), enabled: hasSelection },
   { id: 'flatten', label: 'Flatten', shortcut: 'Ctrl+E', run: () => void flattenSelection(editor), enabled: hasSelection },
   { id: 'outline-stroke', label: 'Outline stroke', shortcut: 'Ctrl+Alt+O', run: () => void outlineStrokeSelection(editor), enabled: hasStroke },
 
@@ -108,6 +109,7 @@ export const CANVAS_MENU = [
   'group',
   'ungroup',
   'frame-selection',
+  'use-as-mask',
   '-',
   'union',
   'subtract',

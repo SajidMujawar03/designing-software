@@ -1,4 +1,4 @@
-import type { ColorStop, GradientPaint, GradientType, Paint, RGB, SolidPaint } from './types';
+import type { ColorStop, Effect, GradientPaint, GradientType, Paint, RGB, SceneNode, SolidPaint } from './types';
 
 export const rgb = (r: number, g: number, b: number): RGB => ({ r, g, b });
 
@@ -112,4 +112,95 @@ export function sampleGradient(stops: ColorStop[], t: number): { color: RGB; opa
   }
   const last = s[s.length - 1];
   return { color: last.color, opacity: last.opacity };
+}
+
+// ------------------------------------------------------------ color spaces
+
+/** HSV with h in degrees (0–360), s and v 0–1. */
+export interface HSV {
+  h: number;
+  s: number;
+  v: number;
+}
+
+export function rgbToHsv({ r, g, b }: RGB): HSV {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s: max ? d / max : 0, v: max };
+}
+
+export function hsvToRgb({ h, s, v }: HSV): RGB {
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  const [r, g, b] =
+    h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return { r: r + m, g: g + m, b: b + m };
+}
+
+/** HSL with h in degrees, s and l 0–1. */
+export function rgbToHsl(rgb: RGB): { h: number; s: number; l: number } {
+  const { h, s: sv, v } = rgbToHsv(rgb);
+  const l = v * (1 - sv / 2);
+  const s = l === 0 || l === 1 ? 0 : (v - l) / Math.min(l, 1 - l);
+  return { h, s, l };
+}
+
+export function hslToRgb({ h, s, l }: { h: number; s: number; l: number }): RGB {
+  const v = l + s * Math.min(l, 1 - l);
+  return hsvToRgb({ h, s: v === 0 ? 0 : 2 * (1 - l / v), v });
+}
+
+/** Every distinct solid color used in the document (fills, strokes, gradient stops, shadows). */
+export function documentColors(nodes: Iterable<SceneNode>, limit = 24): RGB[] {
+  const seen = new Map<string, RGB>();
+  const add = (c: RGB) => {
+    const k = rgbToHex(c);
+    if (!seen.has(k)) seen.set(k, c);
+  };
+  for (const n of nodes) {
+    if (n.type === 'PAGE' || n.type === 'DOCUMENT') continue;
+    for (const p of [...n.fills, ...n.strokes]) {
+      if (p.type === 'SOLID') add(p.color);
+      else if (p.type !== 'IMAGE') p.stops.forEach((s) => add(s.color));
+    }
+    for (const e of n.effects ?? []) if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') add(e.color);
+    if (seen.size >= limit) break;
+  }
+  return [...seen.values()].slice(0, limit);
+}
+
+// ------------------------------------------------------------ effects
+
+export function defaultEffect(type: Effect['type']): Effect {
+  if (type === 'LAYER_BLUR' || type === 'BACKGROUND_BLUR') return { type, radius: 4, visible: true };
+  return {
+    type,
+    color: { r: 0, g: 0, b: 0 },
+    opacity: 0.25,
+    offset: { x: 0, y: 4 },
+    radius: 4,
+    spread: 0,
+    visible: true,
+  };
+}
+
+/** How far a node's visible effects reach beyond its geometry (for culling and export bounds). */
+export function effectOutset(n: SceneNode): number {
+  let out = 0;
+  for (const e of n.effects ?? []) {
+    if (!e.visible) continue;
+    if (e.type === 'DROP_SHADOW') out = Math.max(out, Math.max(Math.abs(e.offset.x), Math.abs(e.offset.y)) + e.radius + Math.max(0, e.spread));
+    if (e.type === 'LAYER_BLUR') out = Math.max(out, e.radius);
+  }
+  return Math.ceil(out);
 }

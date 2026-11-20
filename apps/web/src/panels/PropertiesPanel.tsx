@@ -1,5 +1,9 @@
-import { isGroupLike, solid, type BooleanOperation, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
+import { defaultEffect, isGroupLike, rgbaCss, solid, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
+  Eye,
+  EyeOff,
+  Minus,
+  SlidersHorizontal,
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignEndHorizontal,
@@ -26,6 +30,7 @@ import { FONT_FAMILIES, weightsOf } from '../editor/fonts';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
 import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
+import { ColorPicker } from './ColorPicker';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -154,6 +159,7 @@ export function PropertiesPanel() {
             precision={0}
             onChange={(v, live) => apply(ids, { opacity: v / 100 }, live)}
           />
+          <BlendSelect ids={ids} nodes={nodes} />
         </div>
       </Section>
 
@@ -162,6 +168,8 @@ export function PropertiesPanel() {
       {!isLine && <PaintsSection title="Fill" ids={ids} nodes={nodes} prop="fills" />}
       <PaintsSection title="Stroke" ids={ids} nodes={nodes} prop="strokes" />
       {nodes.some((n) => n.strokes.length > 0) && <StrokeOptions ids={ids} nodes={nodes} />}
+
+      <EffectsSection ids={ids} nodes={nodes} />
 
       <ExportSection ids={ids} />
     </div>
@@ -331,6 +339,7 @@ function ExportSection({ ids }: { ids: NodeId[] }) {
 function PageProperties() {
   const pageId = useUI((s) => s.pageId);
   const page = editor.doc.get(pageId);
+  const paintEdit = useUI((s) => s.paintEdit);
   if (!page) return null;
   const bg = page.fills[0] ?? solid('#F5F5F5');
   return (
@@ -342,6 +351,11 @@ function PageProperties() {
       <Section title="Background">
         <PaintRow
           paint={bg}
+          open={paintEdit?.ids[0] === page.id}
+          onOpen={(r) => {
+            if (!page.fills.length) apply([page.id], { fills: [bg] });
+            editor.setUI({ paintEdit: { ids: [page.id], prop: 'fills', index: 0, stop: 0, anchor: { x: r.left, y: r.top } } });
+          }}
           onChange={(p, live) => apply([page.id], { fills: [{ ...p, opacity: 1, visible: true }] }, live)}
           onRemove={() => apply([page.id], { fills: [] })}
         />
@@ -655,5 +669,146 @@ function StrokeOptions({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           )}
       </div>
     </div>
+  );
+}
+
+const BLEND_MODES: Array<[BlendMode, string]> = [
+  ['NORMAL', 'Normal'],
+  ['DARKEN', 'Darken'],
+  ['MULTIPLY', 'Multiply'],
+  ['COLOR_BURN', 'Color burn'],
+  ['LIGHTEN', 'Lighten'],
+  ['SCREEN', 'Screen'],
+  ['COLOR_DODGE', 'Color dodge'],
+  ['OVERLAY', 'Overlay'],
+  ['SOFT_LIGHT', 'Soft light'],
+  ['HARD_LIGHT', 'Hard light'],
+  ['DIFFERENCE', 'Difference'],
+  ['EXCLUSION', 'Exclusion'],
+  ['HUE', 'Hue'],
+  ['SATURATION', 'Saturation'],
+  ['COLOR', 'Color'],
+  ['LUMINOSITY', 'Luminosity'],
+];
+
+function BlendSelect({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const mode = common(nodes.map((n) => n.blendMode ?? 'NORMAL'));
+  return (
+    <select
+      className="select"
+      value={mode === MIXED ? '' : mode}
+      onChange={(e) => apply(ids, { blendMode: e.target.value as BlendMode })}
+      aria-label="Blend mode"
+      title="Blend mode"
+    >
+      {mode === MIXED && <option value="">Mixed</option>}
+      {BLEND_MODES.map(([m, label]) => (
+        <option key={m} value={m}>
+          {label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+const EFFECT_TYPES: Array<[Effect['type'], string]> = [
+  ['DROP_SHADOW', 'Drop shadow'],
+  ['INNER_SHADOW', 'Inner shadow'],
+  ['LAYER_BLUR', 'Layer blur'],
+  ['BACKGROUND_BLUR', 'Background blur'],
+];
+
+/** Shadows and blurs, each with its own settings. */
+function EffectsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const effects = common(nodes.map((n) => n.effects ?? []));
+  const [open, setOpen] = useState<number | null>(null);
+  const [colorOpen, setColorOpen] = useState(false);
+  const set = (next: Effect[], live = false) => apply(ids, { effects: next }, live);
+  const list = effects === MIXED ? [] : effects;
+  const update = (i: number, patch: Partial<Effect>, live = false) =>
+    set(list.map((e, j) => (j === i ? ({ ...e, ...patch } as Effect) : e)), live);
+
+  return (
+    <Section
+      title="Effects"
+      actions={
+        <IconButton
+          title="Add effect"
+          onClick={() => {
+            set([...(effects === MIXED ? [] : effects), defaultEffect('DROP_SHADOW')]);
+            setOpen(list.length);
+          }}
+        >
+          <Plus size={14} />
+        </IconButton>
+      }
+    >
+      {effects === MIXED ? (
+        <div className="hint">Mixed — click + to replace</div>
+      ) : (
+        list.map((e, i) => (
+          <div key={i} className="effect">
+            <div className={`paint-row${e.visible ? '' : ' muted'}`}>
+              <IconButton title="Effect settings" active={open === i} onClick={() => setOpen(open === i ? null : i)}>
+                <SlidersHorizontal size={13} />
+              </IconButton>
+              <select
+                className="select grow"
+                value={e.type}
+                aria-label="Effect type"
+                onChange={(ev) => {
+                  const type = ev.target.value as Effect['type'];
+                  const next = defaultEffect(type);
+                  set(list.map((x, j) => (j === i ? ({ ...next, radius: x.radius, visible: x.visible } as Effect) : x)));
+                }}
+              >
+                {EFFECT_TYPES.map(([t, label]) => (
+                  <option key={t} value={t}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <IconButton title={e.visible ? 'Hide' : 'Show'} onClick={() => update(i, { visible: !e.visible })}>
+                {e.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+              </IconButton>
+              <IconButton title="Remove" onClick={() => set(list.filter((_, j) => j !== i))}>
+                <Minus size={14} />
+              </IconButton>
+            </div>
+            {open === i && (
+              <div className="effect-body">
+                {e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW' ? (
+                  <>
+                    <div className="grid2">
+                      <NumberField label="X" value={e.offset.x} onChange={(v, live) => update(i, { offset: { ...e.offset, x: v } }, live)} />
+                      <NumberField label="Y" value={e.offset.y} onChange={(v, live) => update(i, { offset: { ...e.offset, y: v } }, live)} />
+                      <NumberField label="Blur" value={e.radius} min={0} onChange={(v, live) => update(i, { radius: v }, live)} />
+                      <NumberField label="Spread" value={e.spread} onChange={(v, live) => update(i, { spread: v }, live)} />
+                    </div>
+                    <div className="paint-row">
+                      <button type="button" className="swatch" title="Shadow color" onClick={() => setColorOpen(!colorOpen)}>
+                        <span className="swatch-color" style={{ background: rgbaCss(e.color, e.opacity) }} />
+                      </button>
+                      <span className="hint grow">Color · {Math.round(e.opacity * 100)}%</span>
+                    </div>
+                    {colorOpen && (
+                      <ColorPicker
+                        color={e.color}
+                        opacity={e.opacity}
+                        onChange={(color, opacity, live) => update(i, { color, opacity }, live)}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="grid2">
+                    <NumberField label="Blur" value={e.radius} min={0} onChange={(v, live) => update(i, { radius: v }, live)} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </Section>
   );
 }

@@ -1,4 +1,6 @@
 import {
+  effectOutset,
+  isGroupLike,
   localTransform,
   paintColor,
   pathData,
@@ -8,7 +10,10 @@ import {
   type DesignDocument,
   type NodeId,
   type Paint as DocPaint,
+  type BlendMode,
+  type BlurEffect,
   type SceneNode,
+  type ShadowEffect,
 } from '@figma/document';
 import { IDENTITY, multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '@figma/geometry';
 import type {
@@ -91,7 +96,7 @@ export class CanvasKitRenderer implements SceneRenderer {
     c.save();
     c.concat(toCk(multiply([this.dpr, 0, 0, this.dpr, 0, 0], opts.view)));
     const ctx: DrawContext = { visible: opts.visible, hidden: opts.hidden };
-    for (const child of doc.children(pageId)) this.drawNode(c, doc, child, IDENTITY, ctx);
+    this.drawChildren(c, doc, doc.children(pageId), IDENTITY, ctx);
     c.restore();
     surface.flush();
     this.pruneParagraphs(doc);
@@ -100,7 +105,7 @@ export class CanvasKitRenderer implements SceneRenderer {
   async exportPng(doc: DesignDocument, id: NodeId, scale: number): Promise<Blob | null> {
     const n = doc.get(id);
     if (!n) return null;
-    const b = worldBounds(doc, id);
+    const b = renderBounds(doc, id);
     const w = Math.max(1, Math.ceil(b.width * scale));
     const h = Math.max(1, Math.ceil(b.height * scale));
     const surface = this.ck.MakeSurface(w, h);
@@ -135,73 +140,211 @@ export class CanvasKitRenderer implements SceneRenderer {
 
   private drawNode(c: Canvas, doc: DesignDocument, n: SceneNode, worldParent: Mat2D, ctx: DrawContext): void {
     if (!n.visible || n.opacity <= 0) return;
-
-    if (n.type === 'BOOLEAN') {
-      // Drawn as one shape: the combined outline of its children, with its own paints.
-      if (ctx.hidden?.has(n.id)) return;
-      const layered = this.beginOpacity(c, n.opacity);
-      this.fill(c, n);
-      this.stroke(c, n);
-      if (layered) c.restore();
-      return;
-    }
-
-    if (n.type === 'GROUP') {
-      // Groups have no transform; their opacity applies to the children as one layer.
-      const layered = this.beginOpacity(c, n.opacity);
-      for (const child of doc.children(n.id)) this.drawNode(c, doc, child, worldParent, ctx);
-      if (layered) c.restore();
-      return;
-    }
-
-    const local = localTransform(n);
+    const groupLike = isGroupLike(n);
+    const local = groupLike ? IDENTITY : localTransform(n);
     const world = multiply(worldParent, local);
-    const bounds = transformRect(world, { x: 0, y: 0, width: n.width, height: n.height });
-    const pad = n.strokeWeight + 2;
-    const culled = !rectIntersects(
-      { x: bounds.x - pad, y: bounds.y - pad, width: bounds.width + pad * 2, height: bounds.height + pad * 2 },
-      ctx.visible,
-    );
-    // Unclipped frames can have children outside their bounds, so still visit them.
-    if (culled && !(n.type === 'FRAME' && !n.clipsContent)) return;
+
+    let culled = false;
+    if (!groupLike) {
+      const bounds = transformRect(world, { x: 0, y: 0, width: n.width, height: n.height });
+      const pad = n.strokeWeight * 2 + effectOutset(n) + 2;
+      culled = !rectIntersects(
+        { x: bounds.x - pad, y: bounds.y - pad, width: bounds.width + pad * 2, height: bounds.height + pad * 2 },
+        ctx.visible,
+      );
+      // Unclipped frames can have children outside their bounds, so still visit them.
+      if (culled && !(n.type === 'FRAME' && !n.clipsContent)) return;
+    }
 
     c.save();
-    c.concat(toCk(local));
-    const layered = this.beginOpacity(c, n.opacity);
-    const draw = !culled && !ctx.hidden?.has(n.id);
+    if (!groupLike) c.concat(toCk(local));
+    const effects = (n.effects ?? []).filter((e) => e.visible);
+    const drawSelf = !culled && !ctx.hidden?.has(n.id);
 
-    if (n.type === 'FRAME') {
-      if (draw) this.fill(c, n);
-      if (n.clipsContent) {
-        c.save();
-        this.clip(c, n);
-        for (const child of doc.children(n.id)) this.drawNode(c, doc, child, world, ctx);
-        c.restore();
-        if (draw) this.stroke(c, n);
-      } else {
-        if (draw) this.stroke(c, n);
-        for (const child of doc.children(n.id)) this.drawNode(c, doc, child, world, ctx);
-      }
-    } else if (draw) {
-      if (n.type === 'TEXT') this.drawText(c, n);
-      else {
-        if (n.type !== 'LINE') this.fill(c, n);
-        this.stroke(c, n);
-      }
+    // 1. Background blur: blur what is already drawn behind the shape, inside the shape.
+    const bgBlur = effects.find((e): e is BlurEffect => e.type === 'BACKGROUND_BLUR');
+    if (bgBlur && drawSelf && !groupLike) this.backgroundBlur(c, n, bgBlur.radius);
+
+    // 2. Drop shadows: the layer's silhouette, offset and blurred, behind it.
+    for (const e of effects) {
+      if (e.type !== 'DROP_SHADOW' || !drawSelf) continue;
+      const p = new this.ck.Paint();
+      const spread = e.spread > 0 ? this.ck.ImageFilter.MakeDilate(e.spread, e.spread, null) : e.spread < 0 ? this.ck.ImageFilter.MakeErode(-e.spread, -e.spread, null) : null;
+      const filter = this.ck.ImageFilter.MakeDropShadowOnly(
+        e.offset.x,
+        e.offset.y,
+        sigma(e.radius),
+        sigma(e.radius),
+        this.ck.Color4f(e.color.r, e.color.g, e.color.b, e.opacity),
+        spread,
+      );
+      p.setImageFilter(filter);
+      p.setAlphaf(n.opacity);
+      c.saveLayer(p);
+      this.drawBody(c, doc, n, world, ctx, culled, false);
+      c.restore();
+      filter.delete();
+      spread?.delete();
+      p.delete();
     }
 
+    // 3. The layer itself, in its own layer when it has opacity, a blend mode or a layer blur.
+    const blur = effects.find((e): e is BlurEffect => e.type === 'LAYER_BLUR');
+    const blend = n.blendMode && n.blendMode !== 'NORMAL' ? n.blendMode : null;
+    const layered = n.opacity < 1 || !!blend || !!blur;
+    if (layered) {
+      const p = new this.ck.Paint();
+      p.setAlphaf(n.opacity);
+      if (blend) p.setBlendMode(this.blendMode(blend));
+      const f = blur ? this.ck.ImageFilter.MakeBlur(sigma(blur.radius), sigma(blur.radius), this.ck.TileMode.Decal, null) : null;
+      if (f) p.setImageFilter(f);
+      c.saveLayer(p);
+      f?.delete();
+      p.delete();
+    }
+    this.drawBody(c, doc, n, world, ctx, culled, true);
     if (layered) c.restore();
     c.restore();
   }
 
-  /** Starts a transparency layer when needed; returns whether one was started. */
-  private beginOpacity(c: Canvas, opacity: number): boolean {
-    if (opacity >= 1) return false;
-    const p = new this.ck.Paint();
-    p.setAlphaf(opacity);
-    c.saveLayer(p);
-    p.delete();
-    return true;
+  /**
+   * A layer's own content: paints, inner shadows and children (in the
+   * layer's coordinates). Inner shadows are skipped for the drop-shadow pass.
+   */
+  private drawBody(c: Canvas, doc: DesignDocument, n: SceneNode, world: Mat2D, ctx: DrawContext, culled: boolean, withInner: boolean): void {
+    const draw = !culled && !ctx.hidden?.has(n.id);
+    const inner = () => {
+      if (withInner && draw) this.innerShadows(c, n);
+    };
+    switch (n.type) {
+      case 'GROUP':
+        this.drawChildren(c, doc, doc.children(n.id), world, ctx);
+        return;
+      case 'BOOLEAN':
+        if (!draw) return;
+        this.fill(c, n);
+        inner();
+        this.stroke(c, n);
+        return;
+      case 'FRAME':
+        if (draw) this.fill(c, n);
+        inner();
+        if (n.clipsContent) {
+          c.save();
+          this.clip(c, n);
+          this.drawChildren(c, doc, doc.children(n.id), world, ctx);
+          c.restore();
+          if (draw) this.stroke(c, n);
+        } else {
+          if (draw) this.stroke(c, n);
+          this.drawChildren(c, doc, doc.children(n.id), world, ctx);
+        }
+        return;
+      case 'TEXT':
+        if (draw) this.drawText(c, n);
+        return;
+      default:
+        if (!draw) return;
+        if (n.type !== 'LINE') this.fill(c, n);
+        inner();
+        this.stroke(c, n);
+    }
+  }
+
+  /**
+   * Draws siblings bottom to top. A mask layer hides itself and clips every
+   * sibling above it to its shape (alpha), like Figma.
+   */
+  private drawChildren(c: Canvas, doc: DesignDocument, kids: SceneNode[], world: Mat2D, ctx: DrawContext): void {
+    for (let i = 0; i < kids.length; i++) {
+      const k = kids[i];
+      if (k.isMask && k.visible) {
+        c.saveLayer();
+        this.drawChildren(c, doc, kids.slice(i + 1), world, ctx);
+        const p = new this.ck.Paint();
+        p.setBlendMode(this.ck.BlendMode.DstIn);
+        c.saveLayer(p);
+        p.delete();
+        this.drawNode(c, doc, k, world, ctx);
+        c.restore();
+        c.restore();
+        return;
+      }
+      this.drawNode(c, doc, k, world, ctx);
+    }
+  }
+
+  /** Blurs the content behind a shape, clipped to the shape. */
+  private backgroundBlur(c: Canvas, n: SceneNode, radius: number): void {
+    const path = this.vectorPath(n);
+    if (!path) return;
+    const f = this.ck.ImageFilter.MakeBlur(sigma(radius), sigma(radius), this.ck.TileMode.Clamp, null);
+    c.save();
+    c.clipPath(path, this.ck.ClipOp.Intersect, true);
+    c.saveLayer(undefined, null, f);
+    c.restore();
+    c.restore();
+    f.delete();
+  }
+
+  /** Inner shadows: the area outside the shape, offset and blurred, drawn inside it. */
+  private innerShadows(c: Canvas, n: SceneNode): void {
+    const shadows = (n.effects ?? []).filter((e): e is ShadowEffect => e.visible && e.type === 'INNER_SHADOW');
+    if (!shadows.length) return;
+    const shape = this.vectorPath(n);
+    if (!shape) return;
+    const ck = this.ck;
+    for (const e of shadows) {
+      // Everything except the (offset, spread-shrunk) shape casts the shadow.
+      const big = Math.max(n.width, n.height) * 2 + Math.abs(e.offset.x) + Math.abs(e.offset.y) + e.radius * 4 + 100;
+      const outside = ck.Path.MakeFromSVGString(`M${-big} ${-big}H${big}V${big}H${-big}Z`)!;
+      let caster: Path = shape;
+      if (e.spread > 0) {
+        const stroked = shape.makeStroked({ width: e.spread * 2 });
+        caster = (stroked && ck.Path.MakeFromOp(shape, stroked, ck.PathOp.Difference)) ?? shape;
+        stroked?.delete();
+      }
+      const hole = ck.Path.MakeFromOp(outside, caster, ck.PathOp.Difference);
+      if (caster !== shape) caster.delete();
+      outside.delete();
+      if (!hole) continue;
+      const p = new ck.Paint();
+      p.setAntiAlias(true);
+      p.setColor(ck.Color4f(e.color.r, e.color.g, e.color.b, e.opacity));
+      const mf = e.radius > 0 ? ck.MaskFilter.MakeBlur(ck.BlurStyle.Normal, sigma(e.radius), true) : null;
+      if (mf) p.setMaskFilter(mf);
+      c.save();
+      c.clipPath(shape, ck.ClipOp.Intersect, true);
+      c.translate(e.offset.x, e.offset.y);
+      c.drawPath(hole, p);
+      c.restore();
+      mf?.delete();
+      p.delete();
+      hole.delete();
+    }
+  }
+
+  private blendMode(m: BlendMode) {
+    const B = this.ck.BlendMode;
+    const map: Record<BlendMode, typeof B.SrcOver> = {
+      NORMAL: B.SrcOver,
+      DARKEN: B.Darken,
+      MULTIPLY: B.Multiply,
+      COLOR_BURN: B.ColorBurn,
+      LIGHTEN: B.Lighten,
+      SCREEN: B.Screen,
+      COLOR_DODGE: B.ColorDodge,
+      OVERLAY: B.Overlay,
+      SOFT_LIGHT: B.SoftLight,
+      HARD_LIGHT: B.HardLight,
+      DIFFERENCE: B.Difference,
+      EXCLUSION: B.Exclusion,
+      HUE: B.Hue,
+      SATURATION: B.Saturation,
+      COLOR: B.Color,
+      LUMINOSITY: B.Luminosity,
+    };
+    return map[m];
   }
 
   private geometry(c: Canvas, n: SceneNode, paint: Paint): void {
@@ -421,4 +564,15 @@ function isClosedShape(n: SceneNode): boolean {
   if (n.type === 'LINE' || n.type === 'TEXT') return false;
   if (n.type === 'VECTOR') return (n.vectorPaths ?? []).every((p) => p.closed);
   return true;
+}
+
+/** Figma blur radius → Skia Gaussian sigma. */
+const sigma = (radius: number) => Math.max(0, radius / 2);
+
+/** On-canvas bounds grown by the layer's (and its children's) effects, for exports. */
+export function renderBounds(doc: DesignDocument, id: NodeId): Rect {
+  const b = worldBounds(doc, id);
+  const n = doc.get(id)!;
+  const pad = Math.max(effectOutset(n), ...doc.descendants(id).map(effectOutset), 0);
+  return { x: b.x - pad, y: b.y - pad, width: b.width + pad * 2, height: b.height + pad * 2 };
 }
