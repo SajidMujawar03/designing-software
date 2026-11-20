@@ -1,4 +1,6 @@
 import {
+  isGroupLike,
+  mapPaths,
   pathsBounds,
   worldBounds,
   worldTransform,
@@ -7,7 +9,7 @@ import {
   type NodeId,
   type NodePatch,
 } from '@figma/document';
-import { applyToPoint, invert, rectUnion, type Mat2D, type Rect, type Vec2 } from '@figma/geometry';
+import { applyToPoint, invert, rectUnion, type Rect, type Vec2 } from '@figma/geometry';
 import { layoutText } from '@figma/renderer';
 
 /** Normalizes degrees to (-180, 180]. */
@@ -26,7 +28,7 @@ export function worldRotation(doc: DesignDocument, id: NodeId): number {
 
 export function worldCenter(doc: DesignDocument, id: NodeId): Vec2 {
   const n = doc.get(id)!;
-  if (n.type === 'GROUP') {
+  if (isGroupLike(n)) {
     const b = worldBounds(doc, id);
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   }
@@ -124,7 +126,7 @@ export function leafIds(doc: DesignDocument, ids: NodeId[]): NodeId[] {
   const visit = (id: NodeId) => {
     const n = doc.get(id);
     if (!n) return;
-    if (n.type === 'GROUP') doc.childIds(id).forEach(visit);
+    if (isGroupLike(n)) doc.childIds(id).forEach(visit);
     else out.push(id);
   };
   ids.forEach(visit);
@@ -159,18 +161,6 @@ export function scaleBounds(doc: DesignDocument, ids: NodeId[], from: Rect, to: 
   }
 }
 
-/** Applies a matrix to paths: points fully, handles (offsets) by the linear part only. */
-export function mapPaths(paths: VectorPath[], m: Mat2D): VectorPath[] {
-  const lin = (v: Vec2) => ({ x: m[0] * v.x + m[2] * v.y, y: m[1] * v.x + m[3] * v.y });
-  return paths.map((path) => ({
-    closed: path.closed,
-    points: path.points.map((v) => {
-      const p = applyToPoint(m, v);
-      return { ...v, x: p.x, y: p.y, in: v.in && lin(v.in), out: v.out && lin(v.out) };
-    }),
-  }));
-}
-
 /** A vector's paths in canvas coordinates. */
 export function worldPathsOf(doc: DesignDocument, id: NodeId): VectorPath[] {
   const n = doc.get(id);
@@ -196,3 +186,5 @@ export function setVectorWorld(doc: DesignDocument, id: NodeId, world: VectorPat
   const place = placementIn(doc, n.parentId, center, worldRotation(doc, id), b.width, b.height);
   doc.updateNode(id, { ...place, width: b.width, height: b.height, vectorPaths: shifted });
 }
+
+export { mapPaths };

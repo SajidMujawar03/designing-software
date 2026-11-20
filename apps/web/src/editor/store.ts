@@ -3,7 +3,18 @@ import type { Rect, Vec2 } from '@figma/geometry';
 import { create } from 'zustand';
 import type { SnapGuides } from './snapping';
 
-export type ToolId = 'select' | 'frame' | 'rectangle' | 'ellipse' | 'line' | 'pen' | 'pencil' | 'text' | 'hand';
+export type ToolId =
+  | 'select'
+  | 'frame'
+  | 'rectangle'
+  | 'ellipse'
+  | 'polygon'
+  | 'star'
+  | 'line'
+  | 'pen'
+  | 'pencil'
+  | 'text'
+  | 'hand';
 
 /** A point on a vector path: [path index, point index]. */
 export type PointRef = [number, number];

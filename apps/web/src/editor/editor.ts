@@ -5,7 +5,7 @@ import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
 import { useUI, type ToolId, type UIState, type Viewport } from './store';
 import { boundsOf, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
-import { worldBounds } from '@figma/document';
+import { isGroupLike, worldBounds } from '@figma/document';
 
 const LAST_PAGE_KEY = 'figma-clone:last-page';
 export const MIN_ZOOM = 0.02;
@@ -291,7 +291,7 @@ export class Editor {
   ungroupSelection(): void {
     const containers = this.topLevelSelection().filter((id) => {
       const t = this.doc.get(id)!.type;
-      return t === 'GROUP' || t === 'FRAME';
+      return isGroupLike(this.doc.get(id)) || t === 'FRAME';
     });
     if (!containers.length) return;
     const released: NodeId[] = [];
@@ -423,7 +423,7 @@ export class Editor {
    */
   snapContext(exclude: NodeId[], parentId: NodeId): SnapContext {
     let ctxId = parentId;
-    while (this.doc.get(ctxId)?.type === 'GROUP') ctxId = this.doc.get(ctxId)!.parentId!;
+    while (isGroupLike(this.doc.get(ctxId))) ctxId = this.doc.get(ctxId)!.parentId!;
     const skip = new Set(exclude);
     const rects: Rect[] = [];
     const container = this.doc.get(ctxId);

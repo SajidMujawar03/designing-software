@@ -11,6 +11,8 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     frame: new ShapeTool(ed, 'FRAME'),
     rectangle: new ShapeTool(ed, 'RECTANGLE'),
     ellipse: new ShapeTool(ed, 'ELLIPSE'),
+    polygon: new ShapeTool(ed, 'POLYGON'),
+    star: new ShapeTool(ed, 'STAR'),
     line: new ShapeTool(ed, 'LINE'),
     pen: new PenTool(ed),
     pencil: new PencilTool(ed),

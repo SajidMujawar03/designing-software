@@ -1,4 +1,6 @@
+import type { BooleanOperation } from '@figma/document';
 import { editor } from './editor';
+import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import type { ToolId } from './store';
 
 const TOOL_KEYS: Record<string, ToolId> = {
@@ -45,7 +47,13 @@ export function installShortcuts(): () => void {
     if (mod && (key === '/' || key === 'k')) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
 
-    if (mod && e.altKey && key === 'g') return run(() => editor.frameSelection());
+    if (mod && e.altKey) {
+      const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
+      if (e.code === 'KeyG') return run(() => editor.frameSelection());
+      if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));
+      if (e.code === 'KeyO') return run(() => void outlineStrokeSelection(editor));
+    }
+    if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') return run(() => void flattenSelection(editor));
 
     // Alignment: Alt+A/D/H (left/right/center), Alt+W/S/V (top/bottom/middle); with Shift, H/V distribute.
     if (e.altKey && !mod) {
@@ -88,6 +96,8 @@ export function installShortcuts(): () => void {
     if (e.shiftKey && !e.altKey) {
       if (e.code === 'KeyR') return run(() => editor.setUI({ showRulers: !ui.showRulers }));
       if (e.code === 'KeyP') return run(() => editor.setTool('pencil'));
+      if (e.code === 'KeyG') return run(() => editor.setTool('polygon'));
+      if (e.code === 'KeyS') return run(() => editor.setTool('star'));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());

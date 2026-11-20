@@ -1,6 +1,20 @@
 export type NodeId = string;
 
-export type NodeType = 'DOCUMENT' | 'PAGE' | 'FRAME' | 'GROUP' | 'RECTANGLE' | 'ELLIPSE' | 'LINE' | 'TEXT' | 'VECTOR';
+export type NodeType =
+  | 'DOCUMENT'
+  | 'PAGE'
+  | 'FRAME'
+  | 'GROUP'
+  | 'BOOLEAN'
+  | 'RECTANGLE'
+  | 'ELLIPSE'
+  | 'POLYGON'
+  | 'STAR'
+  | 'LINE'
+  | 'TEXT'
+  | 'VECTOR';
+
+export type BooleanOperation = 'UNION' | 'SUBTRACT' | 'INTERSECT' | 'EXCLUDE';
 
 /** A point on a vector path, in the node's box coordinates. */
 export interface VectorVertex {
@@ -77,6 +91,15 @@ export interface SceneNode {
   // VECTOR
   vectorPaths?: VectorPath[];
 
+  // POLYGON / STAR
+  /** Number of sides (polygon) or points (star). */
+  pointCount?: number;
+  /** Star inner radius as a fraction of the outer radius (0–1). */
+  innerRadius?: number;
+
+  // BOOLEAN
+  booleanOperation?: BooleanOperation;
+
   // TEXT
   characters?: string;
   fontFamily?: string;
@@ -93,11 +116,17 @@ export type NodePatch = Partial<NodeProps>;
 
 /** Node types that can contain children on the canvas. */
 export const isContainer = (n: SceneNode): boolean =>
-  n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'PAGE' || n.type === 'DOCUMENT';
+  n.type === 'FRAME' || isGroupLike(n) || n.type === 'PAGE' || n.type === 'DOCUMENT';
+
+/**
+ * Groups and boolean operations hold children but have no box of their own:
+ * children are positioned in the parent's space, and bounds come from them.
+ */
+export const isGroupLike = (n: SceneNode | undefined | null): boolean => n?.type === 'GROUP' || n?.type === 'BOOLEAN';
 
 /**
  * Groups have no transform of their own: their children are positioned in the
  * group's parent space, and the group's box is derived from the children.
  */
 export const hasOwnTransform = (n: SceneNode): boolean =>
-  n.type !== 'GROUP' && n.type !== 'PAGE' && n.type !== 'DOCUMENT';
+  !isGroupLike(n) && n.type !== 'PAGE' && n.type !== 'DOCUMENT';

@@ -1,6 +1,7 @@
 import {
   localTransform,
   pathData,
+  shapePaths,
   worldBounds,
   worldTransform,
   type DesignDocument,
@@ -19,6 +20,7 @@ import type {
   Surface,
   TypefaceFontProvider,
 } from 'canvaskit-wasm';
+import { booleanKey, booleanPath } from './pathops';
 import type { FontRegistry, SceneOptions, SceneRenderer } from './types';
 
 /** Mat2D [a, b, c, d, e, f] → CanvasKit 3×3 row-major matrix. */
@@ -49,6 +51,8 @@ export class CanvasKitRenderer implements SceneRenderer {
   private registered = new Set<string>();
   private paragraphs = new Map<NodeId, CachedParagraph>();
   private paths = new Map<NodeId, { d: string; path: Path }>();
+  /** Document being drawn (boolean results need the whole subtree). */
+  private doc: DesignDocument | null = null;
   private unsubscribeFonts: () => void;
 
   constructor(
@@ -76,6 +80,7 @@ export class CanvasKitRenderer implements SceneRenderer {
   }
 
   render(doc: DesignDocument, pageId: NodeId, opts: SceneOptions): void {
+    this.doc = doc;
     const surface = this.surface;
     if (!surface) return;
     const c = surface.getCanvas();
@@ -98,6 +103,7 @@ export class CanvasKitRenderer implements SceneRenderer {
     const h = Math.max(1, Math.ceil(b.height * scale));
     const surface = this.ck.MakeSurface(w, h);
     if (!surface) return null;
+    this.doc = doc;
     const c = surface.getCanvas();
     c.clear(this.ck.TRANSPARENT);
     const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : IDENTITY;
@@ -126,6 +132,16 @@ export class CanvasKitRenderer implements SceneRenderer {
 
   private drawNode(c: Canvas, doc: DesignDocument, n: SceneNode, worldParent: Mat2D, ctx: DrawContext): void {
     if (!n.visible || n.opacity <= 0) return;
+
+    if (n.type === 'BOOLEAN') {
+      // Drawn as one shape: the combined outline of its children, with its own paints.
+      if (ctx.hidden?.has(n.id)) return;
+      const layered = this.beginOpacity(c, n.opacity);
+      this.fill(c, n);
+      this.stroke(c, n);
+      if (layered) c.restore();
+      return;
+    }
 
     if (n.type === 'GROUP') {
       // Groups have no transform; their opacity applies to the children as one layer.
@@ -195,6 +211,9 @@ export class CanvasKitRenderer implements SceneRenderer {
       case 'LINE':
         c.drawLine(0, 0, n.width, 0, paint);
         break;
+      case 'BOOLEAN':
+      case 'POLYGON':
+      case 'STAR':
       case 'VECTOR': {
         const path = this.vectorPath(n);
         if (path) c.drawPath(path, paint);
@@ -208,13 +227,15 @@ export class CanvasKitRenderer implements SceneRenderer {
     }
   }
 
-  /** Skia path for a vector node, cached until its paths change. */
+  /** Skia path for vectors, polygons, stars and booleans, cached until their geometry changes. */
   private vectorPath(n: SceneNode): Path | null {
-    const d = pathData(n.vectorPaths ?? []);
+    // Booleans are keyed on their children; other shapes on their own outline.
+    const d = n.type === 'BOOLEAN' ? booleanKey(this.doc!, n.id) : pathData(shapePaths(n));
     const cached = this.paths.get(n.id);
     if (cached?.d === d) return cached.path;
     cached?.path.delete();
-    const path = d ? this.ck.Path.MakeFromSVGString(d) : null;
+    const path =
+      n.type === 'BOOLEAN' ? booleanPath(this.ck, this.doc!, n.id) : d ? this.ck.Path.MakeFromSVGString(d) : null;
     if (path) this.paths.set(n.id, { d, path });
     else this.paths.delete(n.id);
     return path;

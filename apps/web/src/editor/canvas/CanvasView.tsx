@@ -1,8 +1,8 @@
 import { hitTest, selectableAncestor } from '@figma/document';
-import { Canvas2DRenderer, CanvasKitRenderer, loadCanvasKit, type SceneRenderer } from '@figma/renderer';
+import { Canvas2DRenderer, CanvasKitRenderer, type SceneRenderer } from '@figma/renderer';
 import type { CanvasKit } from 'canvaskit-wasm';
-import wasmUrl from 'canvaskit-wasm/bin/canvaskit.wasm?url';
 import { useEffect, useRef, useState } from 'react';
+import { canvasKitIfLoaded, getCanvasKit } from '../canvaskit';
 import { editor } from '../editor';
 import { fonts } from '../fonts';
 import { useUI } from '../store';
@@ -21,9 +21,6 @@ const currentTool = (): Tool => (editor.ui.vectorEdit && editor.ui.tool === 'sel
 editor.toolKey = (e) => currentTool().key?.(e) ?? false;
 editor.toolDeactivated = (t) => tools[t].deactivate?.();
 
-/** CanvasKit loads once per session; failures fall back to Canvas 2D. */
-let ckPromise: Promise<CanvasKit> | null = null;
-let ckLoaded: CanvasKit | null = null;
 let fittedOnce = false;
 
 export function CanvasView() {
@@ -35,22 +32,20 @@ export function CanvasView() {
   const spaceHeld = useUI((s) => s.spaceHeld);
   const panning = useUI((s) => s.panning);
   const pref = useUI((s) => s.rendererPref);
-  const [ck, setCk] = useState<CanvasKit | null>(ckLoaded);
+  const [ck, setCk] = useState<CanvasKit | null>(canvasKitIfLoaded());
   const [ckFailed, setCkFailed] = useState(false);
 
   // Load CanvasKit when it is the preferred renderer.
   useEffect(() => {
     if (pref !== 'canvaskit' || ck || ckFailed) return;
-    ckPromise ??= loadCanvasKit(wasmUrl);
     let alive = true;
-    ckPromise.then(
+    // CanvasKit loads once per session; failures fall back to Canvas 2D.
+    getCanvasKit().then(
       (loaded) => {
-        ckLoaded = loaded;
         if (alive) setCk(loaded);
       },
       (err) => {
         console.warn('CanvasKit failed to load; using Canvas 2D.', err);
-        ckPromise = null;
         if (alive) setCkFailed(true);
       },
     );

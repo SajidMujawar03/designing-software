@@ -2,7 +2,7 @@ import { generateKeyBetween } from 'fractional-indexing';
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { defaultProps } from './defaults';
-import type { NodeId, NodePatch, NodeType, SceneNode } from './types';
+import { isGroupLike, type NodeId, type NodePatch, type NodeType, type SceneNode } from './types';
 import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
@@ -298,11 +298,11 @@ export class DesignDocument {
     return { ...patch, vectorPaths: scalePaths(n.vectorPaths ?? [], n.width, n.height, w1, h1) };
   }
 
-  /** Groups only exist to hold children: an empty group is removed (and so on upward). */
+  /** Groups and booleans only exist to hold children: an empty one is removed (and so on upward). */
   private pruneEmptyGroup(id: NodeId): void {
     const n = this.nodes.get(id);
-    if (n?.type !== 'GROUP' || this.childIds(id).length > 0) return;
-    const parent = n.parentId;
+    if (!isGroupLike(n) || this.childIds(id).length > 0) return;
+    const parent = n!.parentId;
     this.yNodes.delete(id);
     this.refresh(id, true);
     if (parent) this.pruneEmptyGroup(parent);

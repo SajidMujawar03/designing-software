@@ -1,4 +1,4 @@
-import { pathData, rgbToHex, worldBounds, worldTransform, type DesignDocument, type NodeId, type Paint, type SceneNode } from '@figma/document';
+import { isGroupLike, pathData, rgbToHex, shapePaths, worldBounds, worldTransform, type DesignDocument, type NodeId, type Paint, type SceneNode } from '@figma/document';
 import { multiply, translation } from '@figma/geometry';
 import { layoutText } from './text';
 
@@ -19,7 +19,7 @@ function paintAttrs(n: SceneNode): string {
 }
 
 function transformAttr(n: SceneNode): string {
-  if (n.type === 'GROUP') return '';
+  if (isGroupLike(n)) return '';
   let t = `translate(${n.x} ${n.y})`;
   if (n.rotation) t += ` rotate(${n.rotation} ${n.width / 2} ${n.height / 2})`;
   return ` transform="${t}"`;
@@ -52,8 +52,17 @@ function nodeToSvg(doc: DesignDocument, n: SceneNode, defs: string[]): string {
       body = `<ellipse cx="${n.width / 2}" cy="${n.height / 2}" rx="${n.width / 2}" ry="${n.height / 2}"${paintAttrs(n)}/>`;
       break;
     case 'VECTOR':
-      body = `<path d="${pathData(n.vectorPaths ?? [])}"${paintAttrs(n)}/>`;
+    case 'POLYGON':
+    case 'STAR':
+      body = `<path d="${pathData(shapePaths(n))}"${paintAttrs(n)}/>`;
       break;
+    case 'BOOLEAN': {
+      // The combined outline comes from the caller (it needs Skia's path ops);
+      // without it, the children are exported as a plain group.
+      const d = svgOptions.booleanPathData?.(n.id);
+      body = d ? `<path d="${d}"${paintAttrs(n)}/>` : doc.children(n.id).map((c) => nodeToSvg(doc, c, defs)).join('');
+      break;
+    }
     case 'LINE':
       body = `<line x1="0" y1="0" x2="${n.width}" y2="0"${paintAttrs(n)}/>`;
       break;
@@ -77,8 +86,16 @@ function nodeToSvg(doc: DesignDocument, n: SceneNode, defs: string[]): string {
   return `${open}${body}</g>`;
 }
 
+export interface SvgOptions {
+  /** SVG path data for a boolean operation's result, in the boolean's space. */
+  booleanPathData?: (id: NodeId) => string | null;
+}
+
+let svgOptions: SvgOptions = {};
+
 /** Serializes a node (and its children) to a standalone SVG covering its on-canvas bounds. */
-export function exportSvg(doc: DesignDocument, id: NodeId): string {
+export function exportSvg(doc: DesignDocument, id: NodeId, options: SvgOptions = {}): string {
+  svgOptions = options;
   const n = doc.get(id)!;
   const b = worldBounds(doc, id);
   const defs: string[] = [];

@@ -712,3 +712,14 @@ button {
 .preset:hover {
   background: var(--hover);
 }
+
+.btn.small {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

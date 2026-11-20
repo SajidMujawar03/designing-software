@@ -1,7 +1,9 @@
 import {
+  isGroupLike,
   localTransform,
   rgbaCss,
   segmentsOf,
+  shapePaths,
   worldBounds,
   worldTransform,
   type DesignDocument,
@@ -53,6 +55,10 @@ function drawNode(
   opts: RenderOptions,
 ): void {
   if (!n.visible || n.opacity <= 0) return;
+  if (n.type === 'BOOLEAN') {
+    drawBoolean2D(ctx, doc, n, screenParent);
+    return;
+  }
   if (n.type === 'GROUP') {
     // Groups have no transform; children live in the group's parent space.
     ctx.save();
@@ -104,6 +110,8 @@ function shapePath(ctx: CanvasRenderingContext2D, n: SceneNode): void {
       ctx.lineTo(n.width, 0);
       break;
     case 'VECTOR':
+    case 'POLYGON':
+    case 'STAR':
       traceVector(ctx, n);
       break;
     default: {
@@ -114,9 +122,9 @@ function shapePath(ctx: CanvasRenderingContext2D, n: SceneNode): void {
   }
 }
 
-/** Adds a vector's paths to the current Canvas 2D path (also used by the overlay). */
+/** Adds a shape's outline to a Canvas 2D path (vectors, polygons, stars; also used by the overlay). */
 export function traceVector(ctx: CanvasRenderingContext2D | Path2D, n: SceneNode): void {
-  for (const path of n.vectorPaths ?? []) {
+  for (const path of shapePaths(n)) {
     if (!path.points.length) continue;
     ctx.moveTo(path.points[0].x, path.points[0].y);
     for (const s of segmentsOf(path)) ctx.bezierCurveTo(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.p3.x, s.p3.y);
@@ -201,4 +209,47 @@ export class Canvas2DRenderer implements SceneRenderer {
   }
 
   dispose(): void {}
+}
+
+const COMPOSITE: Record<string, GlobalCompositeOperation> = {
+  UNION: 'source-over',
+  SUBTRACT: 'destination-out',
+  INTERSECT: 'destination-in',
+  EXCLUDE: 'xor',
+};
+
+/**
+ * Canvas 2D fallback for boolean operations: composites the children's
+ * shapes on an offscreen layer, then tints it with the boolean's first fill.
+ * (CanvasKit computes the real outline; this fallback draws fills only.)
+ */
+function drawBoolean2D(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneNode, screenParent: Mat2D): void {
+  const fill = n.fills.find((f) => f.visible);
+  if (!fill || n.opacity <= 0) return;
+  const { width, height } = ctx.canvas;
+  if (!width || !height) return;
+  const layer = new OffscreenCanvas(width, height);
+  const l = layer.getContext('2d')!;
+  const leaves = (node: SceneNode): SceneNode[] =>
+    !node.visible ? [] : isGroupLike(node) ? doc.children(node.id).flatMap(leaves) : [node];
+  doc.children(n.id).forEach((child, i) => {
+    l.globalCompositeOperation = i === 0 ? 'source-over' : COMPOSITE[n.booleanOperation ?? 'UNION'];
+    const path = new Path2D();
+    for (const leaf of leaves(child)) {
+      const p = new Path2D();
+      traceVector(p, leaf);
+      const m = multiply(screenParent, localTransform(leaf));
+      path.addPath(p, new DOMMatrix([m[0], m[1], m[2], m[3], m[4], m[5]]));
+    }
+    l.fillStyle = '#000';
+    l.fill(path);
+  });
+  l.globalCompositeOperation = 'source-in';
+  l.fillStyle = paintStyle(fill);
+  l.fillRect(0, 0, width, height);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha *= n.opacity;
+  ctx.drawImage(layer, 0, 0);
+  ctx.restore();
 }

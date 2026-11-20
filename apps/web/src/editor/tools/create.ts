@@ -22,7 +22,7 @@ export class ShapeTool implements Tool {
 
   constructor(
     private ed: Editor,
-    private type: 'FRAME' | 'RECTANGLE' | 'ELLIPSE' | 'LINE',
+    private type: 'FRAME' | 'RECTANGLE' | 'ELLIPSE' | 'POLYGON' | 'STAR' | 'LINE',
   ) {}
 
   private get doc() {
@@ -60,7 +60,14 @@ export class ShapeTool implements Tool {
   }
 
   private create(): NodeId {
-    const names: Record<string, string> = { FRAME: 'Frame', RECTANGLE: 'Rectangle', ELLIPSE: 'Ellipse', LINE: 'Line' };
+    const names: Record<string, string> = {
+      FRAME: 'Frame',
+      RECTANGLE: 'Rectangle',
+      ELLIPSE: 'Ellipse',
+      POLYGON: 'Polygon',
+      STAR: 'Star',
+      LINE: 'Line',
+    };
     const id = this.doc.createNode({
       type: this.type,
       parentId: this.parentId!,

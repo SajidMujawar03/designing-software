@@ -1,4 +1,4 @@
-import { worldTransform, type NodeId } from '@figma/document';
+import { isGroupLike, worldTransform, type NodeId } from '@figma/document';
 import { applyToPoint, translation, type Mat2D, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { boundsOf, lineEndpoints } from '../transforms';
@@ -18,7 +18,7 @@ export function getSelectionFrame(ed: Editor): SelectionFrame | null {
   const ids = ed.topLevelSelection();
   // Vector edit mode shows points instead of the transform box.
   if (!ids.length || ed.ui.vectorEdit) return null;
-  if (ids.length === 1 && ed.doc.get(ids[0])!.type !== 'GROUP') {
+  if (ids.length === 1 && !isGroupLike(ed.doc.get(ids[0]))) {
     const n = ed.doc.get(ids[0])!;
     const frame: SelectionFrame = { ids, m: worldTransform(ed.doc, n.id), width: n.width, height: n.height };
     if (n.type === 'LINE') frame.line = lineEndpoints(ed.doc, n.id);

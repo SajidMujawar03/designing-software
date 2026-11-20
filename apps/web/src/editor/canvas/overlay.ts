@@ -1,4 +1,4 @@
-import { worldBounds, worldTransform, type NodeId } from '@figma/document';
+import { isGroupLike, worldBounds, worldTransform, type NodeId } from '@figma/document';
 import { applyToPoint, multiply, type Mat2D } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { CORNERS, getSelectionFrame, handleWorldPoint } from './handles';
@@ -40,7 +40,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   const outline = (id: NodeId, width: number) => {
     const n = doc.get(id);
     if (!n) return;
-    if (n.type === 'GROUP') {
+    if (isGroupLike(n)) {
       const b = worldBounds(doc, id);
       const a = ed.worldToScreen({ x: b.x, y: b.y });
       ctx.lineWidth = width;

@@ -1,4 +1,6 @@
+import { isGroupLike } from '@figma/document';
 import { editor } from './editor';
+import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import { exportJson } from './export';
 
 export interface Command {
@@ -11,9 +13,14 @@ export interface Command {
 }
 
 const hasSelection = () => editor.ui.selection.length > 0;
+const canBoolean = () => {
+  const sel = editor.topLevelSelection();
+  return sel.length >= 2 || (sel.length === 1 && editor.doc.get(sel[0])?.type === 'BOOLEAN');
+};
+const hasStroke = () => editor.selectedNodes().some((n) => n.strokeWeight > 0 && n.strokes.some((s) => s.visible));
 const multi = (n: number) => () => editor.topLevelSelection().length >= n;
 const hasContainer = () =>
-  editor.selectedNodes().some((n) => n.type === 'GROUP' || n.type === 'FRAME');
+  editor.selectedNodes().some((n) => isGroupLike(n) || n.type === 'FRAME');
 
 /** Every user command, used by the context menu and the command palette. */
 export const COMMANDS: Command[] = [
@@ -29,6 +36,13 @@ export const COMMANDS: Command[] = [
   { id: 'group', label: 'Group selection', shortcut: 'Ctrl+G', run: () => editor.groupSelection(), enabled: hasSelection },
   { id: 'ungroup', label: 'Ungroup', shortcut: 'Ctrl+Shift+G', run: () => editor.ungroupSelection(), enabled: hasContainer },
   { id: 'frame-selection', label: 'Frame selection', shortcut: 'Ctrl+Alt+G', run: () => editor.frameSelection(), enabled: hasSelection },
+
+  { id: 'union', label: 'Union selection', shortcut: 'Ctrl+Alt+U', run: () => booleanSelection(editor, 'UNION'), enabled: canBoolean },
+  { id: 'subtract', label: 'Subtract selection', shortcut: 'Ctrl+Alt+S', run: () => booleanSelection(editor, 'SUBTRACT'), enabled: canBoolean },
+  { id: 'intersect', label: 'Intersect selection', shortcut: 'Ctrl+Alt+I', run: () => booleanSelection(editor, 'INTERSECT'), enabled: canBoolean },
+  { id: 'exclude', label: 'Exclude selection', shortcut: 'Ctrl+Alt+X', run: () => booleanSelection(editor, 'EXCLUDE'), enabled: canBoolean },
+  { id: 'flatten', label: 'Flatten', shortcut: 'Ctrl+E', run: () => void flattenSelection(editor), enabled: hasSelection },
+  { id: 'outline-stroke', label: 'Outline stroke', shortcut: 'Ctrl+Alt+O', run: () => void outlineStrokeSelection(editor), enabled: hasStroke },
 
   { id: 'front', label: 'Bring to front', shortcut: 'Ctrl+Shift+]', run: () => editor.reorder('front'), enabled: hasSelection },
   { id: 'forward', label: 'Bring forward', shortcut: 'Ctrl+]', run: () => editor.reorder('forward'), enabled: hasSelection },
@@ -92,6 +106,13 @@ export const CANVAS_MENU = [
   'group',
   'ungroup',
   'frame-selection',
+  '-',
+  'union',
+  'subtract',
+  'intersect',
+  'exclude',
+  'flatten',
+  'outline-stroke',
   '-',
   'toggle-visible',
   'toggle-locked',

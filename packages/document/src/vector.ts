@@ -88,8 +88,7 @@ export function pathData(paths: VectorPath[]): string {
 }
 
 /** Hit test in the node's own (box) coordinates: inside a fill or near the outline. */
-export function vectorContainsPoint(n: SceneNode, p: Vec2, tolerance: number): boolean {
-  const paths = n.vectorPaths ?? [];
+export function vectorContainsPoint(n: SceneNode, p: Vec2, tolerance: number, paths = n.vectorPaths ?? []): boolean {
   const hasFill = n.fills.some((f) => f.visible);
   const near = Math.max(tolerance, n.strokeWeight / 2);
   let winding = 0;
@@ -101,4 +100,110 @@ export function vectorContainsPoint(n: SceneNode, p: Vec2, tolerance: number): b
     if (hasFill && poly.length > 2) winding += windingNumber(p, poly);
   }
   return winding !== 0;
+}
+
+/** Control-point distance that makes a cubic approximate a quarter circle. */
+const KAPPA = 0.5522847498;
+
+function ellipsePath(x: number, y: number, w: number, h: number): VectorPath {
+  const rx = w / 2;
+  const ry = h / 2;
+  const cx = x + rx;
+  const cy = y + ry;
+  const kx = rx * KAPPA;
+  const ky = ry * KAPPA;
+  return {
+    closed: true,
+    points: [
+      { x: cx, y: y, in: { x: -kx, y: 0 }, out: { x: kx, y: 0 } },
+      { x: x + w, y: cy, in: { x: 0, y: -ky }, out: { x: 0, y: ky } },
+      { x: cx, y: y + h, in: { x: kx, y: 0 }, out: { x: -kx, y: 0 } },
+      { x: x, y: cy, in: { x: 0, y: ky }, out: { x: 0, y: -ky } },
+    ],
+  };
+}
+
+function rectPath(w: number, h: number, radius: number): VectorPath {
+  const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+  if (r === 0) {
+    return { closed: true, points: [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }] };
+  }
+  const k = r * KAPPA;
+  return {
+    closed: true,
+    points: [
+      { x: r, y: 0, in: { x: -k, y: 0 } },
+      { x: w - r, y: 0, out: { x: k, y: 0 } },
+      { x: w, y: r, in: { x: 0, y: -k } },
+      { x: w, y: h - r, out: { x: 0, y: k } },
+      { x: w - r, y: h, in: { x: k, y: 0 } },
+      { x: r, y: h, out: { x: -k, y: 0 } },
+      { x: 0, y: h - r, in: { x: 0, y: k } },
+      { x: 0, y: r, out: { x: 0, y: -k } },
+    ],
+  };
+}
+
+/**
+ * Polygon or star corners (first point at the top), stretched so the shape
+ * fills its box exactly, as in Figma (a triangle's base sits on the bottom edge).
+ */
+function radialPath(w: number, h: number, count: number, inner: number | null): VectorPath {
+  const n = Math.max(3, Math.round(count));
+  const steps = inner === null ? n : n * 2;
+  const unit: Vec2[] = [];
+  for (let i = 0; i < steps; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI * 2) / steps;
+    const r = inner !== null && i % 2 === 1 ? inner : 1;
+    unit.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+  }
+  const minX = Math.min(...unit.map((p) => p.x));
+  const maxX = Math.max(...unit.map((p) => p.x));
+  const minY = Math.min(...unit.map((p) => p.y));
+  const maxY = Math.max(...unit.map((p) => p.y));
+  const points: VectorVertex[] = unit.map((p) => ({
+    x: ((p.x - minX) / (maxX - minX || 1)) * w,
+    y: ((p.y - minY) / (maxY - minY || 1)) * h,
+  }));
+  return { closed: true, points };
+}
+
+/**
+ * The outline of any shape as Bézier paths in its own box coordinates.
+ * Used for drawing polygons and stars, boolean operations and flattening.
+ * Text and containers have no outline of their own (empty).
+ */
+export function shapePaths(n: SceneNode): VectorPath[] {
+  switch (n.type) {
+    case 'RECTANGLE':
+    case 'FRAME':
+      return [rectPath(n.width, n.height, n.cornerRadius || 0)];
+    case 'ELLIPSE':
+      return [ellipsePath(0, 0, n.width, n.height)];
+    case 'POLYGON':
+      return [radialPath(n.width, n.height, n.pointCount ?? 3, null)];
+    case 'STAR':
+      return [radialPath(n.width, n.height, n.pointCount ?? 5, Math.max(0.01, Math.min(1, n.innerRadius ?? 0.382)))];
+    case 'LINE':
+      return [{ closed: false, points: [{ x: 0, y: 0 }, { x: n.width, y: 0 }] }];
+    case 'VECTOR':
+      return n.vectorPaths ?? [];
+    default:
+      return [];
+  }
+}
+
+/** Applies an affine matrix to paths: points fully, handles (offsets) by its linear part. */
+export function mapPaths(paths: VectorPath[], m: readonly [number, number, number, number, number, number]): VectorPath[] {
+  const lin = (v: Vec2) => ({ x: m[0] * v.x + m[2] * v.y, y: m[1] * v.x + m[3] * v.y });
+  return paths.map((path) => ({
+    closed: path.closed,
+    points: path.points.map((v) => ({
+      ...v,
+      x: m[0] * v.x + m[2] * v.y + m[4],
+      y: m[1] * v.x + m[3] * v.y + m[5],
+      in: v.in && lin(v.in),
+      out: v.out && lin(v.out),
+    })),
+  }));
 }

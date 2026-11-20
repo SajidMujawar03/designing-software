@@ -1,6 +1,7 @@
 import {
   childOfGroupContaining,
   hitTest,
+  isGroupLike,
   nodesInRect,
   selectableAncestor,
   type NodeId,
@@ -98,7 +99,7 @@ export class SelectTool implements Tool {
           center,
           startAngle: Math.atan2(e.world.y - center.y, e.world.x - center.x),
           items: this.snapshot(frame.ids),
-          single: frame.ids.length === 1 && this.doc.get(frame.ids[0])?.type !== 'GROUP',
+          single: frame.ids.length === 1 && !isGroupLike(this.doc.get(frame.ids[0])),
         };
         return;
       }
@@ -214,7 +215,7 @@ export class SelectTool implements Tool {
       const n = this.doc.get(id)!;
       if (n.parentId === target) continue;
       // Only layers that are not inside a moving group get a new parent.
-      if (this.doc.get(n.parentId)?.type === 'GROUP' && !g.tops.includes(n.parentId!)) continue;
+      if (isGroupLike(this.doc.get(n.parentId)) && !g.tops.includes(n.parentId!)) continue;
       this.doc.moveNode(id, target, null);
       for (const it of g.items) if (it.id === id) it.parentId = target;
     }
@@ -334,7 +335,7 @@ export class SelectTool implements Tool {
     // Enter a selected group: select its child under the pointer.
     const group = this.ed.ui.selection
       .map((id) => this.doc.get(id))
-      .find((n) => n?.type === 'GROUP' && this.doc.isAncestor(n.id, hit.id));
+      .find((n) => isGroupLike(n) && this.doc.isAncestor(n!.id, hit.id));
     if (group) {
       const child = childOfGroupContaining(this.doc, group.id, hit.id);
       if (child) this.ed.select([child]);

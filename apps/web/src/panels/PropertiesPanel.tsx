@@ -1,4 +1,4 @@
-import { solid, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
+import { isGroupLike, solid, type BooleanOperation, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -21,6 +21,7 @@ import {
 import { useState } from 'react';
 import { editor } from '../editor/editor';
 import { exportJson, exportPng, exportSvgFile } from '../editor/export';
+import { booleanSelection, flattenSelection, outlineStrokeSelection } from '../editor/pathCommands';
 import { FONT_FAMILIES, weightsOf } from '../editor/fonts';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
@@ -87,7 +88,7 @@ export function PropertiesPanel() {
 
       <AlignBar count={editor.topLevelSelection().length} />
 
-      {nodes.some((n) => n.type === 'GROUP') ? (
+      {nodes.some((n) => isGroupLike(n)) ? (
         <BoxLayout ids={ids} />
       ) : (
       <Section title="Layout">
@@ -139,6 +140,8 @@ export function PropertiesPanel() {
         )}
       </Section>
       )}
+
+      <ShapeSection ids={ids} nodes={nodes} />
 
       <Section title="Layer">
         <div className="grid2">
@@ -305,7 +308,7 @@ function ExportSection({ ids }: { ids: NodeId[] }) {
   const run = async () => {
     for (const id of ids) {
       if (format === 'PNG') await exportPng(id, scale);
-      else exportSvgFile(id);
+      else await exportSvgFile(id);
     }
   };
   return (
@@ -504,4 +507,106 @@ function FramePresets() {
 function weightOptions(family: string | Mixed): Array<[number, string]> {
   const ws = family === MIXED ? [] : weightsOf(family);
   return ws.length ? ws.map((w) => [w, WEIGHT_NAMES[w] ?? String(w)]) : DEFAULT_WEIGHTS;
+}
+
+/** Two overlapping squares showing each operation's result. */
+function BooleanIcon({ op }: { op: BooleanOperation }) {
+  const outline = { fill: 'none', stroke: 'currentColor', strokeWidth: 1, opacity: 0.45 };
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+      {op === 'UNION' && <path d="M1 1h8v4h4v8H5V9H1z" fill="currentColor" />}
+      {op === 'SUBTRACT' && (
+        <>
+          <path d="M1 1h8v4H5v4H1z" fill="currentColor" />
+          <rect x="5.5" y="5.5" width="7" height="7" {...outline} />
+        </>
+      )}
+      {op === 'INTERSECT' && (
+        <>
+          <rect x="1.5" y="1.5" width="7" height="7" {...outline} />
+          <rect x="5.5" y="5.5" width="7" height="7" {...outline} />
+          <rect x="5" y="5" width="4" height="4" fill="currentColor" />
+        </>
+      )}
+      {op === 'EXCLUDE' && <path d="M1 1h8v8H1zM5 5h8v8H5z" fill="currentColor" fillRule="evenodd" />}
+    </svg>
+  );
+}
+
+const BOOLEAN_OPS: Array<[BooleanOperation, string]> = [
+  ['UNION', 'Union (Ctrl+Alt+U)'],
+  ['SUBTRACT', 'Subtract (Ctrl+Alt+S)'],
+  ['INTERSECT', 'Intersect (Ctrl+Alt+I)'],
+  ['EXCLUDE', 'Exclude (Ctrl+Alt+X)'],
+];
+
+/** Polygon/star settings, boolean operation, and flatten / outline stroke. */
+function ShapeSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const radial = nodes.every((n) => n.type === 'POLYGON' || n.type === 'STAR');
+  const stars = nodes.every((n) => n.type === 'STAR');
+  const single = nodes.length === 1 ? nodes[0] : null;
+  const isBoolean = single?.type === 'BOOLEAN';
+  const top = editor.topLevelSelection().length;
+  const canCombine = top >= 2 || isBoolean;
+  const count = common(nodes.map((n) => n.pointCount ?? 0));
+  const ratio = common(nodes.map((n) => Math.round((n.innerRadius ?? 0) * 100)));
+  const hasStroke = nodes.some((n) => n.strokeWeight > 0 && n.strokes.some((st) => st.visible));
+  const canFlatten = nodes.some((n) => n.type !== 'TEXT');
+
+  if (!radial && !canCombine && !canFlatten) return null;
+  return (
+    <Section title={isBoolean ? 'Boolean' : 'Shape'}>
+      {radial && (
+        <div className="grid2">
+          <NumberField
+            label="Count"
+            title={stars ? 'Number of points' : 'Number of sides'}
+            value={count}
+            min={3}
+            max={60}
+            precision={0}
+            onChange={(v, live) => apply(ids, { pointCount: Math.round(v) }, live)}
+          />
+          {stars && (
+            <NumberField
+              label="Ratio"
+              title="Inner radius"
+              value={ratio}
+              suffix="%"
+              min={1}
+              max={100}
+              precision={0}
+              onChange={(v, live) => apply(ids, { innerRadius: v / 100 }, live)}
+            />
+          )}
+        </div>
+      )}
+      <div className="button-row">
+        {BOOLEAN_OPS.map(([op, label]) => (
+          <IconButton
+            key={op}
+            title={label}
+            disabled={!canCombine}
+            active={isBoolean && single?.booleanOperation === op}
+            onClick={() => booleanSelection(editor, op)}
+          >
+            <BooleanIcon op={op} />
+          </IconButton>
+        ))}
+        <span className="spacer" />
+        <button type="button" className="btn small" disabled={!canFlatten} onClick={() => void flattenSelection(editor)} title="Flatten (Ctrl+E)">
+          Flatten
+        </button>
+        <button
+          type="button"
+          className="btn small"
+          disabled={!hasStroke}
+          onClick={() => void outlineStrokeSelection(editor)}
+          title="Outline stroke (Ctrl+Alt+O)"
+        >
+          Outline
+        </button>
+      </div>
+    </Section>
+  );
 }
