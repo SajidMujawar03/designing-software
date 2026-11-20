@@ -214,8 +214,15 @@ button {
 }
 
 .canvas-wrap canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
   touch-action: none;
+}
+
+.scene-canvas {
+  pointer-events: none;
 }
 
 .text-editor {

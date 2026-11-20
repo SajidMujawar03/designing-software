@@ -10,6 +10,7 @@ import {
 } from '@figma/document';
 import { multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '@figma/geometry';
 import { drawText, layoutText } from './text';
+import type { SceneOptions, SceneRenderer } from './types';
 
 export interface RenderOptions {
   /** Canvas-space → screen (CSS px) transform: [zoom, 0, 0, zoom, panX, panY]. */
@@ -25,10 +26,7 @@ export interface RenderOptions {
 
 const paintStyle = (p: Paint): string => rgbaCss(p.color, p.opacity);
 
-/**
- * Draws a page with the Canvas 2D API. Behind the same entry point a
- * CanvasKit (Skia) backend will replace it in Phase 3.
- */
+/** Draws a page with the Canvas 2D API. */
 export function renderPage(
   ctx: CanvasRenderingContext2D,
   doc: DesignDocument,
@@ -161,4 +159,32 @@ export function renderNodeToCanvas(doc: DesignDocument, id: NodeId, scale = 1): 
     background: 'transparent',
   });
   return canvas;
+}
+
+/** Canvas 2D backend: always available; used as the fallback when WebGL/CanvasKit is not. */
+export class Canvas2DRenderer implements SceneRenderer {
+  readonly kind = 'canvas2d' as const;
+  private ctx: CanvasRenderingContext2D;
+  private dpr = 1;
+
+  constructor(private canvas: HTMLCanvasElement) {
+    this.ctx = canvas.getContext('2d')!;
+  }
+
+  resize(width: number, height: number, dpr: number): void {
+    this.dpr = dpr;
+    this.canvas.width = Math.round(width * dpr);
+    this.canvas.height = Math.round(height * dpr);
+  }
+
+  render(doc: DesignDocument, pageId: NodeId, opts: SceneOptions): void {
+    renderPage(this.ctx, doc, pageId, { ...opts, dpr: this.dpr, background: rgbaCss(opts.background) });
+  }
+
+  async exportPng(doc: DesignDocument, id: NodeId, scale: number): Promise<Blob | null> {
+    const canvas = renderNodeToCanvas(doc, id, scale);
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  }
+
+  dispose(): void {}
 }

@@ -55,6 +55,18 @@ export const COMMANDS: Command[] = [
   { id: 'rulers', label: 'Show/Hide rulers', shortcut: 'Shift+R', run: () => editor.setUI({ showRulers: !editor.ui.showRulers }) },
   { id: 'clear-guides', label: 'Remove all guides on this page', run: () => editor.clearGuides() },
 
+  {
+    id: 'renderer-canvaskit',
+    label: 'Renderer: use CanvasKit (Skia)',
+    run: () => editor.setRenderer('canvaskit'),
+    enabled: () => editor.ui.rendererPref !== 'canvaskit',
+  },
+  {
+    id: 'renderer-canvas2d',
+    label: 'Renderer: use Canvas 2D',
+    run: () => editor.setRenderer('canvas2d'),
+    enabled: () => editor.ui.rendererPref !== 'canvas2d',
+  },
   { id: 'add-page', label: 'Add page', run: () => editor.addPage() },
   { id: 'export-json', label: 'Export file as JSON', run: () => exportJson() },
 ];

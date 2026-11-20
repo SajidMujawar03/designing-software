@@ -1,6 +1,7 @@
 import { DesignDocument, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
+import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
 import { useUI, type ToolId, type UIState, type Viewport } from './store';
 import { boundsOf, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
@@ -17,6 +18,8 @@ export const MAX_ZOOM = 256;
 export class Editor {
   readonly doc = new DesignDocument();
   canvasSize = { width: 800, height: 600 };
+  /** The renderer currently drawing the canvas (set by the canvas view). */
+  renderer: SceneRenderer | null = null;
   /** Aborts the in-progress pointer gesture (set by the canvas view). */
   cancelGesture: () => void = () => {};
   private internalClipboard: ClipboardData | null = null;
@@ -453,6 +456,15 @@ export class Editor {
 
   clearGuides(): void {
     this.doc.change(() => this.doc.updateNode(this.pageId, { guides: [] }));
+  }
+
+  setRenderer(pref: 'canvaskit' | 'canvas2d'): void {
+    try {
+      localStorage.setItem('figma-clone:renderer', pref);
+    } catch {
+      // storage unavailable
+    }
+    this.setUI({ rendererPref: pref });
   }
 
   // ------------------------------------------------------------ pages

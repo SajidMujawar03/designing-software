@@ -16,8 +16,10 @@ const safeName = (s: string) => s.replace(/[^\w\- ]+/g, '_').trim() || 'export';
 export async function exportPng(id: NodeId, scale: number): Promise<void> {
   const n = editor.doc.get(id);
   if (!n) return;
-  const canvas = renderNodeToCanvas(editor.doc, id, scale);
-  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
+  // Export with the renderer on screen so the file matches what you see.
+  const blob = editor.renderer
+    ? await editor.renderer.exportPng(editor.doc, id, scale)
+    : await new Promise<Blob | null>((r) => renderNodeToCanvas(editor.doc, id, scale).toBlob(r, 'image/png'));
   if (blob) download(blob, `${safeName(n.name)}${scale !== 1 ? `@${scale}x` : ''}.png`);
 }
 

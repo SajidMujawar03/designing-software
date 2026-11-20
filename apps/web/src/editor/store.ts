@@ -32,6 +32,18 @@ export interface UIState {
   /** Open context menu position (CSS px in the window). */
   contextMenu: { x: number; y: number } | null;
   paletteOpen: boolean;
+  /** Renderer the user prefers; CanvasKit falls back to Canvas 2D if it cannot start. */
+  rendererPref: 'canvaskit' | 'canvas2d';
+  /** Renderer actually drawing the canvas. */
+  activeRenderer: 'canvaskit' | 'canvas2d' | null;
+}
+
+function storedRenderer(): 'canvaskit' | 'canvas2d' {
+  try {
+    return localStorage.getItem('figma-clone:renderer') === 'canvas2d' ? 'canvas2d' : 'canvaskit';
+  } catch {
+    return 'canvaskit';
+  }
 }
 
 export const useUI = create<UIState>()(() => ({
@@ -50,4 +62,6 @@ export const useUI = create<UIState>()(() => ({
   showRulers: true,
   contextMenu: null,
   paletteOpen: false,
+  rendererPref: storedRenderer(),
+  activeRenderer: null,
 }));

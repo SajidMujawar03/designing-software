@@ -1,7 +1,10 @@
-import { hitTest, rgbToHex, selectableAncestor } from '@figma/document';
-import { renderPage } from '@figma/renderer';
-import { useEffect, useRef } from 'react';
+import { hitTest, selectableAncestor } from '@figma/document';
+import { Canvas2DRenderer, CanvasKitRenderer, loadCanvasKit, type SceneRenderer } from '@figma/renderer';
+import type { CanvasKit } from 'canvaskit-wasm';
+import wasmUrl from 'canvaskit-wasm/bin/canvaskit.wasm?url';
+import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor';
+import { fonts } from '../fonts';
 import { useUI } from '../store';
 import { createTools, type Tool, type ToolEvent } from '../tools';
 import { snapPx } from '../tools/types';
@@ -9,72 +12,118 @@ import { drawOverlay } from './overlay';
 import { hitGuide, RULER } from './rulers';
 import { TextEditor } from './TextEditor';
 
-const CANVAS_BG = '#F5F5F5';
+const CANVAS_BG = { r: 245 / 255, g: 245 / 255, b: 245 / 255 };
 const tools = createTools(editor);
+
+/** CanvasKit loads once per session; failures fall back to Canvas 2D. */
+let ckPromise: Promise<CanvasKit> | null = null;
+let ckLoaded: CanvasKit | null = null;
+let fittedOnce = false;
 
 export function CanvasView() {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tool = useUI((s) => s.tool);
   const cursor = useUI((s) => s.cursor);
   const spaceHeld = useUI((s) => s.spaceHeld);
   const panning = useUI((s) => s.panning);
+  const pref = useUI((s) => s.rendererPref);
+  const [ck, setCk] = useState<CanvasKit | null>(ckLoaded);
+  const [ckFailed, setCkFailed] = useState(false);
 
-  // Render loop: redraw on the next frame after any document or UI change.
+  // Load CanvasKit when it is the preferred renderer.
   useEffect(() => {
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
+    if (pref !== 'canvaskit' || ck || ckFailed) return;
+    ckPromise ??= loadCanvasKit(wasmUrl);
+    let alive = true;
+    ckPromise.then(
+      (loaded) => {
+        ckLoaded = loaded;
+        if (alive) setCk(loaded);
+      },
+      (err) => {
+        console.warn('CanvasKit failed to load; using Canvas 2D.', err);
+        ckPromise = null;
+        if (alive) setCkFailed(true);
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [pref, ck, ckFailed]);
+
+  const backend: 'canvaskit' | 'canvas2d' = pref === 'canvaskit' && ck && !ckFailed ? 'canvaskit' : 'canvas2d';
+
+  // Renderer + render loop: redraw on the next frame after any document or UI change.
+  useEffect(() => {
+    const scene = sceneRef.current!;
+    const overlay = canvasRef.current!;
+    const octx = overlay.getContext('2d')!;
     let frame = 0;
-    const draw = () => {
+    let dpr = window.devicePixelRatio || 1;
+
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(draw);
+    };
+    const renderer: SceneRenderer =
+      backend === 'canvaskit' && ck ? new CanvasKitRenderer(ck, scene, fonts, schedule) : new Canvas2DRenderer(scene);
+    editor.renderer = renderer;
+    editor.setUI({ activeRenderer: renderer.kind });
+
+    function draw() {
       frame = 0;
-      const dpr = window.devicePixelRatio || 1;
       const { viewport, editingTextId } = editor.ui;
       const { width, height } = editor.canvasSize;
-      renderPage(ctx, editor.doc, editor.pageId, {
+      fonts.requestUsed(editor.doc);
+      renderer.render(editor.doc, editor.pageId, {
         view: [viewport.zoom, 0, 0, viewport.zoom, viewport.x, viewport.y],
-        dpr,
         visible: {
           x: -viewport.x / viewport.zoom,
           y: -viewport.y / viewport.zoom,
           width: width / viewport.zoom,
           height: height / viewport.zoom,
         },
-        background: editor.doc.get(editor.pageId)?.fills[0]
-          ? `#${rgbToHex(editor.doc.get(editor.pageId)!.fills[0].color)}`
-          : CANVAS_BG,
+        background: editor.doc.get(editor.pageId)?.fills[0]?.color ?? CANVAS_BG,
         hidden: editingTextId ? new Set([editingTextId]) : undefined,
       });
-      drawOverlay(ctx, editor, dpr);
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(draw);
-    };
+      octx.setTransform(1, 0, 0, 1, 0, 0);
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+      drawOverlay(octx, editor, dpr);
+    }
+
     const unsubDoc = editor.doc.subscribe(schedule);
     const unsubUI = useUI.subscribe(schedule);
-    document.fonts?.addEventListener?.('loadingdone', schedule);
+    const unsubFonts = fonts.onLoad(schedule);
 
     const ro = new ResizeObserver(() => {
-      const rect = canvas.parentElement!.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-      const first = editor.canvasSize.width === 800 && editor.canvasSize.height === 600;
+      const rect = wrapRef.current!.getBoundingClientRect();
+      dpr = window.devicePixelRatio || 1;
+      for (const c of [scene, overlay]) {
+        c.style.width = `${rect.width}px`;
+        c.style.height = `${rect.height}px`;
+      }
+      renderer.resize(rect.width, rect.height, dpr);
+      overlay.width = Math.round(rect.width * dpr);
+      overlay.height = Math.round(rect.height * dpr);
       editor.canvasSize = { width: rect.width, height: rect.height };
-      if (first) editor.zoomToFit();
-      schedule();
+      if (!fittedOnce && rect.width > 0) {
+        fittedOnce = true;
+        editor.zoomToFit();
+      }
+      draw();
     });
-    ro.observe(canvas.parentElement!);
-    schedule();
+    ro.observe(wrapRef.current!);
     return () => {
       unsubDoc();
       unsubUI();
+      unsubFonts();
       ro.disconnect();
-      document.fonts?.removeEventListener?.('loadingdone', schedule);
       if (frame) cancelAnimationFrame(frame);
+      if (editor.renderer === renderer) editor.renderer = null;
+      renderer.dispose();
     };
-  }, []);
+  }, [backend, ck]);
 
   // Pointer handling.
   useEffect(() => {
@@ -198,7 +247,9 @@ export function CanvasView() {
 
   return (
     <div className="canvas-wrap" ref={wrapRef}>
-      <canvas ref={canvasRef} style={{ cursor: css }} data-testid="canvas" />
+      {/* A fresh element per backend: a canvas cannot switch between WebGL and 2D contexts. */}
+      <canvas key={backend} ref={sceneRef} className="scene-canvas" data-renderer={backend} />
+      <canvas ref={canvasRef} className="overlay-canvas" style={{ cursor: css }} data-testid="canvas" />
       <TextEditor />
     </div>
   );

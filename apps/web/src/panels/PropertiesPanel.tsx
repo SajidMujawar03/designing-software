@@ -21,13 +21,24 @@ import {
 import { useState } from 'react';
 import { editor } from '../editor/editor';
 import { exportJson, exportPng, exportSvgFile } from '../editor/export';
+import { FONT_FAMILIES, weightsOf } from '../editor/fonts';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
 import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
-const FONTS = ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Playfair Display', 'Merriweather', 'Source Code Pro'];
-const WEIGHTS: Array<[number, string]> = [
+const WEIGHT_NAMES: Record<number, string> = {
+  100: 'Thin',
+  200: 'Extra Light',
+  300: 'Light',
+  400: 'Regular',
+  500: 'Medium',
+  600: 'Semi Bold',
+  700: 'Bold',
+  800: 'Extra Bold',
+  900: 'Black',
+};
+const DEFAULT_WEIGHTS: Array<[number, string]> = [
   [300, 'Light'],
   [400, 'Regular'],
   [500, 'Medium'],
@@ -180,7 +191,7 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
         aria-label="Font family"
       >
         {family === MIXED && <option value="">Mixed</option>}
-        {FONTS.map((f) => (
+        {FONT_FAMILIES.map((f) => (
           <option key={f}>{f}</option>
         ))}
       </select>
@@ -192,7 +203,7 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           aria-label="Font weight"
         >
           {weight === MIXED && <option value="">Mixed</option>}
-          {WEIGHTS.map(([w, label]) => (
+          {weightOptions(family ?? 'Inter').map(([w, label]) => (
             <option key={w} value={w}>
               {label}
             </option>
@@ -487,4 +498,10 @@ function FramePresets() {
       ))}
     </div>
   );
+}
+
+/** Weights the selected family ships with (all families' defaults when mixed). */
+function weightOptions(family: string | Mixed): Array<[number, string]> {
+  const ws = family === MIXED ? [] : weightsOf(family);
+  return ws.length ? ws.map((w) => [w, WEIGHT_NAMES[w] ?? String(w)]) : DEFAULT_WEIGHTS;
 }
