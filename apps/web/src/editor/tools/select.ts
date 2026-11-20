@@ -1,10 +1,28 @@
-import { hitTest, nodesInRect, type NodeId, type NodePatch } from '@figma/document';
-import { applyToPoint, invert, rectContainsPoint, rectFromPoints, type Mat2D, type Vec2 } from '@figma/geometry';
+import {
+  childOfGroupContaining,
+  hitTest,
+  nodesInRect,
+  selectableAncestor,
+  type NodeId,
+  type NodePatch,
+} from '@figma/document';
+import { applyToPoint, invert, rectContainsPoint, rectFromPoints, type Mat2D, type Rect, type Vec2 } from '@figma/geometry';
 import { getSelectionFrame, handleCursor, hitHandle, HANDLES, type HandleId, type SelectionFrame } from '../canvas/handles';
 import type { Editor } from '../editor';
-import { boundsOf, fitText, normDeg, placementIn, setLineEndpoints, worldCenter, worldRotation } from '../transforms';
+import { snapPoint, snapRect } from '../snapping';
+import {
+  boundsOf,
+  fitText,
+  leafIds,
+  normDeg,
+  placementIn,
+  setLineEndpoints,
+  worldCenter,
+  worldRotation,
+} from '../transforms';
 import { snapAngle, type Tool, type ToolEvent } from './types';
 
+/** Canvas placement of one geometry-carrying layer at gesture start. */
 interface ItemSnapshot {
   id: NodeId;
   parentId: NodeId;
@@ -17,7 +35,7 @@ interface ItemSnapshot {
 type Gesture =
   | { kind: 'none' }
   | { kind: 'pending'; start: ToolEvent; hitId: NodeId | null; wasSelected: boolean }
-  | { kind: 'move'; start: Vec2; items: ItemSnapshot[] }
+  | { kind: 'move'; start: Vec2; tops: NodeId[]; items: ItemSnapshot[]; bounds: Rect }
   | { kind: 'resize'; handle: HandleId; frame: SelectionFrame; inv: Mat2D; items: ItemSnapshot[] }
   | { kind: 'rotate'; center: Vec2; startAngle: number; items: ItemSnapshot[]; single: boolean }
   | { kind: 'endpoint'; id: NodeId; index: 0 | 1; other: Vec2 }
@@ -35,8 +53,9 @@ export class SelectTool implements Tool {
     return this.ed.doc;
   }
 
+  /** Snapshots the leaves of `ids` (groups are expanded: they carry no geometry). */
   private snapshot(ids: NodeId[]): ItemSnapshot[] {
-    return ids.map((id) => {
+    return leafIds(this.doc, ids).map((id) => {
       const n = this.doc.get(id)!;
       return {
         id,
@@ -49,8 +68,16 @@ export class SelectTool implements Tool {
     });
   }
 
+  /** Deepest layer under the pointer. */
   private hit(e: ToolEvent) {
     return hitTest(this.doc, this.ed.pageId, e.world, { tolerance: 4 / this.ed.ui.viewport.zoom });
+  }
+
+  /** What a click selects: the outermost group unless entered; Ctrl selects the deepest layer. */
+  private pick(e: ToolEvent): NodeId | null {
+    const hit = this.hit(e);
+    if (!hit) return null;
+    return e.mod ? hit.id : selectableAncestor(this.doc, hit.id, this.ed.ui.selection);
   }
 
   down(e: ToolEvent): void {
@@ -71,7 +98,7 @@ export class SelectTool implements Tool {
           center,
           startAngle: Math.atan2(e.world.y - center.y, e.world.x - center.x),
           items: this.snapshot(frame.ids),
-          single: frame.ids.length === 1,
+          single: frame.ids.length === 1 && this.doc.get(frame.ids[0])?.type !== 'GROUP',
         };
         return;
       }
@@ -81,13 +108,13 @@ export class SelectTool implements Tool {
       }
     }
 
-    const hit = this.hit(e);
+    const picked = this.pick(e);
     const sel = this.ed.ui.selection;
-    if (hit) {
-      const wasSelected = sel.includes(hit.id);
-      if (e.shift) this.ed.toggleSelected(hit.id);
-      else if (!wasSelected) this.ed.select([hit.id]);
-      this.g = { kind: 'pending', start: e, hitId: hit.id, wasSelected };
+    if (picked) {
+      const wasSelected = sel.includes(picked);
+      if (e.shift) this.ed.toggleSelected(picked);
+      else if (!wasSelected) this.ed.select([picked]);
+      this.g = { kind: 'pending', start: e, hitId: picked, wasSelected };
       return;
     }
 
@@ -117,34 +144,13 @@ export class SelectTool implements Tool {
           ids = this.ed.duplicateInPlace(ids);
           this.ed.select(ids);
         }
-        this.g = { kind: 'move', start: g.start.px, items: this.snapshot(ids) };
+        this.g = { kind: 'move', start: g.start.px, tops: ids, items: this.snapshot(ids), bounds: boundsOf(this.doc, ids)! };
         this.move(e);
         return;
       }
-      case 'move': {
-        let dx = e.px.x - g.start.x;
-        let dy = e.px.y - g.start.y;
-        if (e.shift) {
-          if (Math.abs(dx) > Math.abs(dy)) dy = 0;
-          else dx = 0;
-        }
-        // Dragging over a frame moves the layers into it; dragging out moves them to the page.
-        const moving = new Set(g.items.map((it) => it.id));
-        const target =
-          hitTest(this.doc, this.ed.pageId, e.world, { framesOnly: true, exclude: moving })?.id ?? this.ed.pageId;
-        for (const it of g.items) {
-          if (it.parentId !== target) {
-            this.doc.moveNode(it.id, target, null);
-            it.parentId = target;
-          }
-        }
-        const patches: Array<[NodeId, NodePatch]> = g.items.map((it) => [
-          it.id,
-          placementIn(this.doc, it.parentId, { x: it.center.x + dx, y: it.center.y + dy }, it.rotation, it.width, it.height),
-        ]);
-        this.doc.updateNodes(patches);
+      case 'move':
+        this.moveSelection(g, e);
         return;
-      }
       case 'resize':
         this.resize(g, e);
         return;
@@ -168,7 +174,13 @@ export class SelectTool implements Tool {
         return;
       }
       case 'endpoint': {
-        const p = e.shift ? snapAngle(g.other, e.px, 45) : e.px;
+        let p = e.shift ? snapAngle(g.other, e.px, 45) : e.px;
+        if (!e.shift && !e.mod) {
+          const n = this.doc.get(g.id)!;
+          const snapped = snapPoint(p, this.ed.snapContext([g.id], n.parentId!));
+          p = snapped.p;
+          this.ed.setUI({ snapGuides: snapped.guides });
+        }
         const [a, b] = g.index === 0 ? [p, g.other] : [g.other, p];
         setLineEndpoints(this.doc, g.id, a, b);
         return;
@@ -185,12 +197,63 @@ export class SelectTool implements Tool {
     }
   }
 
+  private moveSelection(g: Extract<Gesture, { kind: 'move' }>, e: ToolEvent): void {
+    let dx = e.px.x - g.start.x;
+    let dy = e.px.y - g.start.y;
+    let lockX = false;
+    let lockY = false;
+    if (e.shift) {
+      if (Math.abs(dx) > Math.abs(dy)) (dy = 0), (lockY = true);
+      else (dx = 0), (lockX = true);
+    }
+
+    // Dragging over a frame moves the layers into it; dragging out moves them to the page.
+    const target =
+      hitTest(this.doc, this.ed.pageId, e.world, { framesOnly: true, exclude: new Set(g.tops) })?.id ?? this.ed.pageId;
+    for (const id of g.tops) {
+      const n = this.doc.get(id)!;
+      if (n.parentId === target) continue;
+      // Only layers that are not inside a moving group get a new parent.
+      if (this.doc.get(n.parentId)?.type === 'GROUP' && !g.tops.includes(n.parentId!)) continue;
+      this.doc.moveNode(id, target, null);
+      for (const it of g.items) if (it.id === id) it.parentId = target;
+    }
+
+    // Smart guides: snap the moved bounds to nearby layers (hold Ctrl to skip).
+    let guides = null;
+    if (!e.mod) {
+      const r = { ...g.bounds, x: g.bounds.x + dx, y: g.bounds.y + dy };
+      const snap = snapRect(r, this.ed.snapContext(g.tops, this.doc.get(g.tops[0])!.parentId!), lockX, lockY);
+      dx += snap.dx;
+      dy += snap.dy;
+      guides = snap.guides;
+    }
+    this.ed.setUI({ snapGuides: guides });
+
+    const patches: Array<[NodeId, NodePatch]> = g.items.map((it) => {
+      const p = placementIn(this.doc, it.parentId, { x: it.center.x + dx, y: it.center.y + dy }, it.rotation, it.width, it.height);
+      return [it.id, { x: p.x, y: p.y }];
+    });
+    this.doc.updateNodes(patches);
+  }
+
   private resize(g: Extract<Gesture, { kind: 'resize' }>, e: ToolEvent): void {
     const { frame } = g;
     const w = frame.width || 1;
     const h = frame.height || 1;
-    const local = applyToPoint(g.inv, e.px);
     const u = HANDLES[g.handle];
+
+    // Snap the dragged handle when the box is axis-aligned.
+    let pointer = e.px;
+    const axisAligned = Math.abs(frame.m[1]) < 1e-9 && Math.abs(frame.m[2]) < 1e-9;
+    if (axisAligned && !e.mod) {
+      const parent = this.doc.get(frame.ids[0])!.parentId!;
+      const snapped = snapPoint(pointer, this.ed.snapContext(frame.ids, parent), { x: u.x !== 0.5, y: u.y !== 0.5 });
+      pointer = snapped.p;
+      this.ed.setUI({ snapGuides: snapped.guides });
+    }
+
+    const local = applyToPoint(g.inv, pointer);
     const ax = u.x === 0.5 ? null : e.alt ? w / 2 : (1 - u.x) * w;
     const ay = u.y === 0.5 ? null : e.alt ? h / 2 : (1 - u.y) * h;
     let sx = 1;
@@ -213,11 +276,10 @@ export class SelectTool implements Tool {
     }
     const fx = ax ?? w / 2;
     const fy = ay ?? h / 2;
-    const toWorld = frame.m;
 
     const patches: Array<[NodeId, NodePatch]> = g.items.map((it) => {
       const lc = applyToPoint(g.inv, it.center);
-      const nc = applyToPoint(toWorld, { x: fx + (lc.x - fx) * sx, y: fy + (lc.y - fy) * sy });
+      const nc = applyToPoint(frame.m, { x: fx + (lc.x - fx) * sx, y: fy + (lc.y - fy) * sy });
       const patch = placementIn(
         this.doc,
         it.parentId,
@@ -240,16 +302,18 @@ export class SelectTool implements Tool {
   up(_e: ToolEvent): void {
     const g = this.g;
     if (g.kind === 'pending' && g.hitId && g.wasSelected && !g.start.shift) {
-      // Click on an already-selected node inside a multi-selection: select just it.
+      // Click on an already-selected layer inside a multi-selection: select just it.
       if (this.ed.ui.selection.length > 1) this.ed.select([g.hitId]);
     }
-    if (g.kind === 'marquee') this.ed.setUI({ marquee: null });
-    this.doc.endGesture();
-    this.g = { kind: 'none' };
+    this.finish();
   }
 
   cancel(): void {
-    if (this.g.kind === 'marquee') this.ed.setUI({ marquee: null });
+    this.finish();
+  }
+
+  private finish(): void {
+    this.ed.setUI({ marquee: null, snapGuides: null });
     this.doc.endGesture();
     this.g = { kind: 'none' };
   }
@@ -261,12 +325,21 @@ export class SelectTool implements Tool {
       this.ed.setUI({ cursor: handleCursor(frame, h), hoverId: null });
       return;
     }
-    const hit = this.hit(e);
-    this.ed.setUI({ cursor: 'default', hoverId: hit?.id ?? null });
+    this.ed.setUI({ cursor: 'default', hoverId: this.pick(e) });
   }
 
   doubleClick(e: ToolEvent): void {
     const hit = this.hit(e);
-    if (hit?.type === 'TEXT') this.ed.startTextEdit(hit.id);
+    if (!hit) return;
+    // Enter a selected group: select its child under the pointer.
+    const group = this.ed.ui.selection
+      .map((id) => this.doc.get(id))
+      .find((n) => n?.type === 'GROUP' && this.doc.isAncestor(n.id, hit.id));
+    if (group) {
+      const child = childOfGroupContaining(this.doc, group.id, hit.id);
+      if (child) this.ed.select([child]);
+      return;
+    }
+    if (hit.type === 'TEXT') this.ed.startTextEdit(hit.id);
   }
 }

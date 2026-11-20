@@ -1,6 +1,7 @@
 import type { NodeId } from '@figma/document';
 import type { Rect } from '@figma/geometry';
 import { create } from 'zustand';
+import type { SnapGuides } from './snapping';
 
 export type ToolId = 'select' | 'frame' | 'rectangle' | 'ellipse' | 'line' | 'text' | 'hand';
 
@@ -25,6 +26,12 @@ export interface UIState {
   spaceHeld: boolean;
   panning: boolean;
   cursor: string;
+  /** Smart guides shown while dragging. */
+  snapGuides: SnapGuides | null;
+  showRulers: boolean;
+  /** Open context menu position (CSS px in the window). */
+  contextMenu: { x: number; y: number } | null;
+  paletteOpen: boolean;
 }
 
 export const useUI = create<UIState>()(() => ({
@@ -39,4 +46,8 @@ export const useUI = create<UIState>()(() => ({
   spaceHeld: false,
   panning: false,
   cursor: 'default',
+  snapGuides: null,
+  showRulers: true,
+  contextMenu: null,
+  paletteOpen: false,
 }));

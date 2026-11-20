@@ -17,7 +17,7 @@ export interface SelectionFrame {
 export function getSelectionFrame(ed: Editor): SelectionFrame | null {
   const ids = ed.topLevelSelection();
   if (!ids.length) return null;
-  if (ids.length === 1) {
+  if (ids.length === 1 && ed.doc.get(ids[0])!.type !== 'GROUP') {
     const n = ed.doc.get(ids[0])!;
     const frame: SelectionFrame = { ids, m: worldTransform(ed.doc, n.id), width: n.width, height: n.height };
     if (n.type === 'LINE') frame.line = lineEndpoints(ed.doc, n.id);

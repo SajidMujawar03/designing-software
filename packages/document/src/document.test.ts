@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
-import { DesignDocument, hitTest, nodesInRect, worldBounds } from './index';
+import { childOfGroupContaining, DesignDocument, hitTest, nodesInRect, selectableAncestor, worldBounds } from './index';
 
 function setup() {
   const doc = new DesignDocument();
@@ -110,6 +110,34 @@ describe('scene', () => {
     expect(hitTest(doc, page.id, { x: 500, y: 500 })).toBeNull();
     doc.change(() => doc.updateNode(r, { locked: true }));
     expect(hitTest(doc, page.id, { x: 20, y: 20 })?.id).toBe(f);
+  });
+
+  it('derives group bounds from children and removes empty groups', () => {
+    const { doc, page } = setup();
+    const g = doc.change(() => doc.createNode({ type: 'GROUP', parentId: page.id }));
+    const a = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: g, x: 10, y: 10, width: 10, height: 10 }));
+    const b = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: g, x: 50, y: 30, width: 20, height: 20 }));
+    expect(worldBounds(doc, g)).toEqual({ x: 10, y: 10, width: 60, height: 40 });
+    expect(hitTest(doc, page.id, { x: 15, y: 15 })?.id).toBe(a);
+    doc.change(() => doc.moveNode(a, page.id, null));
+    expect(doc.get(g)).toBeDefined();
+    doc.change(() => doc.deleteNodes([b]));
+    expect(doc.get(g)).toBeUndefined();
+    doc.undo();
+    expect(doc.get(g)).toBeDefined();
+  });
+
+  it('picks the outermost group unless it was entered', () => {
+    const { doc, page } = setup();
+    const outer = doc.change(() => doc.createNode({ type: 'GROUP', parentId: page.id }));
+    const inner = doc.change(() => doc.createNode({ type: 'GROUP', parentId: outer }));
+    const r = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: inner }));
+    const s = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: outer }));
+    expect(selectableAncestor(doc, r, [])).toBe(outer);
+    expect(selectableAncestor(doc, r, [outer])).toBe(outer);
+    expect(selectableAncestor(doc, r, [s])).toBe(inner);
+    expect(selectableAncestor(doc, r, [r])).toBe(r);
+    expect(childOfGroupContaining(doc, outer, r)).toBe(inner);
   });
 
   it('selects frame children with a partial marquee', () => {

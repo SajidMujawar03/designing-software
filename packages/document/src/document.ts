@@ -202,10 +202,14 @@ export class DesignDocument {
         toDelete.add(id);
         for (const d of this.descendants(id)) toDelete.add(d.id);
       }
+      const parents = new Set<NodeId>();
       for (const id of toDelete) {
+        const parent = this.nodes.get(id)?.parentId;
+        if (parent && !toDelete.has(parent)) parents.add(parent);
         this.yNodes.delete(id);
         this.refresh(id, true);
       }
+      for (const p of parents) this.pruneEmptyGroup(p);
     }, { merge: true });
   }
 
@@ -218,10 +222,12 @@ export class DesignDocument {
     const y = this.yNodes.get(id);
     if (!y) return;
     this.change(() => {
+      const oldParent = this.nodes.get(id)?.parentId;
       const siblings = this.childIds(parentId).filter((c) => c !== id);
       y.set('parentId', parentId);
       y.set('index', indexAboveIn(siblings, this.nodes, aboveId));
       this.refresh(id, true);
+      if (oldParent && oldParent !== parentId) this.pruneEmptyGroup(oldParent);
     }, { merge: true });
   }
 
@@ -234,11 +240,13 @@ export class DesignDocument {
     const y = this.yNodes.get(id);
     if (!y) return;
     this.change(() => {
+      const oldParent = this.nodes.get(id)?.parentId;
       y.set('parentId', parentId);
       const lo = above ? this.nodes.get(above)!.index : null;
       const hi = this.nodes.get(belowId)!.index;
       y.set('index', generateKeyBetween(lo, hi));
       this.refresh(id, true);
+      if (oldParent && oldParent !== parentId) this.pruneEmptyGroup(oldParent);
     }, { merge: true });
   }
 
@@ -277,6 +285,16 @@ export class DesignDocument {
   }
 
   // ---------------------------------------------------------------- internals
+
+  /** Groups only exist to hold children: an empty group is removed (and so on upward). */
+  private pruneEmptyGroup(id: NodeId): void {
+    const n = this.nodes.get(id);
+    if (n?.type !== 'GROUP' || this.childIds(id).length > 0) return;
+    const parent = n.parentId;
+    this.yNodes.delete(id);
+    this.refresh(id, true);
+    if (parent) this.pruneEmptyGroup(parent);
+  }
 
   /**
    * Updates the snapshot right away, so reads inside the same transaction

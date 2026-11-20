@@ -1,9 +1,12 @@
-import { worldTransform, type NodeId } from '@figma/document';
+import { worldBounds, worldTransform, type NodeId } from '@figma/document';
 import { applyToPoint, multiply, type Mat2D } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { CORNERS, getSelectionFrame, handleWorldPoint } from './handles';
+import { drawRulers } from './rulers';
 
 export const BLUE = '#0D99FF';
+export const RED = '#F24822';
+const PINK = '#FF24BD';
 
 /** Draws selection, hover, handles, marquee and frame labels in screen space. */
 export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number): void {
@@ -32,6 +35,14 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   const outline = (id: NodeId, width: number) => {
     const n = doc.get(id);
     if (!n) return;
+    if (n.type === 'GROUP') {
+      const b = worldBounds(doc, id);
+      const a = ed.worldToScreen({ x: b.x, y: b.y });
+      ctx.lineWidth = width;
+      ctx.strokeStyle = BLUE;
+      ctx.strokeRect(a.x, a.y, b.width * viewport.zoom, b.height * viewport.zoom);
+      return;
+    }
     const m = multiply(screen, multiply(view, worldTransform(doc, id)));
     ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
     ctx.beginPath();
@@ -77,6 +88,65 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     drawPill(ctx, label, cx, bottom + 8);
   }
 
+  // Ruler guides on this page.
+  const page = doc.get(pageId);
+  if (page?.guides?.length) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = RED;
+    const { width, height } = ed.canvasSize;
+    for (const g of page.guides) {
+      const s = ed.worldToScreen({ x: g.offset, y: g.offset });
+      ctx.beginPath();
+      if (g.axis === 'x') {
+        const x = Math.round(s.x) + 0.5;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+      } else {
+        const y = Math.round(s.y) + 0.5;
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // Smart guides while dragging.
+  const guides = ed.ui.snapGuides;
+  if (guides) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = RED;
+    for (const l of guides.lines) {
+      const a = ed.worldToScreen({ x: l.x1, y: l.y1 });
+      const b = ed.worldToScreen({ x: l.x2, y: l.y2 });
+      ctx.beginPath();
+      ctx.moveTo(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5);
+      ctx.lineTo(Math.round(b.x) + 0.5, Math.round(b.y) + 0.5);
+      ctx.stroke();
+    }
+    for (const gap of guides.gaps) {
+      const color = gap.spacing ? PINK : RED;
+      const a = ed.worldToScreen({ x: gap.x1, y: gap.y1 });
+      const b = ed.worldToScreen({ x: gap.x2, y: gap.y2 });
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      // End ticks.
+      const vertical = Math.abs(a.x - b.x) < 0.5;
+      for (const p of [a, b]) {
+        if (vertical) {
+          ctx.moveTo(p.x - 3, p.y);
+          ctx.lineTo(p.x + 3, p.y);
+        } else {
+          ctx.moveTo(p.x, p.y - 3);
+          ctx.lineTo(p.x, p.y + 3);
+        }
+      }
+      ctx.stroke();
+      drawPill(ctx, gap.label, (a.x + b.x) / 2, (a.y + b.y) / 2 - 9, color);
+    }
+  }
+
   if (marquee) {
     const a = ed.worldToScreen({ x: marquee.x, y: marquee.y });
     const w = marquee.width * viewport.zoom;
@@ -87,6 +157,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(w), Math.round(h));
   }
+
+  if (ed.ui.showRulers) drawRulers(ctx, ed);
 
   ctx.restore();
 }
@@ -103,13 +175,13 @@ function drawHandle(ctx: CanvasRenderingContext2D, p: { x: number; y: number }, 
   ctx.stroke();
 }
 
-function drawPill(ctx: CanvasRenderingContext2D, text: string, cx: number, top: number): void {
+function drawPill(ctx: CanvasRenderingContext2D, text: string, cx: number, top: number, color = BLUE): void {
   ctx.font = '500 11px Inter, system-ui, sans-serif';
   const w = ctx.measureText(text).width + 10;
   const h = 18;
   ctx.beginPath();
   ctx.roundRect(Math.round(cx - w / 2), Math.round(top), w, h, 3);
-  ctx.fillStyle = BLUE;
+  ctx.fillStyle = color;
   ctx.fill();
   ctx.fillStyle = '#FFFFFF';
   ctx.textBaseline = 'middle';

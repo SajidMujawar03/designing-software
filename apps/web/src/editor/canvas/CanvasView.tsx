@@ -1,4 +1,4 @@
-import { rgbToHex } from '@figma/document';
+import { hitTest, rgbToHex, selectableAncestor } from '@figma/document';
 import { renderPage } from '@figma/renderer';
 import { useEffect, useRef } from 'react';
 import { editor } from '../editor';
@@ -6,6 +6,7 @@ import { useUI } from '../store';
 import { createTools, type Tool, type ToolEvent } from '../tools';
 import { snapPx } from '../tools/types';
 import { drawOverlay } from './overlay';
+import { hitGuide, RULER } from './rulers';
 import { TextEditor } from './TextEditor';
 
 const CANVAS_BG = '#F5F5F5';
@@ -79,6 +80,8 @@ export function CanvasView() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     let active: Tool | null = null;
+    /** Guide being dragged (from a ruler, or an existing one). */
+    let guide: { index: number; axis: 'x' | 'y' } | null = null;
 
     const toEvent = (e: PointerEvent | MouseEvent): ToolEvent => {
       const r = canvas.getBoundingClientRect();
@@ -99,15 +102,40 @@ export function CanvasView() {
       if (e.button === 2) return;
       canvas.setPointerCapture(e.pointerId);
       const ui = editor.ui;
+      const ev = toEvent(e);
+      const gh = e.button === 0 && !ui.spaceHeld ? hitGuide(editor, ev.screen) : null;
+      if (gh) {
+        editor.doc.endGesture();
+        const index = gh.kind === 'ruler' ? editor.addGuide(gh.axis, ev.px[gh.axis]) : gh.index;
+        guide = { index, axis: gh.axis };
+        return;
+      }
       active = e.button === 1 || ui.spaceHeld ? tools.hand : tools[ui.tool];
       active.down(toEvent(e));
     };
     const onMove = (e: PointerEvent) => {
       const ev = toEvent(e);
-      if (active) active.move(ev);
-      else tools[editor.ui.tool].hover?.(ev);
+      if (guide) {
+        editor.moveGuide(guide.index, ev.px[guide.axis]);
+        return;
+      }
+      if (active) return active.move(ev);
+      tools[editor.ui.tool].hover?.(ev);
+      const gh = hitGuide(editor, ev.screen);
+      if (gh?.kind === 'guide') editor.setUI({ cursor: gh.axis === 'x' ? 'ew-resize' : 'ns-resize', hoverId: null });
+      else if (gh?.kind === 'ruler') editor.setUI({ cursor: 'default', hoverId: null });
     };
     const onUp = (e: PointerEvent) => {
+      if (guide) {
+        // Dropping a guide back on its ruler (or off-canvas) deletes it.
+        const ev = toEvent(e);
+        const pos = guide.axis === 'x' ? ev.screen.x : ev.screen.y;
+        if (pos < (editor.ui.showRulers ? RULER : 0)) editor.removeGuide(guide.index);
+        editor.doc.endGesture();
+        guide = null;
+        if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        return;
+      }
       if (!active) return;
       const t = active;
       active = null;
@@ -144,7 +172,16 @@ export function CanvasView() {
     canvas.addEventListener('dblclick', onDbl);
     canvas.addEventListener('pointerleave', onLeave);
     canvas.addEventListener('wheel', onWheel, { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault();
+      const ev = toEvent(e);
+      const hit = hitTest(editor.doc, editor.pageId, ev.world, { tolerance: 4 / editor.ui.viewport.zoom });
+      const id = hit && (ev.mod ? hit.id : selectableAncestor(editor.doc, hit.id, editor.ui.selection));
+      if (!id) editor.select([]);
+      else if (!editor.ui.selection.includes(id)) editor.select([id]);
+      editor.setUI({ contextMenu: { x: e.clientX, y: e.clientY } });
+    };
+    canvas.addEventListener('contextmenu', onContext);
     return () => {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
@@ -153,6 +190,7 @@ export function CanvasView() {
       canvas.removeEventListener('dblclick', onDbl);
       canvas.removeEventListener('pointerleave', onLeave);
       canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('contextmenu', onContext);
     };
   }, []);
 

@@ -37,3 +37,14 @@ pnpm typecheck
 | Ctrl+Shift+H / Ctrl+Shift+L | Hide / lock |
 | Arrows (Shift = 10px) | Nudge |
 | Enter / Esc | Edit text or select children / select parent |
+| Ctrl+G / Ctrl+Shift+G | Group / ungroup |
+| Ctrl+Alt+G | Frame selection |
+| Double-click | Enter a group (select the layer inside) |
+| Ctrl + click / Ctrl + drag | Select the deepest layer / move without snapping |
+| Alt+A / H / D | Align left / horizontal centers / right |
+| Alt+W / V / S | Align top / vertical centers / bottom |
+| Alt+Shift+H / V | Distribute horizontal / vertical spacing |
+| Tab / Shift+Tab | Select next / previous layer |
+| Shift+R | Show or hide rulers (drag from a ruler to add a guide, drop it back to remove) |
+| Ctrl+/ or Ctrl+K | Command palette |
+| Right-click | Context menu |

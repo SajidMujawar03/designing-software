@@ -8,6 +8,7 @@ import {
   rectContainsPoint,
   rectContainsRect,
   rectIntersects,
+  rectUnion,
   rotation,
   transformRect,
   translation,
@@ -16,13 +17,13 @@ import {
   type Vec2,
 } from '@figma/geometry';
 import type { DesignDocument } from './document';
-import type { NodeId, SceneNode } from './types';
+import { hasOwnTransform, type NodeId, type SceneNode } from './types';
 
 const DEG = Math.PI / 180;
 
 /** Node box to parent space. Rotation is around the box center. */
 export function localTransform(n: SceneNode): Mat2D {
-  if (n.type === 'PAGE' || n.type === 'DOCUMENT') return IDENTITY;
+  if (!hasOwnTransform(n)) return IDENTITY;
   if (!n.rotation) return translation(n.x, n.y);
   const cx = n.width / 2;
   const cy = n.height / 2;
@@ -49,9 +50,13 @@ export function parentTransform(doc: DesignDocument, id: NodeId): Mat2D {
 
 export const boxOf = (n: SceneNode): Rect => ({ x: 0, y: 0, width: n.width, height: n.height });
 
-/** Axis-aligned bounds on the canvas. */
+/** Axis-aligned bounds on the canvas. A group's bounds are its children's. */
 export function worldBounds(doc: DesignDocument, id: NodeId): Rect {
   const n = doc.get(id)!;
+  if (n.type === 'GROUP') {
+    const kids = doc.childIds(id).filter((c) => doc.get(c)!.visible);
+    return rectUnion(kids.map((c) => worldBounds(doc, c))) ?? { x: 0, y: 0, width: 0, height: 0 };
+  }
   return transformRect(worldTransform(doc, id), boxOf(n));
 }
 
@@ -74,6 +79,7 @@ export function isEffectivelyLocked(doc: DesignDocument, id: NodeId): boolean {
 
 /** Does the node's own shape contain the canvas-space point? */
 export function shapeContainsPoint(doc: DesignDocument, n: SceneNode, p: Vec2, tolerance: number): boolean {
+  if (n.type === 'GROUP') return doc.children(n.id).some((c) => c.visible && shapeContainsPoint(doc, c, p, tolerance));
   const local = applyToPoint(invert(worldTransform(doc, n.id)), p);
   const grown = { x: -tolerance, y: -tolerance, width: n.width + tolerance * 2, height: n.height + tolerance * 2 };
   switch (n.type) {
@@ -104,7 +110,11 @@ export function hitTest(doc: DesignDocument, pageId: NodeId, p: Vec2, opts: HitT
       const n = kids[i];
       if (!n.visible || n.locked || opts.exclude?.has(n.id)) continue;
       const inside = shapeContainsPoint(doc, n, p, n.type === 'FRAME' ? 0 : tol);
-      if (n.type === 'FRAME') {
+      if (n.type === 'GROUP') {
+        if (opts.framesOnly) continue;
+        const child = visit(n.id);
+        if (child) return child;
+      } else if (n.type === 'FRAME') {
         if (!n.clipsContent || inside) {
           const child = visit(n.id);
           if (child) return child;
@@ -131,6 +141,11 @@ export function nodesInRect(doc: DesignDocument, pageId: NodeId, r: Rect, deep =
       const b = worldBounds(doc, n.id);
       if (!rectIntersects(b, r)) continue;
       const hasKids = doc.childIds(n.id).length > 0;
+      if (n.type === 'GROUP') {
+        if (deep) visit(n.id, false);
+        else out.push(n);
+        continue;
+      }
       // A top-level frame only partly covered by the marquee selects its children.
       if (n.type === 'FRAME' && hasKids && (deep || (topLevel && !rectContainsRect(r, b)))) {
         const before = out.length;
@@ -143,4 +158,35 @@ export function nodesInRect(doc: DesignDocument, pageId: NodeId, r: Rect, deep =
   };
   visit(pageId, true);
   return out;
+}
+
+/**
+ * What a click on `hitId` selects, like Figma: the outermost group around the
+ * hit, unless the user has already "entered" that group (something inside it
+ * is selected). Double-click enters a selected group.
+ */
+export function selectableAncestor(doc: DesignDocument, hitId: NodeId, selection: NodeId[]): NodeId {
+  const entered = (groupId: NodeId) => selection.some((s) => s !== groupId && doc.isAncestor(groupId, s));
+  // Ancestors from the hit upward, stopping at the first non-group.
+  const chain: NodeId[] = [];
+  for (const a of doc.ancestors(hitId)) {
+    if (a.type !== 'GROUP') break;
+    chain.push(a.id);
+  }
+  // Outermost group first; descend while that group is entered.
+  let result = hitId;
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (!entered(chain[i])) {
+      result = chain[i];
+      break;
+    }
+  }
+  return result;
+}
+
+/** Double-click on a selected group: the child of that group under the hit. */
+export function childOfGroupContaining(doc: DesignDocument, groupId: NodeId, hitId: NodeId): NodeId | null {
+  let cur = doc.get(hitId);
+  while (cur && cur.parentId !== groupId) cur = doc.get(cur.parentId);
+  return cur?.id ?? null;
 }

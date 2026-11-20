@@ -1,9 +1,12 @@
 import { DesignDocument, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
+import type { SnapContext } from './snapping';
 import { useUI, type ToolId, type UIState, type Viewport } from './store';
-import { boundsOf, reparentKeepingPosition, worldCenter } from './transforms';
+import { boundsOf, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
+import { worldBounds } from '@figma/document';
 
+const LAST_PAGE_KEY = 'figma-clone:last-page';
 export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 256;
 
@@ -37,7 +40,15 @@ export class Editor {
 
   onReady(): void {
     this.doc.ensureInitialized();
-    this.setUI({ ready: true, pageId: this.doc.pages()[0].id });
+    // Reopen the page that was open last time, if it still exists.
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(LAST_PAGE_KEY);
+    } catch {
+      // storage unavailable
+    }
+    const page = this.doc.pages().find((p) => p.id === last) ?? this.doc.pages()[0];
+    this.setUI({ ready: true, pageId: page.id });
   }
 
   // ------------------------------------------------------------ selection
@@ -165,12 +176,7 @@ export class Editor {
   nudge(dx: number, dy: number): void {
     const ids = this.topLevelSelection();
     if (!ids.length) return;
-    this.doc.change(() => {
-      for (const id of ids) {
-        const n = this.doc.get(id)!;
-        this.doc.updateNode(id, { x: n.x + dx, y: n.y + dy });
-      }
-    });
+    this.doc.change(() => moveByWorld(this.doc, ids, dx, dy));
   }
 
   /** Ctrl+] / Ctrl+[ (one step) and Ctrl+Shift+] / [ (to front/back). */
@@ -236,11 +242,229 @@ export class Editor {
     return [...ids].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
   }
 
+  // ------------------------------------------------------------ grouping
+
+  private nextName(base: string, type: SceneNode['type']): string {
+    let count = 0;
+    for (const n of this.doc.allNodes()) if (n.type === type) count++;
+    return `${base} ${count + 1}`;
+  }
+
+  /** Ctrl+G: wraps the selection in a group, placed where the top-most layer was. */
+  groupSelection(): void {
+    const ids = this.sortByZ(this.topLevelSelection());
+    if (!ids.length) return;
+    const top = this.doc.get(ids[ids.length - 1])!;
+    const groupId = this.doc.change(() => {
+      const g = this.doc.createNode({
+        type: 'GROUP',
+        parentId: top.parentId!,
+        aboveId: top.id,
+        name: this.nextName('Group', 'GROUP'),
+        width: 0,
+        height: 0,
+      });
+      for (const id of ids) reparentKeepingPosition(this.doc, id, g);
+      return g;
+    });
+    this.select([groupId]);
+  }
+
+  /** Ctrl+Shift+G: replaces selected groups (and frames) with their children. */
+  ungroupSelection(): void {
+    const containers = this.topLevelSelection().filter((id) => {
+      const t = this.doc.get(id)!.type;
+      return t === 'GROUP' || t === 'FRAME';
+    });
+    if (!containers.length) return;
+    const released: NodeId[] = [];
+    this.doc.change(() => {
+      for (const gid of containers) {
+        const g = this.doc.get(gid)!;
+        for (const cid of this.doc.childIds(gid)) {
+          const c = this.doc.get(cid)!;
+          if (g.opacity < 1) this.doc.updateNode(cid, { opacity: c.opacity * g.opacity });
+          reparentKeepingPosition(this.doc, cid, g.parentId!, { below: gid });
+          released.push(cid);
+        }
+        // Groups disappear when emptied; frames have to be removed explicitly.
+        if (this.doc.has(gid)) this.doc.deleteNodes([gid]);
+      }
+    });
+    this.select(released);
+  }
+
+  /** Adds a frame of a preset size beside the existing top-level layers and shows it. */
+  addFramePreset(name: string, width: number, height: number): void {
+    const content = boundsOf(this.doc, this.doc.childIds(this.pageId));
+    const x = content ? Math.round(content.x + content.width + 100) : Math.round(this.viewCenter().x - width / 2);
+    const y = content ? Math.round(content.y) : Math.round(this.viewCenter().y - height / 2);
+    const id = this.doc.change(() =>
+      this.doc.createNode({ type: 'FRAME', parentId: this.pageId, name, x, y, width, height }),
+    );
+    this.setTool('select');
+    this.select([id]);
+    this.zoomToRect({ x, y, width, height }, 1);
+  }
+
+  /** Ctrl+Alt+G: wraps the selection in a frame of the same size. */
+  frameSelection(): void {
+    const ids = this.sortByZ(this.topLevelSelection());
+    const b = boundsOf(this.doc, ids);
+    if (!ids.length || !b) return;
+    const top = this.doc.get(ids[ids.length - 1])!;
+    const parentId = top.parentId!;
+    const frameId = this.doc.change(() => {
+      const f = this.doc.createNode({
+        type: 'FRAME',
+        parentId,
+        aboveId: top.id,
+        name: this.nextName('Frame', 'FRAME'),
+      });
+      this.doc.updateNode(
+        f,
+        placementIn(this.doc, parentId, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, worldRotation(this.doc, parentId), b.width, b.height),
+      );
+      for (const id of ids) reparentKeepingPosition(this.doc, id, f);
+      return f;
+    });
+    this.select([frameId]);
+  }
+
+  // ------------------------------------------------------------ align & distribute
+
+  /**
+   * Aligns the selection to its combined bounds, or a single layer to its
+   * parent frame.
+   */
+  align(edge: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom'): void {
+    const ids = this.topLevelSelection();
+    if (!ids.length) return;
+    let target: Rect | null;
+    if (ids.length === 1) {
+      const parent = this.doc.get(this.doc.get(ids[0])!.parentId);
+      if (!parent || parent.type === 'PAGE') return;
+      target = worldBounds(this.doc, parent.id);
+    } else target = boundsOf(this.doc, ids);
+    if (!target) return;
+    const t = target;
+    this.doc.change(() => {
+      for (const id of ids) {
+        const b = worldBounds(this.doc, id);
+        let dx = 0;
+        let dy = 0;
+        if (edge === 'left') dx = t.x - b.x;
+        if (edge === 'right') dx = t.x + t.width - (b.x + b.width);
+        if (edge === 'hcenter') dx = t.x + t.width / 2 - (b.x + b.width / 2);
+        if (edge === 'top') dy = t.y - b.y;
+        if (edge === 'bottom') dy = t.y + t.height - (b.y + b.height);
+        if (edge === 'vcenter') dy = t.y + t.height / 2 - (b.y + b.height / 2);
+        moveByWorld(this.doc, [id], Math.round(dx * 100) / 100, Math.round(dy * 100) / 100);
+      }
+    });
+  }
+
+  /** Equal spacing between layers, keeping the outermost two in place. */
+  distribute(axis: 'x' | 'y'): void {
+    const ids = this.topLevelSelection();
+    if (ids.length < 3) return;
+    const items = ids.map((id) => ({ id, b: worldBounds(this.doc, id) }));
+    const pos = (r: Rect) => (axis === 'x' ? r.x : r.y);
+    const size = (r: Rect) => (axis === 'x' ? r.width : r.height);
+    items.sort((a, b) => pos(a.b) - pos(b.b));
+    const first = items[0].b;
+    const last = items[items.length - 1].b;
+    const span = pos(last) + size(last) - pos(first);
+    const gap = (span - items.reduce((s, it) => s + size(it.b), 0)) / (items.length - 1);
+    this.doc.change(() => {
+      let cursor = pos(first) + size(first) + gap;
+      for (const it of items.slice(1, -1)) {
+        const d = Math.round((cursor - pos(it.b)) * 100) / 100;
+        moveByWorld(this.doc, [it.id], axis === 'x' ? d : 0, axis === 'y' ? d : 0);
+        cursor += size(it.b) + gap;
+      }
+    });
+  }
+
+  /** Tab / Shift+Tab: select the next or previous sibling. */
+  selectSibling(dir: 1 | -1): void {
+    const n = this.selectedNodes()[0];
+    const parentId = n?.parentId ?? this.pageId;
+    const sibs = this.doc.childIds(parentId).filter((id) => this.doc.get(id)!.visible);
+    if (!sibs.length) return;
+    // Layers panel order is top-first, so "next" walks down the stack.
+    const i = n ? sibs.indexOf(n.id) : -1;
+    const j = i < 0 ? sibs.length - 1 : (i - dir + sibs.length) % sibs.length;
+    this.select([sibs[j]]);
+  }
+
+  // ------------------------------------------------------------ snapping
+
+  /**
+   * What a drag inside `parentId` can snap to: the containing frame, its other
+   * children (or the page's top-level layers), and the page's ruler guides.
+   */
+  snapContext(exclude: NodeId[], parentId: NodeId): SnapContext {
+    let ctxId = parentId;
+    while (this.doc.get(ctxId)?.type === 'GROUP') ctxId = this.doc.get(ctxId)!.parentId!;
+    const skip = new Set(exclude);
+    const rects: Rect[] = [];
+    const container = this.doc.get(ctxId);
+    if (container?.type === 'FRAME') rects.push(worldBounds(this.doc, ctxId));
+    for (const c of this.doc.children(ctxId)) {
+      if (!c.visible || skip.has(c.id)) continue;
+      if (exclude.some((id) => this.doc.isAncestor(c.id, id))) {
+        // A group holding the moving layer: snap to its other members instead.
+        for (const g of this.doc.children(c.id)) if (!skip.has(g.id) && g.visible) rects.push(worldBounds(this.doc, g.id));
+        continue;
+      }
+      rects.push(worldBounds(this.doc, c.id));
+    }
+    const guides = this.doc.get(this.pageId)?.guides ?? [];
+    return {
+      rects,
+      guideX: guides.filter((g) => g.axis === 'x').map((g) => g.offset),
+      guideY: guides.filter((g) => g.axis === 'y').map((g) => g.offset),
+      threshold: 5 / this.ui.viewport.zoom,
+    };
+  }
+
+  // ------------------------------------------------------------ ruler guides
+
+  private get guides() {
+    return this.doc.get(this.pageId)?.guides ?? [];
+  }
+
+  /** Adds a guide to the current page and returns its index. Merges into the current undo step. */
+  addGuide(axis: 'x' | 'y', offset: number): number {
+    const next = [...this.guides, { axis, offset: Math.round(offset) }];
+    this.doc.updateNode(this.pageId, { guides: next });
+    return next.length - 1;
+  }
+
+  moveGuide(index: number, offset: number): void {
+    const next = this.guides.map((g, i) => (i === index ? { ...g, offset: Math.round(offset) } : g));
+    this.doc.updateNode(this.pageId, { guides: next });
+  }
+
+  removeGuide(index: number): void {
+    this.doc.updateNode(this.pageId, { guides: this.guides.filter((_, i) => i !== index) });
+  }
+
+  clearGuides(): void {
+    this.doc.change(() => this.doc.updateNode(this.pageId, { guides: [] }));
+  }
+
   // ------------------------------------------------------------ pages
 
   setPage(pageId: NodeId): void {
     this.commitTextEdit();
     this.setUI({ pageId, selection: [], hoverId: null });
+    try {
+      localStorage.setItem(LAST_PAGE_KEY, pageId);
+    } catch {
+      // storage unavailable
+    }
   }
 
   addPage(): void {
