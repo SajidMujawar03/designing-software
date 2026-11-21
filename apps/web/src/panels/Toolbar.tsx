@@ -1,4 +1,4 @@
-import { ArrowUpRight, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -11,21 +11,111 @@ import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI, type ToolId } from '../editor/store';
 
-const TOOLS: Array<{ id: ToolId; label: string; key: string; Icon: typeof Square }> = [
-  { id: 'select', label: 'Move', key: 'V', Icon: MousePointer2 },
-  { id: 'frame', label: 'Frame', key: 'F', Icon: Frame },
-  { id: 'rectangle', label: 'Rectangle', key: 'R', Icon: Square },
-  { id: 'ellipse', label: 'Ellipse', key: 'O', Icon: Circle },
-  { id: 'polygon', label: 'Polygon', key: 'Shift+G', Icon: Triangle },
-  { id: 'star', label: 'Star', key: 'Shift+S', Icon: Star },
-  { id: 'line', label: 'Line', key: 'L', Icon: Minus },
-  { id: 'arrow', label: 'Arrow', key: 'Shift+L', Icon: ArrowUpRight },
-  { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
-  { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
-  { id: 'text', label: 'Text', key: 'T', Icon: Type },
-  { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
-  { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
+interface ToolDef {
+  id: ToolId;
+  label: string;
+  key: string;
+  Icon: typeof Square;
+}
+
+const T = {
+  select: { id: 'select', label: 'Move', key: 'V', Icon: MousePointer2 },
+  scale: { id: 'scale', label: 'Scale', key: 'K', Icon: Scaling },
+  frame: { id: 'frame', label: 'Frame', key: 'F', Icon: Frame },
+  section: { id: 'section', label: 'Section', key: 'Shift+S', Icon: PanelTop },
+  slice: { id: 'slice', label: 'Slice', key: 'S', Icon: Slice },
+  rectangle: { id: 'rectangle', label: 'Rectangle', key: 'R', Icon: Square },
+  ellipse: { id: 'ellipse', label: 'Ellipse', key: 'O', Icon: Circle },
+  polygon: { id: 'polygon', label: 'Polygon', key: 'Shift+G', Icon: Triangle },
+  star: { id: 'star', label: 'Star', key: '', Icon: Star },
+  line: { id: 'line', label: 'Line', key: 'L', Icon: Minus },
+  arrow: { id: 'arrow', label: 'Arrow', key: 'Shift+L', Icon: ArrowUpRight },
+  pen: { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
+  pencil: { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
+  text: { id: 'text', label: 'Text', key: 'T', Icon: Type },
+  hand: { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
+  comment: { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
+} satisfies Record<string, ToolDef>;
+
+/** Toolbar slots: a single tool, or a group whose menu picks which of its tools the slot shows. */
+const TOOLS: ToolDef[][] = [
+  [T.select, T.scale],
+  [T.frame, T.section, T.slice],
+  [T.rectangle],
+  [T.ellipse],
+  [T.polygon],
+  [T.star],
+  [T.line],
+  [T.arrow],
+  [T.pen],
+  [T.pencil],
+  [T.text],
+  [T.hand],
+  [T.comment],
 ];
+
+const tip = (t: ToolDef) => (t.key ? `${t.label} (${t.key})` : t.label);
+
+/** One toolbar slot. A group shows its active (or last used) tool, with a caret that opens the others. */
+function ToolSlot({ tools, tool }: { tools: ToolDef[]; tool: ToolId }) {
+  const [last, setLast] = useState(tools[0]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = tools.find((t) => t.id === tool) ?? last;
+  const active = tools.some((t) => t.id === tool);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', close, true);
+    return () => {
+      window.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('keydown', close, true);
+    };
+  }, [open]);
+
+  const pick = (t: ToolDef) => {
+    setLast(t);
+    setOpen(false);
+    editor.setTool(t.id);
+  };
+  const { Icon } = current;
+  return (
+    <div className="tool-slot" ref={ref}>
+      <button
+        type="button"
+        className={`tool-btn${active ? ' active' : ''}`}
+        title={tip(current)}
+        aria-label={current.label}
+        aria-pressed={active}
+        onClick={() => editor.setTool(current.id)}
+      >
+        <Icon size={16} strokeWidth={1.75} />
+      </button>
+      {tools.length > 1 && (
+        <button type="button" className="tool-caret" title={`More ${current.label.toLowerCase()} tools`} aria-label={`More tools like ${current.label}`} aria-expanded={open} onClick={() => setOpen(!open)}>
+          <ChevronDown size={10} />
+        </button>
+      )}
+      {open && (
+        <div className="menu tool-menu" role="menu">
+          {tools.map((t) => (
+            <button key={t.id} type="button" role="menuitemradio" aria-checked={t.id === current.id} className="menu-item" onClick={() => pick(t)}>
+              <span className="tool-menu-label">
+                <t.Icon size={14} strokeWidth={1.75} />
+                {t.label}
+              </span>
+              {t.key && <kbd>{t.key}</kbd>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Toolbar() {
   useDocVersion();
@@ -40,18 +130,8 @@ export function Toolbar() {
         <div className="logo" aria-hidden>
           ◆
         </div>
-        {TOOLS.filter((t) => t.id !== 'comment' || location.pathname.startsWith('/file/')).map(({ id, label, key, Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className={`tool-btn${tool === id ? ' active' : ''}`}
-            title={`${label} (${key})`}
-            aria-label={label}
-            aria-pressed={tool === id}
-            onClick={() => editor.setTool(id)}
-          >
-            <Icon size={16} strokeWidth={1.75} />
-          </button>
+        {TOOLS.filter((g) => g[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
+          <ToolSlot key={g[0].id} tools={g} tool={tool} />
         ))}
         <span className="divider" />
         <button type="button" className="tool-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!editor.doc.canUndo()} onClick={() => editor.undo()}>

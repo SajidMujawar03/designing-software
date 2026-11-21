@@ -1,5 +1,5 @@
 import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
-import { Boxes, Combine, Component, Contrast, Diamond, Image as ImageIcon, ImageOff, Star, Triangle } from 'lucide-react';
+import { Boxes, Combine, Component, Contrast, Diamond, Image as ImageIcon, ImageOff, PanelTop, Slice, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
@@ -12,6 +12,8 @@ import { IconButton } from './controls';
 
 const ICONS: Partial<Record<NodeType, typeof Square>> = {
   FRAME: Hash,
+  SECTION: PanelTop,
+  SLICE: Slice,
   COMPONENT: Component,
   COMPONENT_SET: Boxes,
   INSTANCE: Diamond,

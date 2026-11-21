@@ -213,7 +213,8 @@ export class CanvasKitRenderer implements SceneRenderer {
   async exportPng(doc: DesignDocument, id: NodeId, scale: number): Promise<Blob | null> {
     const n = doc.get(id);
     if (!n) return null;
-    const b = renderBounds(doc, id);
+    const area = sliceArea(doc, id);
+    const b = area?.rect ?? renderBounds(doc, id);
     const w = Math.max(1, Math.ceil(b.width * scale));
     const h = Math.max(1, Math.ceil(b.height * scale));
     const surface = this.ck.MakeSurface(w, h);
@@ -221,9 +222,15 @@ export class CanvasKitRenderer implements SceneRenderer {
     this.doc = doc;
     const c = surface.getCanvas();
     c.clear(this.ck.TRANSPARENT);
-    const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : IDENTITY;
-    c.concat(toCk(multiply([scale, 0, 0, scale, -b.x * scale, -b.y * scale], parentWorld)));
-    this.drawNode(c, doc, n, parentWorld, { visible: b });
+    if (area) {
+      // A slice: everything on its page inside the slice's rectangle.
+      c.concat(toCk([scale, 0, 0, scale, -b.x * scale, -b.y * scale]));
+      for (const root of area.roots) this.drawNode(c, doc, root, IDENTITY, { visible: b });
+    } else {
+      const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : IDENTITY;
+      c.concat(toCk(multiply([scale, 0, 0, scale, -b.x * scale, -b.y * scale], parentWorld)));
+      this.drawNode(c, doc, n, parentWorld, { visible: b });
+    }
     surface.flush();
     const image = surface.makeImageSnapshot();
     const bytes = image.encodeToBytes();
@@ -335,6 +342,7 @@ export class CanvasKitRenderer implements SceneRenderer {
         this.stroke(c, n);
         return;
       case 'FRAME':
+      case 'SECTION':
       case 'COMPONENT':
       case 'COMPONENT_SET':
       case 'INSTANCE':
@@ -636,6 +644,18 @@ export function strokeOutset(n: SceneNode): number {
   // Mitred corners sharper than a right angle (stars, polygons, paths) reach past the stroke (Skia's miter limit is 4).
   const sharp = n.type === 'STAR' || n.type === 'POLYGON' || n.type === 'VECTOR';
   return sharp && (n.strokeJoin ?? 'MITER') === 'MITER' ? out * 4 : out;
+}
+
+/**
+ * For a slice: the area it exports (its rectangle on the canvas) and the
+ * page's top-level layers to draw there. Null for other layers.
+ */
+export function sliceArea(doc: DesignDocument, id: NodeId): { rect: Rect; roots: SceneNode[] } | null {
+  const n = doc.get(id);
+  if (n?.type !== 'SLICE') return null;
+  const page = doc.pageOf(id);
+  const b = worldBounds(doc, id);
+  return { rect: { x: b.x, y: b.y, width: Math.max(1, b.width), height: Math.max(1, b.height) }, roots: page ? doc.children(page.id) : [] };
 }
 
 /** What a layer draws outside its box: its stroke and effects. */

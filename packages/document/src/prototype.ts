@@ -31,17 +31,30 @@ export const DEVICES: DevicePreset[] = [
 
 export const deviceOf = (d: PrototypeDevice | null | undefined): DevicePreset => DEVICES.find((x) => x.id === d?.type) ?? DEVICES[0];
 
-/** Top-level frames of a page: the screens a prototype can show. */
+const isScreen = (n: SceneNode) => n.type === 'FRAME' || n.type === 'COMPONENT' || n.type === 'INSTANCE';
+
+/** Top-level frames of a page (sections don't count as a level): the screens a prototype can show. */
 export function screensOf(doc: DesignDocument, pageId: NodeId): SceneNode[] {
-  return doc.children(pageId).filter((n) => n.type === 'FRAME' || n.type === 'COMPONENT' || n.type === 'INSTANCE');
+  const out: SceneNode[] = [];
+  const visit = (parentId: NodeId) => {
+    for (const n of doc.children(parentId)) {
+      if (n.type === 'SECTION') visit(n.id);
+      else if (isScreen(n)) out.push(n);
+    }
+  };
+  visit(pageId);
+  return out;
 }
 
-/** The top-level frame (screen) a layer is on. */
+/** The top-level frame (screen) a layer is on: the outermost layer below the page and any sections. */
 export function screenOf(doc: DesignDocument, id: NodeId): SceneNode | undefined {
-  const page = doc.pageOf(id);
   let n = doc.get(id);
-  while (n && n.parentId !== page?.id) n = doc.get(n.parentId);
-  return n && n.parentId === page?.id ? n : undefined;
+  while (n) {
+    const parent = doc.get(n.parentId);
+    if (!parent || parent.type === 'PAGE' || parent.type === 'SECTION') return n.type === 'SECTION' ? undefined : n;
+    n = parent;
+  }
+  return undefined;
 }
 
 /** "On click → Navigate to Checkout" */

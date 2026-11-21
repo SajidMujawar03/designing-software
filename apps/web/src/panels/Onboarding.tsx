@@ -123,7 +123,10 @@ export function ShortcutsSheet() {
   const close = () => useOnboarding.setState({ shortcuts: false });
   const tools: Array<[string, string]> = [
     ['Move', 'V'],
+    ['Scale', 'K'],
     ['Frame', 'F'],
+    ['Section', 'Shift+S'],
+    ['Slice', 'S'],
     ['Rectangle', 'R'],
     ['Ellipse', 'O'],
     ['Line', 'L'],

@@ -93,6 +93,12 @@ export function shapeContainsPoint(doc: DesignDocument, n: SceneNode, p: Vec2, t
     case 'POLYGON':
     case 'STAR':
       return vectorContainsPoint(n, local, tolerance, shapePaths(n));
+    case 'SLICE': {
+      // Slices are invisible: only their outline is clickable, so the layers under them stay reachable.
+      const t = Math.max(tolerance, 1);
+      const inner = { x: t, y: t, width: n.width - t * 2, height: n.height - t * 2 };
+      return rectContainsPoint(grown, local) && !(inner.width > 0 && inner.height > 0 && rectContainsPoint(inner, local));
+    }
     default:
       return rectContainsPoint(grown, local);
   }

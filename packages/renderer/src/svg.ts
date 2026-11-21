@@ -16,7 +16,7 @@ import {
   type ShadowEffect,
 } from '@figma/document';
 import { multiply, translation } from '@figma/geometry';
-import { renderBounds } from './canvaskit';
+import { renderBounds, sliceArea } from './canvaskit';
 import { imageMatrix } from './ckpaint';
 import { markerPathData, nodeMarkers } from './markers';
 import { layoutText } from './text';
@@ -103,6 +103,7 @@ function geometryTag(c: SvgContext, n: SceneNode): string | null {
   switch (n.type) {
     case 'RECTANGLE':
     case 'FRAME':
+    case 'SECTION':
     case 'COMPONENT':
     case 'COMPONENT_SET':
     case 'INSTANCE': {
@@ -309,11 +310,13 @@ function nodeToSvg(c: SvgContext, n: SceneNode): string {
 /** Serializes a node (and its children) to a standalone SVG covering its on-canvas bounds. */
 export function exportSvg(doc: DesignDocument, id: NodeId, options: SvgOptions = {}): string {
   const n = doc.get(id)!;
-  const b = renderBounds(doc, id);
+  const area = sliceArea(doc, id);
+  const b = area?.rect ?? renderBounds(doc, id);
   const c: SvgContext = { doc, defs: [], options, next: 0 };
-  const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : translation(0, 0);
+  const parentWorld = area ? translation(0, 0) : n.parentId ? worldTransform(doc, n.parentId) : translation(0, 0);
   const m = multiply(translation(-b.x, -b.y), parentWorld);
-  const content = nodeToSvg(c, n);
+  // A slice exports everything on its page inside its rectangle (the viewBox crops the rest).
+  const content = area ? area.roots.map((r) => nodeToSvg(c, r)).join('') : nodeToSvg(c, n);
   const w = Math.ceil(b.width);
   const h = Math.ceil(b.height);
   return (

@@ -10,6 +10,9 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
   return {
     select: new SelectTool(ed),
     frame: new ShapeTool(ed, 'FRAME'),
+    section: new ShapeTool(ed, 'SECTION'),
+    slice: new ShapeTool(ed, 'SLICE'),
+    scale: new SelectTool(ed, { scale: true }),
     rectangle: new ShapeTool(ed, 'RECTANGLE'),
     ellipse: new ShapeTool(ed, 'ELLIPSE'),
     polygon: new ShapeTool(ed, 'POLYGON'),

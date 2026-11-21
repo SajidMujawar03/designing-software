@@ -22,6 +22,8 @@ const NAMES: Record<NodeType, string> = {
   DOCUMENT: 'Document',
   PAGE: 'Page',
   FRAME: 'Frame',
+  SECTION: 'Section',
+  SLICE: 'Slice',
   COMPONENT: 'Component',
   COMPONENT_SET: 'Component set',
   INSTANCE: 'Instance',
@@ -44,6 +46,16 @@ export function defaultProps(type: NodeType): NodeProps {
     case 'INSTANCE':
       p.fills = [solid('#FFFFFF')];
       p.clipsContent = true;
+      break;
+    case 'SECTION':
+      p.fills = [solid('#FFFFFF')];
+      p.strokes = [solid('#D9D9D9')];
+      p.strokeAlign = 'INSIDE';
+      p.cornerRadius = 4;
+      p.clipsContent = false;
+      break;
+    case 'SLICE':
+      p.exportSettings = [{ format: 'PNG', constraint: { type: 'SCALE', value: 1 }, suffix: '' }];
       break;
     case 'COMPONENT_SET':
       // A dashed purple outline around the variants.

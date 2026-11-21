@@ -368,7 +368,7 @@ export class Editor {
     const containers = this.topLevelSelection().filter((id) => {
       if (isInInstance(this.doc, id)) return false;
       const t = this.doc.get(id)!.type;
-      return isGroupLike(this.doc.get(id)) || t === 'FRAME';
+      return isGroupLike(this.doc.get(id)) || t === 'FRAME' || t === 'SECTION';
     });
     if (!containers.length) return;
     const released: NodeId[] = [];
