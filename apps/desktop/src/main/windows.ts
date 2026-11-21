@@ -156,8 +156,8 @@ export function secureAllContents(): void {
     });
   });
 
-  // Only what the app uses: the clipboard (copy/paste of layers) and fullscreen (present mode).
-  const allowed = new Set(['clipboard-read', 'clipboard-sanitized-write', 'fullscreen']);
+  // Only what the app uses: the clipboard (copy/paste of layers), fullscreen (present mode) and notifications (comment mentions).
+  const allowed = new Set(['clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'notifications']);
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
     callback(allowed.has(permission) && origins.has(contents.id));
   });

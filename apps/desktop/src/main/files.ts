@@ -5,6 +5,7 @@ import * as Y from 'yjs';
 import type { DiskFileInfo, RecentFile } from '../../../web/src/desktop/api';
 import { decodeDesignFile, DESIGN_EXTENSION, DesignFileError, encodeDesignFile, FORMAT_VERSION, newDocId } from '../../../web/src/desktop/designFile';
 import { saveSettings, settings } from './settings';
+import { refreshMenus } from './menus';
 import { onChildWindow, roleOf } from './windows';
 
 /**
@@ -61,6 +62,7 @@ const suggestedPath = (name: string) => join(app.getPath('documents'), `${(name 
 
 function remember(path: string): void {
   saveSettings({ recent: [path, ...settings().recent.filter((p) => p.toLowerCase() !== path.toLowerCase())].slice(0, 15) });
+  refreshMenus();
 }
 
 /** Writes a .design file atomically. */
@@ -306,6 +308,7 @@ export function fileBridge(opts: { trusted: Check; openAppWindow: (path: string)
   ipcMain.handle('desktop:forgetRecent', (e, path: unknown) => {
     trusted(e);
     saveSettings({ recent: settings().recent.filter((p) => p !== path) });
+    refreshMenus();
   });
   ipcMain.handle('desktop:uploadToCloud', (e, state: unknown, name: unknown) =>
     plain(async () => {
