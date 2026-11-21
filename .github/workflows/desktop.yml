@@ -1,6 +1,7 @@
-# Builds the desktop app's Windows installers, smoke-tests the packaged app, and
-# for a tag like desktop-v0.1.0, publishes them as a GitHub Release.
-#   git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
+# Builds the desktop app for Windows, macOS and Linux, smoke-tests each packaged
+# app, and for a tag like desktop-v0.2.0 publishes one GitHub Release with
+# everything, including the latest*.yml files installed apps update from.
+#   git tag desktop-v0.2.0 && git push origin desktop-v0.2.0
 # Run it by hand (Actions > Desktop release > Run workflow) to just build and download them.
 name: Desktop release
 
@@ -13,8 +14,22 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    name: build (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            builder: --win
+          - os: macos-latest
+            platform: mac
+            builder: --mac --arm64 --x64
+          - os: ubuntu-latest
+            platform: linux
+            builder: --linux
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -32,44 +47,102 @@ jobs:
             exit 1
           fi
 
-      - name: Build the installers
-        run: pnpm dist:desktop
+      - name: Build the web app
+        run: pnpm --filter @figma/web build
+
+      - name: Package
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          # Signing and notarization settings are passed on only when their secrets are set:
+          # electron-builder treats an empty CSC_LINK as a (missing) certificate path and fails.
+          if [ -n "$SIGN_CERTIFICATE" ]; then
+            export CSC_LINK="$SIGN_CERTIFICATE" CSC_KEY_PASSWORD="$SIGN_PASSWORD"
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          for v in APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID DESKTOP_SENTRY_DSN VITE_SENTRY_DSN; do
+            [ -z "${!v}" ] && unset "$v"
+          done
+          node build.mjs && pnpm exec electron-builder ${{ matrix.builder }} --publish never
         env:
-          # Optional: crash and error reports to Sentry (set them as repository secrets).
+          # Optional: crash and error reports to Sentry.
           DESKTOP_SENTRY_DSN: ${{ secrets.DESKTOP_SENTRY_DSN }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-          # Optional code signing (a .pfx as base64, and its password).
-          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          # Optional signing. Windows: a .pfx (base64) and password. macOS: a Developer ID .p12, plus
+          # an Apple ID app-specific password and team id for notarization.
+          SIGN_CERTIFICATE: ${{ matrix.platform == 'win' && secrets.WINDOWS_CERTIFICATE || matrix.platform == 'mac' && secrets.MAC_CERTIFICATE || '' }}
+          SIGN_PASSWORD: ${{ matrix.platform == 'win' && secrets.WINDOWS_CERTIFICATE_PASSWORD || matrix.platform == 'mac' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Smoke-test the packaged app
+      - name: Smoke-test the packaged app (Windows)
+        if: matrix.platform == 'win'
         shell: bash
         run: '"apps/desktop/release/win-unpacked/Design Clone.exe" --smoke'
+        env:
+          SMOKE_OUT: ${{ github.workspace }}/smoke
+
+      - name: Smoke-test the packaged app (macOS)
+        if: matrix.platform == 'mac'
+        run: '"apps/desktop/release/mac-arm64/Design Clone.app/Contents/MacOS/Design Clone" --smoke'
+        env:
+          SMOKE_OUT: ${{ github.workspace }}/smoke
+
+      - name: Smoke-test the packaged app (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          # Chromium's sandbox helper must be setuid root, and Ubuntu restricts the namespaces it uses.
+          sudo chown root:root apps/desktop/release/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 apps/desktop/release/linux-unpacked/chrome-sandbox
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          xvfb-run -a apps/desktop/release/linux-unpacked/design-clone --smoke
         env:
           SMOKE_OUT: ${{ github.workspace }}/smoke
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: design-clone-windows
+          name: smoke-${{ matrix.platform }}
+          path: smoke/
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: design-clone-${{ matrix.platform }}
           path: |
             apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
             apps/desktop/release/*.blockmap
             apps/desktop/release/latest*.yml
-            smoke/
-          if-no-files-found: warn
+          if-no-files-found: error
 
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: design-clone-*
+          path: files
+          merge-multiple: true
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           version=${GITHUB_REF_NAME#desktop-v}
-          gh release create "$GITHUB_REF_NAME" \
-            apps/desktop/release/Design-Clone-Setup-$version.exe \
-            apps/desktop/release/Design-Clone-Setup-$version.exe.blockmap \
-            apps/desktop/release/Design-Clone-$version-portable.exe \
-            --title "Design Clone $version for Windows" \
-            --notes "Download **Design-Clone-Setup-$version.exe** to install, or the portable .exe to run it without installing. The installers aren't code-signed yet, so Windows SmartScreen may warn on first run (More info > Run anyway)." \
-            --verify-tag
+          ls -la files
+          cat > notes.md <<EOF
+          **Windows:** Design-Clone-Setup-$version.exe installs it (or use the portable .exe).
+          **macOS:** the .dmg for your Mac (arm64 for Apple silicon, x64 for Intel).
+          **Linux:** the .AppImage, or the .deb for Debian and Ubuntu.
+
+          Installed apps update themselves from this release. Builds without a signing certificate show a warning on first run (Windows: More info > Run anyway; macOS: right-click > Open).
+          EOF
+          gh release create "$GITHUB_REF_NAME" files/* --repo "$REPO" --title "Design Clone $version" --notes-file notes.md --verify-tag

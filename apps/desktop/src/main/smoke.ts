@@ -7,6 +7,7 @@ import { dialogs, openPath } from './files';
 import { linkDialogs, openLink, parseLink } from './links';
 import { buildMenu, menuLabels } from './menus';
 import { settings } from './settings';
+import { startUpdates, updateDialogs, updateState } from './updater';
 import { createWindow, findWindow, setOpenExternal } from './windows';
 
 /** The names of the layers stored in a .design file (read straight from disk). */
@@ -142,6 +143,16 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
     results.badServer = badServer;
     check('plain http servers are refused', /https/.test(badServer));
 
+    // ---- Updates (with DESKTOP_UPDATE_URL pointing at a feed that offers a newer version)
+    if (process.env.DESKTOP_UPDATE_URL) {
+      let offered = '';
+      updateDialogs.restart = async (v) => ((offered = v), false);
+      startUpdates();
+      for (let i = 0; i < 180 && !['ready', 'error', 'none'].includes(updateState().status); i++) await wait(500);
+      results.update = { state: updateState(), offered };
+      check('an update downloads and asks to restart', updateState().status === 'ready' && offered !== '' && offered === (updateState() as { version?: string }).version);
+    }
+
     // ---- Files on disk (dialogs answered with paths in the output folder)
     const filesDir = join(opts.out, 'files');
     rmSync(filesDir, { recursive: true, force: true });
@@ -232,6 +243,15 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
       check('open recent lists the file', !!find(after, 'File', 'Open Recent') && settings().recent.includes(renamedPath));
       const recentItems = buildMenu(reopened).items.find((m) => m.label === 'File')?.submenu?.items.find((i) => i.label === 'Open Recent')?.submenu?.items.map((i) => i.label) ?? [];
       check('open recent shows the file name', recentItems.includes('Renamed design'));
+
+      // While typing in a text field, Edit commands act on the text (as on macOS, where menus capture the shortcuts).
+      await js(`(() => { const i = document.createElement('input'); i.id = 'smoke-input'; i.value = 'some text'; document.body.appendChild(i); i.focus(); i.setSelectionRange(0, 0); })()`);
+      await wait(300);
+      buildMenu(reopened).items.find((m) => m.label === 'Edit')?.submenu?.items.find((i) => i.label === 'Select all')?.click(undefined, reopened, undefined as never);
+      await wait(500);
+      const field = await js<{ start: number; end: number; layers: number }>(`(() => { const i = document.getElementById('smoke-input'); const r = { start: i.selectionStart, end: i.selectionEnd, layers: window.editor.ui.selection.length }; i.remove(); return r; })()`);
+      results.textSelectAll = field;
+      check('edit commands act on a focused text field', field.start === 0 && field.end === 9);
     } else check('the file reopens with its layers', false);
 
     // A missing file gives a reason instead of an empty window.

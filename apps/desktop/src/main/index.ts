@@ -4,6 +4,7 @@ import { designFilesIn, fileBridge, newFile, openFileDialog, openPath } from './
 import { linksIn, openLink, registerScheme } from './links';
 import { log, logsDir, startCrashReporting } from './log';
 import { startMenus } from './menus';
+import { checkNow, startUpdates } from './updater';
 import { APP_ORIGIN, handleAppScheme, registerAppScheme } from './protocol';
 import { checkServerUrl, saveSettings, settings } from './settings';
 import { runSmokeTest } from './smoke';
@@ -186,6 +187,7 @@ async function start(): Promise<void> {
       openCloud: () => void openCloud(),
       hasServer: () => !!settings().serverUrl,
       openLogs: () => void shell.openPath(logsDir()),
+      checkForUpdates: () => void checkNow(),
     },
   });
   if (SMOKE) {
@@ -200,6 +202,7 @@ async function start(): Promise<void> {
   if (files.length) openFiles(files);
   if (links.length) handleLinks(links);
   if (!files.length && !links.length) openStart();
+  startUpdates();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openStart();
   });
