@@ -151,10 +151,12 @@ describe('components and instances', () => {
     createInstance(doc, icon, main);
     const inst = createInstance(doc, main, page)!;
     detachInstance(doc, inst);
-    expect(doc.get(inst)).toMatchObject({ type: 'FRAME', componentId: null, sourceId: null });
+    expect(doc.get(inst)!.type).toBe('FRAME');
+    expect(doc.get(inst)!.componentId ?? null).toBeNull();
+    expect(doc.get(inst)!.sourceId ?? null).toBeNull();
     const nested = doc.children(inst).find((n) => n.type === 'INSTANCE')!;
     expect(nested.sourceId).toBe(icon);
-    expect(doc.children(inst).find((n) => n.type === 'TEXT')!.sourceId).toBeNull();
+    expect(doc.children(inst).find((n) => n.type === 'TEXT')!.sourceId ?? null).toBeNull();
 
     doc.change(() => doc.updateNode(label, { characters: 'Changed' }));
     expect(doc.children(inst).find((n) => n.type === 'TEXT')!.characters).toBe('OK');
@@ -172,7 +174,7 @@ describe('components and instances', () => {
       normalizeLinks(doc, id);
       return id;
     });
-    expect(doc.get(copy)!.sourceId).toBeNull();
+    expect(doc.get(copy)!.sourceId ?? null).toBeNull();
     doc.change(() => doc.updateNode(kid(doc, main).id, { fontSize: 30 }));
     expect(doc.get(copy)!.fontSize).not.toBe(30);
     expect(kid(doc, inst).fontSize).toBe(30);

@@ -34,7 +34,7 @@ describe('shared styles', () => {
     const a = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: page }));
     doc.change(() => doc.applyStyle(a, style, 'fills'));
     doc.change(() => doc.updateNode(a, { fills: [blue] }));
-    expect(doc.get(a)!.fillStyleId).toBeNull();
+    expect(doc.get(a)!.fillStyleId ?? null).toBeNull();
     // Later style edits no longer reach it.
     doc.change(() => doc.updateStyle(style, { paints: [solid('#00FF00')] }));
     expect(doc.get(a)!.fills).toEqual([blue]);
@@ -63,7 +63,7 @@ describe('shared styles', () => {
     doc.change(() => doc.applyStyle(a, style, 'effects'));
     doc.change(() => doc.deleteStyle(style));
     expect(doc.getStyle(style)).toBeUndefined();
-    expect(doc.get(a)!.effectStyleId).toBeNull();
+    expect(doc.get(a)!.effectStyleId ?? null).toBeNull();
     doc.undo();
     expect(doc.getStyle(style)?.name).toBe('Shadow');
     expect(doc.get(a)!.effectStyleId).toBe(style);

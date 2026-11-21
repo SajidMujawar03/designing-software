@@ -9,6 +9,7 @@ import {
   type FillStyle,
   type NodeId,
   type NodePatch,
+  type NodeProps,
   type NodeType,
   type SceneNode,
   type SharedStyle,
@@ -377,16 +378,27 @@ export class DesignDocument {
     }
     this.change(() => {
       let changed = false;
+      const oldType = y.get('type') as NodeType;
+      let defs = defaultsFor(oldType);
+      // A new type has other defaults: keep the old effective values that would change.
+      if (patch.type && patch.type !== oldType) {
+        const next = defaultsFor(patch.type);
+        for (const [k, v] of Object.entries(defs)) {
+          if (!y.has(k) && k !== 'type' && k !== 'name' && !shallowEqual(v, (next as unknown as Record<string, unknown>)[k])) y.set(k, v);
+        }
+        defs = next;
+      }
       for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined || k === 'textRuns') continue;
+        if (v === undefined || k === 'textRuns' || k === 'id') continue;
         if (k === 'characters') {
           changed = this.replaceText(y, v as string) || changed;
           continue;
         }
-        if (!shallowEqual(y.get(k), v)) {
-          y.set(k, v);
-          changed = true;
-        }
+        const cur = y.has(k) ? y.get(k) : (defs as unknown as Record<string, unknown>)[k];
+        if (shallowEqual(cur, v) || (cur == null && v == null)) continue;
+        if (isDefault(k, v, defs)) y.delete(k);
+        else y.set(k, v);
+        changed = true;
       }
       if (!changed) return;
       this.refresh(id, 'parentId' in patch || 'index' in patch);
@@ -1053,7 +1065,8 @@ export class DesignDocument {
         this.childrenDirty = true;
       } else {
         const target = e.target instanceof Y.Text ? (e.target.parent as YNode) : (e.target as YNode);
-        const id = target?.get('id') as NodeId | undefined;
+        // A node map's key in the nodes map is its id (older files also store it inside).
+        const id = ((target as unknown as { _item?: { parentSub?: string } })?._item?.parentSub ?? target?.get('id')) as NodeId | undefined;
         if (id) changed.add(id);
         if (e instanceof Y.YMapEvent && (e.keysChanged.has('parentId') || e.keysChanged.has('index'))) {
           this.childrenDirty = true;
@@ -1126,10 +1139,33 @@ function indexAboveIn(siblings: NodeId[], nodes: Map<NodeId, SceneNode>, aboveId
   return generateKeyBetween(lo, hi);
 }
 
+/**
+ * Stored sparsely: a node's map holds only values that differ from its type's
+ * defaults (and never its id, which is the key). Files load several times
+ * faster, since every stored property is a CRDT entry to decode, while edits
+ * to different properties of one layer still merge.
+ */
+const ALWAYS_STORED = new Set(['type', 'parentId', 'index']);
+const defaultsCache = new Map<NodeType, NodeProps>();
+export function defaultsFor(type: NodeType): NodeProps {
+  let d = defaultsCache.get(type);
+  if (!d) defaultsCache.set(type, (d = defaultProps(type)));
+  return d;
+}
+/** Whether a value can be left out of storage (it equals the default, or clears an unset one). */
+function isDefault(k: string, v: unknown, defs: NodeProps): boolean {
+  if (ALWAYS_STORED.has(k) || k === 'characters') return false;
+  const d = (defs as unknown as Record<string, unknown>)[k];
+  if (d === undefined) return v === null || v === undefined;
+  return shallowEqual(v, d);
+}
+
 function toY(obj: Record<string, unknown>): YNode {
   const y = new Y.Map<unknown>();
+  const defs = defaultsFor(obj.type as NodeType);
   for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined || k === 'textRuns') continue;
+    if (v === undefined || k === 'textRuns' || k === 'id') continue;
+    if (isDefault(k, v, defs)) continue;
     if (k === 'characters' && typeof v === 'string') {
       const t = new Y.Text();
       t.insert(0, v);
@@ -1148,7 +1184,14 @@ function runAttrs(r: TextRun): Record<string, unknown> {
 }
 
 function snapshot(id: NodeId, y: YNode): SceneNode {
-  const n = { ...(y.toJSON() as SceneNode), id };
+  const raw = y.toJSON() as SceneNode;
+  const defs = defaultsFor(raw.type);
+  const n = { ...defs, ...raw, id } as SceneNode;
+  // Default lists are shared: give each snapshot its own copies.
+  const m = n as unknown as Record<string, unknown>;
+  for (const k of ['fills', 'strokes', 'vectorPaths', 'dashPattern'] as const) {
+    if (!(k in raw) && Array.isArray(m[k])) m[k] = [...(m[k] as unknown[])];
+  }
   const t = y.get('characters');
   if (t instanceof Y.Text) n.textRuns = runsOf(t);
   return n;
