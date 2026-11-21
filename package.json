@@ -4,7 +4,9 @@
   "type": "module",
   "packageManager": "pnpm@10.27.0",
   "scripts": {
-    "dev": "pnpm --filter @figma/web dev",
+    "dev": "pnpm --parallel --filter @figma/web --filter @figma/server dev",
+    "dev:web": "pnpm --filter @figma/web dev",
+    "dev:server": "pnpm --filter @figma/server dev",
     "build": "pnpm --filter @figma/web build",
     "test": "vitest run",
     "test:watch": "vitest",

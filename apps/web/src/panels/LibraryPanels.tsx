@@ -1,5 +1,5 @@
 import { libraryStatus, type PublishedComponent, type PublishedLibrary } from '@figma/document';
-import { BookOpen, Boxes, ChevronDown, Component, FilePlus, FileText, RefreshCw, Trash2, X } from 'lucide-react';
+import { BookOpen, Boxes, History, ChevronDown, Component, FilePlus, FileText, RefreshCw, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ASSET_MIME, insertInstanceAt } from '../editor/componentCommands';
 import { editor } from '../editor/editor';
@@ -10,6 +10,7 @@ import {
   deleteFileAndLibrary,
   enabledLibraries,
   getLibrary,
+  libraryCounts,
   outdatedLibraries,
   publishLibrary,
   setLibraryEnabled,
@@ -18,6 +19,8 @@ import {
   useLibraries,
 } from '../editor/libraryStore';
 import { useUI } from '../editor/store';
+import { api } from '../cloud/api';
+import { renameCloudFile, useCloudFile } from '../cloud/cloudFile';
 import { IconButton } from './controls';
 
 const ago = (t: number) => {
@@ -46,6 +49,91 @@ function useFiles(): FileEntry[] {
 // ------------------------------------------------------------ file menu (toolbar)
 
 export function FileMenu() {
+  return location.pathname.startsWith('/file/') ? <CloudFileMenu /> : <LocalFileMenu />;
+}
+
+/** Toolbar title of a cloud file: name, sync status and the file menu. */
+function CloudFileMenu() {
+  const { file, role, status, unsynced, team, project } = useCloudFile();
+  const [open, setOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
+  }, [open]);
+  useEffect(() => {
+    document.title = `${file?.name ?? 'File'} – Figma Clone`;
+  }, [file?.name]);
+  const canEdit = role === 'owner' || role === 'editor';
+  const previewing = new URLSearchParams(location.search).has('version');
+  const sync = previewing
+    ? 'Saved version'
+    : status === 'connected' ? (unsynced ? 'Saving…' : 'Saved') : status === 'connecting' ? 'Connecting…' : unsynced ? 'Offline – changes will sync' : 'Offline';
+
+  if (renaming)
+    return (
+      <input
+        className="file-name-input"
+        autoFocus
+        defaultValue={file?.name}
+        onFocus={(e) => e.target.select()}
+        onBlur={(e) => {
+          void renameCloudFile(e.target.value);
+          setRenaming(false);
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') setRenaming(false);
+        }}
+      />
+    );
+
+  return (
+    <div className="file-menu" ref={ref}>
+      {(project || team) && <span className="file-crumb">{project?.name ?? 'Drafts'} /</span>}
+      <button type="button" className="file-name" title="File menu (double-click to rename)" onClick={() => setOpen(!open)} onDoubleClick={() => canEdit && setRenaming(true)}>
+        {file?.name ?? 'Untitled'} <ChevronDown size={12} />
+      </button>
+      <span className={`sync-status ${previewing ? 'preview' : status}${unsynced ? ' unsynced' : ''}`} title={sync}>
+        <span className="sync-dot" /> {sync}
+      </span>
+      {role === 'viewer' && <span className="view-only">View only</span>}
+      {open && (
+        <div className="menu file-menu-pop" role="menu">
+          <button role="menuitem" onClick={() => location.assign('/')}>
+            <FileText size={12} /> Back to files
+          </button>
+          {canEdit && (
+            <button role="menuitem" onClick={() => (setOpen(false), setRenaming(true))}>
+              Rename file
+            </button>
+          )}
+          <button
+            role="menuitem"
+            onClick={async () => {
+              const { file: f } = await api<{ file: { id: string } }>('/files', { body: { name: 'Untitled', teamId: team?.id, projectId: project?.id ?? null } });
+              location.assign(`/file/${f.id}`);
+            }}
+          >
+            <FilePlus size={12} /> New file
+          </button>
+          <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ librariesOpen: true }))}>
+            <BookOpen size={12} /> Libraries…
+          </button>
+          <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ historyOpen: true }))}>
+            <History size={12} /> Version history
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LocalFileMenu() {
   useLibraries();
   const files = useFiles();
   const [open, setOpen] = useState(false);
@@ -90,6 +178,9 @@ export function FileMenu() {
         <div className="menu file-menu-pop" role="menu">
           <button role="menuitem" onClick={() => (setOpen(false), setRenaming(true))}>
             Rename file
+          </button>
+          <button role="menuitem" onClick={() => location.assign('/')}>
+            <FileText size={12} /> Your account's files
           </button>
           <button role="menuitem" onClick={() => openFile(createFile())}>
             <FilePlus size={12} /> New file
@@ -184,14 +275,20 @@ export function LibrariesModal() {
           </div>
           <div className="lib-section">
             <div className="lib-subhead">Libraries from other files</div>
-            {!others.length && <div className="hint">No other file has published a library yet. Open a file, then Libraries → Publish.</div>}
+            {!others.length && (
+              <div className="hint">
+                {location.pathname.startsWith('/file/')
+                  ? 'No library is published in files you can open. Open a file, then Libraries → Publish; your team sees it here.'
+                  : 'No other file in this browser has published a library yet. Open a file, then Libraries → Publish.'}
+              </div>
+            )}
             {others.map((l) => (
               <label key={l.fileId} className="lib-card lib-toggle">
                 <input type="checkbox" checked={enabled.has(l.fileId)} onChange={(e) => setLibraryEnabled(editor, l.fileId, e.target.checked)} />
                 <div>
                   <div className="lib-title">{l.name}</div>
                   <div className="hint">
-                    {l.components.length} components · {l.styles.length} styles · {l.variables.length} variables · version {l.version}, {ago(l.publishedAt)}
+                    {l.components.length} components · {libraryCounts(l).styles} styles · {libraryCounts(l).variables} variables · version {l.version}, {ago(l.publishedAt)}
                   </div>
                 </div>
               </label>

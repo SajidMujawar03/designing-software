@@ -12,11 +12,65 @@ import { useSyncExternalStore } from 'react';
 import * as Y from 'yjs';
 import type { Editor } from './editor';
 import { currentFile, deleteFile as removeFile } from './files';
+import { api } from '../cloud/api';
 
 /**
- * Published libraries, shared by every file in this browser (IndexedDB),
- * and which of them the open file uses (kept in the file itself).
+ * Published libraries, and which of them the open file uses (kept in the
+ * file itself). Cloud files publish to and use the server's team libraries;
+ * files kept in this browser share libraries through IndexedDB.
  */
+
+const isCloud = () => location.pathname.startsWith('/file/');
+
+/** The editor whose file's library choices drive which full libraries are fetched. */
+let current: Editor | null = null;
+
+/** Full libraries fetched from the server, by file id (refetched when the version changes). */
+const fullCache = new Map<string, PublishedLibrary>();
+
+/** A library summary from the server: components to show, counts for the rest. */
+interface ServerSummary {
+  fileId: string;
+  name: string;
+  version: number;
+  publishedAt: number;
+  components: PublishedLibrary['components'];
+  styleCount: number;
+  variableCount: number;
+}
+
+const toBase64 = (b: Uint8Array) => {
+  let s = '';
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+const fromBase64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+/** Styles and variables in a library (summaries only carry counts). */
+export function libraryCounts(l: PublishedLibrary): { styles: number; variables: number } {
+  const x = l as PublishedLibrary & { styleCount?: number; variableCount?: number };
+  return { styles: x.styleCount ?? l.styles.length, variables: x.variableCount ?? l.variables.length };
+}
+
+async function refreshCloud(): Promise<void> {
+  const { libraries: list } = await api<{ libraries: ServerSummary[] }>('/libraries');
+  const enabled = new Set(current ? enabledLibraries(current) : []);
+  const out: PublishedLibrary[] = [];
+  for (const s of list) {
+    if (enabled.has(s.fileId)) {
+      let full = fullCache.get(s.fileId);
+      if (!full || full.version !== s.version) {
+        const raw = await api<PublishedLibrary & { images: Record<string, string> }>(`/libraries/${s.fileId}`);
+        full = { ...raw, images: Object.fromEntries(Object.entries(raw.images).map(([k, v]) => [k, fromBase64(v as unknown as string)])) };
+        fullCache.set(s.fileId, full);
+      }
+      out.push(full);
+    } else {
+      out.push({ ...s, nodes: [], styles: [], collections: [], variables: [], images: {}, styleCount: s.styleCount, variableCount: s.variableCount } as PublishedLibrary);
+    }
+  }
+  libraries = out;
+}
 
 const DB = 'figma-clone:libraries';
 const STORE = 'libraries';
@@ -52,9 +106,10 @@ const emit = () => {
 
 export async function refreshLibraries(): Promise<void> {
   try {
-    libraries = await tx('readonly', (s) => s.getAll() as IDBRequest<PublishedLibrary[]>);
+    if (isCloud()) await refreshCloud();
+    else libraries = await tx('readonly', (s) => s.getAll() as IDBRequest<PublishedLibrary[]>);
   } catch {
-    libraries = [];
+    libraries = isCloud() ? libraries : [];
   }
   emit();
 }
@@ -92,10 +147,18 @@ export function setLibraryEnabled(ed: Editor, fileId: string, on: boolean): void
   else now.delete(fileId);
   ed.doc.ydoc.transact(() => meta(ed).set('libraries', [...now]));
   emit();
+  if (isCloud()) void refreshLibraries();
 }
 
 export function watchFileMeta(ed: Editor): void {
-  meta(ed).observe((e: Y.YMapEvent<unknown>) => e.keysChanged.has('libraries') && emit());
+  current = ed;
+  meta(ed).observe((e: Y.YMapEvent<unknown>) => {
+    if (!e.keysChanged.has('libraries')) return;
+    emit();
+    if (isCloud()) void refreshLibraries();
+  });
+  // Pick up libraries published elsewhere every so often (and on focus).
+  if (isCloud()) setInterval(() => document.visibilityState === 'visible' && void refreshLibraries(), 60_000);
 }
 
 /** Libraries the open file uses that have published updates it hasn't taken. */
@@ -123,6 +186,15 @@ export async function publishLibrary(ed: Editor): Promise<PublishedLibrary> {
     }
   };
   const lib = buildLibrary(ed.doc, { fileId: file.id, name: file.name, version: (prev?.version ?? 0) + 1 }, thumbnail);
+  if (isCloud()) {
+    const images = Object.fromEntries(Object.entries(lib.images).map(([k, v]) => [k, toBase64(v)]));
+    const { version } = await api<{ version: number }>(`/libraries/${file.id}`, {
+      method: 'PUT',
+      body: { components: lib.components, nodes: lib.nodes, styles: lib.styles, collections: lib.collections, variables: lib.variables, images },
+    });
+    await refreshLibraries();
+    return { ...lib, version };
+  }
   await tx('readwrite', (s) => s.put(lib));
   channel?.postMessage({ published: file.id });
   await refreshLibraries();
@@ -130,6 +202,11 @@ export async function publishLibrary(ed: Editor): Promise<PublishedLibrary> {
 }
 
 export async function unpublishLibrary(fileId: string): Promise<void> {
+  if (isCloud()) {
+    await api(`/libraries/${fileId}`, { method: 'DELETE' });
+    await refreshLibraries();
+    return;
+  }
   await tx('readwrite', (s) => s.delete(fileId));
   channel?.postMessage({ unpublished: fileId });
   await refreshLibraries();

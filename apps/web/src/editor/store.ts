@@ -14,7 +14,8 @@ export type ToolId =
   | 'pen'
   | 'pencil'
   | 'text'
-  | 'hand';
+  | 'hand'
+  | 'comment';
 
 /** A point on a vector path: [path index, point index]. */
 export type PointRef = [number, number];
@@ -50,6 +51,10 @@ export interface UIState {
   variablesOpen: boolean;
   /** The libraries window. */
   librariesOpen: boolean;
+  /** The version history panel (cloud files). */
+  historyOpen: boolean;
+  /** The share dialog (cloud files). */
+  shareOpen: boolean;
   /** Editing a vector's points and handles. */
   vectorEdit: { id: NodeId; selected: PointRef[] } | null;
   /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
@@ -109,6 +114,8 @@ export const useUI = create<UIState>()(() => ({
   paletteOpen: false,
   variablesOpen: false,
   librariesOpen: false,
+  historyOpen: false,
+  shareOpen: false,
   vectorEdit: null,
   penPreview: null,
   paintEdit: null,

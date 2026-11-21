@@ -1,5 +1,7 @@
-import { Circle, Frame, Hand, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
+import { ShareButton } from './ShareDialog';
 import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -17,6 +19,7 @@ const TOOLS: Array<{ id: ToolId; label: string; key: string; Icon: typeof Square
   { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   { id: 'text', label: 'Text', key: 'T', Icon: Type },
   { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
+  { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
 ];
 
 export function Toolbar() {
@@ -32,7 +35,7 @@ export function Toolbar() {
         <div className="logo" aria-hidden>
           ◆
         </div>
-        {TOOLS.map(({ id, label, key, Icon }) => (
+        {TOOLS.filter((t) => t.id !== 'comment' || location.pathname.startsWith('/file/')).map(({ id, label, key, Icon }) => (
           <button
             key={id}
             type="button"
@@ -59,6 +62,8 @@ export function Toolbar() {
         <span>{page?.name}</span>
       </div>
       <div className="toolbar-right">
+        <Avatars />
+        <ShareButton />
         <ZoomMenu zoom={zoom} />
       </div>
     </header>
@@ -105,6 +110,33 @@ function ZoomMenu({ zoom }: { zoom: number }) {
           {item('Zoom to 100%', 'Shift 0', () => editor.zoomTo(1))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Who else is in the file; click someone to follow their view. */
+function Avatars() {
+  const { peers, me, following } = usePresence();
+  if (!me) return null;
+  const list = people(peers);
+  const shown = list.slice(0, 4);
+  return (
+    <div className="avatars">
+      {shown.map((p) => (
+        <button
+          key={p.clientId}
+          className={`avatar avatar-btn${following === p.clientId ? ' following' : ''}`}
+          style={{ background: p.user.color, borderColor: p.user.color }}
+          title={following === p.clientId ? `Stop following ${p.user.name}` : `Follow ${p.user.name}`}
+          onClick={() => follow(following === p.clientId ? null : p.clientId)}
+        >
+          {p.user.name.slice(0, 1).toUpperCase()}
+        </button>
+      ))}
+      {list.length > shown.length && <span className="avatar avatar-more">+{list.length - shown.length}</span>}
+      <span className="avatar avatar-me" style={{ background: me.color }} title={`${me.name} (you)`}>
+        {me.name.slice(0, 1).toUpperCase()}
+      </span>
     </div>
   );
 }

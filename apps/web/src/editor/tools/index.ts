@@ -2,6 +2,7 @@ import type { Editor } from '../editor';
 import type { ToolId } from '../store';
 import { HandTool, ShapeTool, TextTool } from './create';
 import { SelectTool } from './select';
+import { CommentTool } from './comment';
 import { PencilTool, PenTool, VectorEditTool } from './vector';
 import type { Tool } from './types';
 
@@ -18,6 +19,7 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     pencil: new PencilTool(ed),
     text: new TextTool(ed),
     hand: new HandTool(ed),
+    comment: new CommentTool(),
   };
 }
 

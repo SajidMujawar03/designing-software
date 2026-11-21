@@ -1,4 +1,5 @@
 import type { BooleanOperation } from '@figma/document';
+import { follow, usePresence } from '../cloud/presence';
 import { createComponent, detachSelection } from './componentCommands';
 import { addAutoLayout, removeAutoLayout } from './layoutCommands';
 import { editor } from './editor';
@@ -16,6 +17,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
   p: 'pen',
   t: 'text',
   h: 'hand',
+  c: 'comment',
 };
 
 function isTyping(target: EventTarget | null): boolean {
@@ -49,6 +51,11 @@ export function installShortcuts(): () => void {
 
     if (mod && !e.altKey && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
+    if (e.key === 'Escape' && usePresence.getState().following !== null) return run(() => follow(null));
+    if (ui.shareOpen) {
+      if (e.key === 'Escape') run(() => editor.setUI({ shareOpen: false }));
+      return;
+    }
     if (ui.librariesOpen) {
       if (e.key === 'Escape') run(() => editor.setUI({ librariesOpen: false }));
       return;
@@ -148,6 +155,8 @@ export function installShortcuts(): () => void {
       }
     }
 
+    // Comments need an account file.
+    if (TOOL_KEYS[key] === 'comment' && !location.pathname.startsWith('/file/')) return;
     if (!e.shiftKey && !e.altKey && TOOL_KEYS[key]) return run(() => editor.setTool(TOOL_KEYS[key]));
   };
 
