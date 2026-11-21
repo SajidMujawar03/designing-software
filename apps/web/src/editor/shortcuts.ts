@@ -49,6 +49,10 @@ export function installShortcuts(): () => void {
 
     if (mod && !e.altKey && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
+    if (ui.librariesOpen) {
+      if (e.key === 'Escape') run(() => editor.setUI({ librariesOpen: false }));
+      return;
+    }
     if (ui.variablesOpen) {
       if (e.key === 'Escape') run(() => editor.setUI({ variablesOpen: false }));
       return;

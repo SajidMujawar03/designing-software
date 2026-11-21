@@ -267,6 +267,9 @@ export interface SceneNode {
   /** Pages and frames: the mode each variable collection uses inside them (others inherit). */
   explicitVariableModes?: Record<string, string> | null;
 
+  /** Hidden holder of components imported from a library (a child of the document root). */
+  library?: LibraryRef | null;
+
   // PAGE
   guides?: Guide[];
 
@@ -326,6 +329,8 @@ export interface VariableMode {
 /** A group of variables sharing a set of modes (such as Light and Dark). */
 export interface VariableCollection {
   id: string;
+  /** Imported from a library. */
+  remote?: LibraryRef;
   name: string;
   modes: VariableMode[];
   defaultModeId: string;
@@ -333,6 +338,8 @@ export interface VariableCollection {
 
 export interface Variable {
   id: string;
+  /** Imported from a library. */
+  remote?: LibraryRef;
   /** Slashes group variables, e.g. "Colors/Primary". */
   name: string;
   collectionId: string;
@@ -362,8 +369,19 @@ export interface ComponentPropertyReferences {
 /** Text properties a text style controls (color comes from fills, as in Figma). */
 export type TextStyleValues = Required<Omit<TextStyleProps, 'color' | 'textStyleId'>>;
 
+/** Where something imported from a library came from. */
+export interface LibraryRef {
+  fileId: string;
+  /** The library's name when it was imported or last updated. */
+  name: string;
+  /** The published version it matches. */
+  version: number;
+}
+
 interface StyleBase {
   id: string;
+  /** Imported from a library (read-only here; updated from the library). */
+  remote?: LibraryRef;
   /** Slashes group styles into folders, e.g. "Brand/Primary". */
   name: string;
   description?: string;

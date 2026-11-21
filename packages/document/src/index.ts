@@ -9,4 +9,5 @@ export * from './autolayout';
 export * from './components';
 export * from './variants';
 export * from './variables';
+export * from './library';
 export { computeAutoLayout, defaultGrid, gridSpans, gridLines, gridSnapEdges, DEFAULT_CONSTRAINTS } from '@figma/layout';

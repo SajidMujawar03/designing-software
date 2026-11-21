@@ -48,6 +48,8 @@ export interface UIState {
   paletteOpen: boolean;
   /** The local variables window. */
   variablesOpen: boolean;
+  /** The libraries window. */
+  librariesOpen: boolean;
   /** Editing a vector's points and handles. */
   vectorEdit: { id: NodeId; selected: PointRef[] } | null;
   /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
@@ -106,6 +108,7 @@ export const useUI = create<UIState>()(() => ({
   contextMenu: null,
   paletteOpen: false,
   variablesOpen: false,
+  librariesOpen: false,
   vectorEdit: null,
   penPreview: null,
   paintEdit: null,

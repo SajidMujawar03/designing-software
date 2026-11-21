@@ -1,4 +1,5 @@
 import { Circle, Frame, Hand, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { FileMenu } from './LibraryPanels';
 import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -53,7 +54,7 @@ export function Toolbar() {
         </button>
       </div>
       <div className="toolbar-center">
-        <span className="file-name">Untitled</span>
+        <FileMenu />
         <span className="sep">/</span>
         <span>{page?.name}</span>
       </div>

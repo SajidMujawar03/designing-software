@@ -4,6 +4,7 @@ import {
   componentProperties,
   deleteComponentProperty,
   instancesOf,
+  libraryOf,
   isInInstance,
   outerInstance,
   overridesOf,
@@ -257,6 +258,7 @@ function InstanceSection({ inst, many = false }: { inst: SceneNode; many?: boole
   const main = doc().get(inst.componentId);
   const set = setOf(doc(), inst.componentId);
   const nested = isInInstance(doc(), inst.id);
+  const fromLib = libraryOf(doc(), inst.componentId);
   const targets = swapTargets(editor);
   const changed = many ? 0 : changedLayers(inst);
   const values = main ? variantValues(doc(), main.id) : {};
@@ -265,7 +267,7 @@ function InstanceSection({ inst, many = false }: { inst: SceneNode; many?: boole
     <Section
       title="Instance"
       actions={
-        main && !many ? (
+        main && !many && !fromLib ? (
           <IconButton title="Go to main component" onClick={() => goToMainComponent(editor)}>
             <Target size={12} />
           </IconButton>
@@ -308,6 +310,7 @@ function InstanceSection({ inst, many = false }: { inst: SceneNode; many?: boole
           <PropertyControl id={inst.id} prop={p} />
         </div>
       ))}
+      {fromLib && <div className="hint lib-from">From library {fromLib.name}</div>}
       {!many && (
         <div className="hint">
           {changed ? <span className="override-dot">{changed} changed layer{changed === 1 ? '' : 's'}</span> : 'No changes'}

@@ -9,6 +9,7 @@ import { PaintPopover } from './panels/PaintPopover';
 import { PropertiesPanel } from './panels/PropertiesPanel';
 import { Toolbar } from './panels/Toolbar';
 import { VariablesModal } from './panels/VariablesPanel';
+import { LibrariesModal } from './panels/LibraryPanels';
 
 let started = false;
 
@@ -43,6 +44,7 @@ export function App() {
       <ContextMenu />
       <CommandPalette />
       <VariablesModal />
+      <LibrariesModal />
     </div>
   );
 }

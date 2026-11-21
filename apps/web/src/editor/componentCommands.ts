@@ -1,5 +1,6 @@
 import {
   addVariantProperty,
+  importedComponents,
   canHoldInstance,
   hitTest,
   createInstance,
@@ -18,6 +19,7 @@ import {
   type NodeId,
 } from '@figma/document';
 import type { Editor } from './editor';
+import { useLibraryComponent } from './libraryStore';
 import { boundsOf, placementIn, reparentKeepingPosition, worldRotation } from './transforms';
 import type { Vec2 } from '@figma/geometry';
 
@@ -73,7 +75,8 @@ export function goToMainComponent(ed: Editor): void {
   const main = ed.doc.get(n?.type === 'INSTANCE' ? n.componentId : undefined);
   if (!main) return;
   const page = ed.doc.pageOf(main.id);
-  if (page && page.id !== ed.pageId) ed.setPage(page.id);
+  if (!page) return; // imported from a library: its main lives in the library's file
+  if (page.id !== ed.pageId) ed.setPage(page.id);
   ed.select([main.id]);
   ed.zoomToSelection();
 }
@@ -107,10 +110,11 @@ export function allComponents(ed: Editor) {
 
 /** What an instance can be swapped to: components outside sets, and sets (as their first variant). */
 export function swapTargets(ed: Editor) {
-  return ed.doc
+  const local = ed.doc
     .pages()
     .flatMap((p) => ed.doc.descendants(p.id))
     .filter((n) => n.type === 'COMPONENT_SET' || (n.type === 'COMPONENT' && !setOf(ed.doc, n.id)));
+  return [...local, ...importedComponents(ed.doc)];
 }
 
 /** Selected main components (outside sets) become variants of a new component set. */
@@ -186,6 +190,14 @@ export const ASSET_MIME = 'application/x-figma-component';
  */
 export function insertInstanceAt(ed: Editor, componentId: NodeId, at: Vec2): NodeId | null {
   const doc = ed.doc;
+  const lib = /^lib:([\w-]+):(.+)$/.exec(componentId);
+  if (lib) {
+    // Importing and placing are one undo step.
+    return doc.change(() => {
+      const local = useLibraryComponent(ed, lib[1], lib[2]);
+      return local ? insertInstanceAt(ed, local, at) : null;
+    });
+  }
   const src = doc.get(componentId);
   if (!src) return null;
   const main = src.type === 'COMPONENT_SET' ? variantsOf(doc, src.id)[0] : src;

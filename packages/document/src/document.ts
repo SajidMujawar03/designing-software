@@ -665,6 +665,30 @@ export class DesignDocument {
     }, { merge: true });
   }
 
+  /**
+   * Adds a style with its own id, or updates it (and the layers using it):
+   * used when importing from a library.
+   */
+  putStyle(style: SharedStyle): void {
+    const { id, ...rest } = style;
+    if (!this.yStyles.has(id)) {
+      this.change(() => {
+        const y = new Y.Map<unknown>();
+        for (const [k, v] of Object.entries({ ...rest, id })) if (v !== undefined) y.set(k, v);
+        this.yStyles.set(id, y);
+        this.refreshStyle(id);
+      }, { merge: true });
+      return;
+    }
+    this.change(() => {
+      const y = this.yStyles.get(id)!;
+      for (const [k, v] of Object.entries(rest)) if (v !== undefined && !['paints', 'text', 'effects'].includes(k)) y.set(k, v);
+      this.refreshStyle(id);
+      const { paints, text, effects } = style as Partial<FillStyle & TextStyle & EffectStyle>;
+      this.updateStyle(id, paints ? { paints } : text ? { text } : effects ? { effects } : {});
+    }, { merge: true });
+  }
+
   /** Removes a style; layers keep its values but are detached from it. */
   deleteStyle(id: string): void {
     this.change(() => {
@@ -864,6 +888,22 @@ export class DesignDocument {
     if (modeId) next[collectionId] = modeId;
     else delete next[collectionId];
     this.updateNode(nodeId, { explicitVariableModes: Object.keys(next).length ? next : null });
+  }
+
+  /** Adds or replaces a collection as given (used when importing from a library). */
+  putCollection(c: VariableCollection): void {
+    this.change(() => {
+      this.yCollections.set(c.id, c);
+      this.varsAll = true;
+    }, { merge: true });
+  }
+
+  /** Adds or replaces a variable as given (used when importing from a library). */
+  putVariable(v: Variable): void {
+    this.change(() => {
+      this.yVariables.set(v.id, v);
+      this.varsAll = true;
+    }, { merge: true });
   }
 
   /** Layers bound to a variable. */

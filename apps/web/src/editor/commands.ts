@@ -48,6 +48,7 @@ export const COMMANDS: Command[] = [
   { id: 'create-component', label: 'Create component', shortcut: 'Ctrl+Alt+K', run: () => createComponent(editor), enabled: canMakeComponent },
   { id: 'detach-instance', label: 'Detach instance', shortcut: 'Ctrl+Alt+B', run: () => detachSelection(editor), enabled: hasInstance },
   { id: 'reset-instance', label: 'Reset all changes', run: () => resetSelection(editor), enabled: () => editor.selectedNodes().some((n) => n.type === 'INSTANCE' || !!n.sourceId) },
+  { id: 'libraries', label: 'Libraries', run: () => editor.setUI({ librariesOpen: true }) },
   { id: 'variables', label: 'Local variables', shortcut: 'Ctrl+Alt+V', run: () => editor.setUI({ variablesOpen: true }) },
   { id: 'go-to-main', label: 'Go to main component', run: () => goToMainComponent(editor), enabled: hasInstance },
   {

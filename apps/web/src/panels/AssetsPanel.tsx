@@ -1,10 +1,11 @@
 import { variantsOf, setOf, type NodeId, type SceneNode } from '@figma/document';
 import { renderNodeToCanvas } from '@figma/renderer';
-import { Boxes, ChevronDown, ChevronRight, Component, Search } from 'lucide-react';
+import { BookOpen, Boxes, ChevronDown, ChevronRight, Component, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ASSET_MIME, insertInstanceAt } from '../editor/componentCommands';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
+import { LibraryAssets, LibraryUpdates } from './LibraryPanels';
 
 const THUMB = 64;
 
@@ -102,7 +103,13 @@ export function AssetsPanel() {
           }}
         />
       </label>
-      <div className="panel-head">Local components</div>
+      <LibraryUpdates />
+      <div className="panel-head">
+        Local components
+        <button type="button" className="lib-btn" title="Publish this file or use other files' libraries" onClick={() => editor.setUI({ librariesOpen: true })}>
+          <BookOpen size={12} /> Libraries
+        </button>
+      </div>
       {assets.length === 0 && (
         <div className="hint pad">
           {query ? 'No components match.' : 'No components yet. Select layers and press Ctrl+Alt+K to make one.'}
@@ -123,6 +130,7 @@ export function AssetsPanel() {
           )}
         </div>
       ))}
+      <LibraryAssets query={query} />
       <div className="hint pad">Click to place an instance, drag it onto the canvas, or double-click to go to the main component.</div>
     </div>
   );
