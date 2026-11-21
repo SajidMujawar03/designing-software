@@ -1,4 +1,4 @@
-import { gridLines, gridSpans, isGroupLike, worldBounds, worldTransform, type NodeId } from '@figma/document';
+import { gridLines, gridSpans, isFrameLike, isGroupLike, worldBounds, worldTransform, type NodeId, type SceneNode } from '@figma/document';
 import { applyToPoint, multiply, type Mat2D } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { CORNERS, getSelectionFrame, handleWorldPoint } from './handles';
@@ -14,6 +14,14 @@ import { drawRulers } from './rulers';
 export const BLUE = '#0D99FF';
 export const RED = '#F24822';
 const PINK = '#FF24BD';
+
+const PURPLE = '#9747FF';
+
+/** Components, instances and the layers inside them are outlined in purple. */
+function isComponentLayer(doc: Editor['doc'], n: SceneNode): boolean {
+  const isComp = (x: SceneNode) => x.type === 'COMPONENT' || x.type === 'INSTANCE' || x.type === 'COMPONENT_SET';
+  return isComp(n) || doc.ancestors(n.id).some(isComp);
+}
 
 /** Draws selection, hover, handles, marquee and frame labels in screen space. */
 export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number): void {
@@ -33,22 +41,24 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   ctx.font = '11px Inter, system-ui, sans-serif';
   ctx.textBaseline = 'bottom';
   for (const n of doc.children(pageId)) {
-    if (n.type !== 'FRAME' || !n.visible) continue;
+    if (!isFrameLike(n) || !n.visible) continue;
     const p = ed.worldToScreen(applyToPoint(worldTransform(doc, n.id), { x: 0, y: 0 }));
     const maxW = n.width * viewport.zoom;
     if (maxW < 20) continue;
-    ctx.fillStyle = selected.has(n.id) || hoverId === n.id ? BLUE : '#8C8C8C';
-    ctx.fillText(ellipsize(ctx, n.name, maxW), p.x, p.y - 4);
+    const comp = n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'COMPONENT_SET';
+    ctx.fillStyle = comp ? PURPLE : selected.has(n.id) || hoverId === n.id ? BLUE : '#8C8C8C';
+    ctx.fillText(ellipsize(ctx, (n.type === 'COMPONENT' || n.type === 'COMPONENT_SET' ? '\u2756 ' : n.type === 'INSTANCE' ? '\u25C7 ' : '') + n.name, maxW), p.x, p.y - 4);
   }
 
   const outline = (id: NodeId, width: number) => {
     const n = doc.get(id);
     if (!n) return;
+    const color = isComponentLayer(doc, n) ? PURPLE : BLUE;
     if (isGroupLike(n)) {
       const b = worldBounds(doc, id);
       const a = ed.worldToScreen({ x: b.x, y: b.y });
       ctx.lineWidth = width;
-      ctx.strokeStyle = BLUE;
+      ctx.strokeStyle = color;
       ctx.strokeRect(a.x, a.y, b.width * viewport.zoom, b.height * viewport.zoom);
       return;
     }
@@ -63,7 +73,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     else ctx.rect(0, 0, n.width, n.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineWidth = width;
-    ctx.strokeStyle = BLUE;
+    ctx.strokeStyle = color;
     ctx.stroke();
   };
 
@@ -328,7 +338,7 @@ function drawLayoutGrids(ctx: CanvasRenderingContext2D, ed: Editor, toScreen: Ma
   const visit = (parentId: NodeId) => {
     for (const n of doc.children(parentId)) {
       if (!n.visible) continue;
-      if (n.type === 'FRAME' && n.layoutGrids?.some((g) => g.visible)) {
+      if (isFrameLike(n) && n.layoutGrids?.some((g) => g.visible)) {
         const m = multiply(toScreen, worldTransform(doc, n.id));
         ctx.save();
         ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
@@ -364,7 +374,7 @@ function drawLayoutGrids(ctx: CanvasRenderingContext2D, ed: Editor, toScreen: Ma
         }
         ctx.restore();
       }
-      if (n.type === 'FRAME' || isGroupLike(n)) visit(n.id);
+      if (isFrameLike(n) || isGroupLike(n)) visit(n.id);
     }
   };
   visit(ed.pageId);

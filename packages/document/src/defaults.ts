@@ -22,6 +22,9 @@ const NAMES: Record<NodeType, string> = {
   DOCUMENT: 'Document',
   PAGE: 'Page',
   FRAME: 'Frame',
+  COMPONENT: 'Component',
+  COMPONENT_SET: 'Component set',
+  INSTANCE: 'Instance',
   GROUP: 'Group',
   BOOLEAN: 'Boolean',
   POLYGON: 'Polygon',
@@ -37,8 +40,17 @@ export function defaultProps(type: NodeType): NodeProps {
   const p: NodeProps = { ...BASE, type, name: NAMES[type] };
   switch (type) {
     case 'FRAME':
+    case 'COMPONENT':
+    case 'INSTANCE':
       p.fills = [solid('#FFFFFF')];
       p.clipsContent = true;
+      break;
+    case 'COMPONENT_SET':
+      // A dashed purple outline around the variants.
+      p.strokes = [solid('#9747FF')];
+      p.dashPattern = [10, 5];
+      p.cornerRadius = 5;
+      p.clipsContent = false;
       break;
     case 'RECTANGLE':
     case 'ELLIPSE':

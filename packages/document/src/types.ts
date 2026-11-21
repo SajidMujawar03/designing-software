@@ -10,6 +10,9 @@ export type NodeType =
   | 'DOCUMENT'
   | 'PAGE'
   | 'FRAME'
+  | 'COMPONENT'
+  | 'COMPONENT_SET'
+  | 'INSTANCE'
   | 'GROUP'
   | 'BOOLEAN'
   | 'RECTANGLE'
@@ -235,6 +238,38 @@ export interface SceneNode {
   /** How the layer follows its parent frame's resizing (left/top by default). */
   constraints?: Constraints;
 
+  // Components and instances
+  /** INSTANCE (and nested instances inside one): the main component it is an instance of. */
+  componentId?: NodeId | null;
+  /**
+   * Layers inside an instance (and the instance itself): the layer it mirrors.
+   * For an instance, the main component, or the nested instance it was copied
+   * from inside another component. Edits to the source reach every mirror
+   * whose value still matches the source's old value; differing values are
+   * overrides and survive.
+   */
+  sourceId?: NodeId | null;
+  /** COMPONENT / COMPONENT_SET: shown in the assets panel and inspector. */
+  description?: string;
+  /**
+   * COMPONENT (or the COMPONENT_SET of variants): boolean, text and
+   * instance-swap properties. Their values live on the layers bound to them
+   * (see `componentPropertyReferences`), so instances override them like any
+   * other change.
+   */
+  componentPropertyDefinitions?: Record<string, ComponentPropertyDefinition>;
+  /** Layers inside a main component: which of its properties drive this layer. */
+  componentPropertyReferences?: ComponentPropertyReferences | null;
+
+  // Variables
+  /** Properties driven by variables: field ("fills/0", "cornerRadius", ...) → variable id. */
+  boundVariables?: Record<string, string> | null;
+  /** Pages and frames: the mode each variable collection uses inside them (others inherit). */
+  explicitVariableModes?: Record<string, string> | null;
+
+  /** Hidden holder of components imported from a library (a child of the document root). */
+  library?: LibraryRef | null;
+
   // PAGE
   guides?: Guide[];
 
@@ -273,11 +308,80 @@ export interface SceneNode {
   textStyleId?: string | null;
 }
 
+export type VariableType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
+
+export interface RGBA extends RGB {
+  a: number;
+}
+
+export interface VariableAlias {
+  type: 'VARIABLE_ALIAS';
+  id: string;
+}
+
+export type VariableValue = RGBA | number | string | boolean;
+
+export interface VariableMode {
+  modeId: string;
+  name: string;
+}
+
+/** A group of variables sharing a set of modes (such as Light and Dark). */
+export interface VariableCollection {
+  id: string;
+  /** Imported from a library. */
+  remote?: LibraryRef;
+  name: string;
+  modes: VariableMode[];
+  defaultModeId: string;
+}
+
+export interface Variable {
+  id: string;
+  /** Imported from a library. */
+  remote?: LibraryRef;
+  /** Slashes group variables, e.g. "Colors/Primary". */
+  name: string;
+  collectionId: string;
+  type: VariableType;
+  /** A value (or a reference to another variable) for each mode of the collection. */
+  valuesByMode: Record<string, VariableValue | VariableAlias>;
+  description?: string;
+}
+
+export type ComponentPropertyType = 'BOOLEAN' | 'TEXT' | 'INSTANCE_SWAP';
+
+export interface ComponentPropertyDefinition {
+  type: ComponentPropertyType;
+  /** INSTANCE_SWAP: components offered when swapping (empty = all). */
+  preferredValues?: NodeId[];
+}
+
+export interface ComponentPropertyReferences {
+  /** BOOLEAN property: shows or hides the layer. */
+  visible?: string;
+  /** TEXT property: the layer's text. */
+  characters?: string;
+  /** INSTANCE_SWAP property: which component a nested instance shows. */
+  mainComponent?: string;
+}
+
 /** Text properties a text style controls (color comes from fills, as in Figma). */
 export type TextStyleValues = Required<Omit<TextStyleProps, 'color' | 'textStyleId'>>;
 
+/** Where something imported from a library came from. */
+export interface LibraryRef {
+  fileId: string;
+  /** The library's name when it was imported or last updated. */
+  name: string;
+  /** The published version it matches. */
+  version: number;
+}
+
 interface StyleBase {
   id: string;
+  /** Imported from a library (read-only here; updated from the library). */
+  remote?: LibraryRef;
   /** Slashes group styles into folders, e.g. "Brand/Primary". */
   name: string;
   description?: string;
@@ -306,7 +410,7 @@ export type NodePatch = Partial<NodeProps>;
 
 /** Node types that can contain children on the canvas. */
 export const isContainer = (n: SceneNode): boolean =>
-  n.type === 'FRAME' || isGroupLike(n) || n.type === 'PAGE' || n.type === 'DOCUMENT';
+  FRAME_LIKE.has(n.type) || isGroupLike(n) || n.type === 'PAGE' || n.type === 'DOCUMENT';
 
 /**
  * Groups and boolean operations hold children but have no box of their own:
@@ -321,9 +425,13 @@ export const isGroupLike = (n: SceneNode | undefined | null): boolean => n?.type
 export const hasOwnTransform = (n: SceneNode): boolean =>
   !isGroupLike(n) && n.type !== 'PAGE' && n.type !== 'DOCUMENT';
 
+/** Frames, main components and instances: boxes that hold, clip and lay out children. */
+export const isFrameLike = (n: SceneNode | undefined | null): n is SceneNode => !!n && FRAME_LIKE.has(n.type);
+const FRAME_LIKE = new Set<NodeType>(['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
+
 /** A frame that lays out its children (auto layout). */
 export const isAutoLayout = (n: SceneNode | undefined | null): boolean =>
-  n?.type === 'FRAME' && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
+  isFrameLike(n) && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
 
 /** A child placed by its auto layout parent (rather than positioned freely). */
 export const isLayoutChild = (n: SceneNode, parent: SceneNode | undefined | null): boolean =>

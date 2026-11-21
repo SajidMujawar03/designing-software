@@ -1,4 +1,5 @@
 import {
+  isFrameLike,
   boxInParent,
   isAutoLayout,
   isLayoutChild,
@@ -21,7 +22,7 @@ const near = (vs: number[]) => vs.every((v) => Math.abs(v - vs[0]) < 1);
  */
 export function convertToAutoLayout(doc: DesignDocument, id: NodeId): void {
   const f = doc.get(id);
-  if (!f || f.type !== 'FRAME') return;
+  if (!f || !isFrameLike(f)) return;
   const kids = doc.children(id).filter((k) => k.visible);
   if (!kids.length) {
     doc.updateNode(id, { layoutMode: 'HORIZONTAL', itemSpacing: 10, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED' });
@@ -74,7 +75,7 @@ export function addAutoLayout(ed: Editor): void {
   if (!sel.length) return;
   const one = sel.length === 1 ? doc.get(sel[0]) : undefined;
   doc.change(() => {
-    if (one?.type === 'FRAME' && !isAutoLayout(one)) {
+    if (isFrameLike(one) && !isAutoLayout(one)) {
       convertToAutoLayout(doc, one.id);
       return;
     }

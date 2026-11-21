@@ -1,5 +1,6 @@
-import { isAutoLayout, isGroupLike } from '@figma/document';
+import { isAutoLayout, isFrameLike, isGroupLike } from '@figma/document';
 import { addAutoLayout, removeAutoLayout } from './layoutCommands';
+import { combineAsVariants, createComponent, detachSelection, goToMainComponent, resetSelection } from './componentCommands';
 import { editor } from './editor';
 import { placeImages } from './shortcuts';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
@@ -22,7 +23,13 @@ const canBoolean = () => {
 const hasStroke = () => editor.selectedNodes().some((n) => n.strokeWeight > 0 && n.strokes.some((s) => s.visible));
 const multi = (n: number) => () => editor.topLevelSelection().length >= n;
 const hasContainer = () =>
-  editor.selectedNodes().some((n) => isGroupLike(n) || n.type === 'FRAME');
+  editor.selectedNodes().some((n) => isGroupLike(n) || isFrameLike(n));
+
+const canMakeComponent = () => {
+  const sel = editor.selectedNodes();
+  return sel.length > 0 && !(sel.length === 1 && ['COMPONENT', 'INSTANCE', 'COMPONENT_SET'].includes(sel[0].type));
+};
+const hasInstance = () => editor.selectedNodes().some((n) => n.type === 'INSTANCE');
 
 /** Every user command, used by the context menu and the command palette. */
 export const COMMANDS: Command[] = [
@@ -38,6 +45,21 @@ export const COMMANDS: Command[] = [
   { id: 'group', label: 'Group selection', shortcut: 'Ctrl+G', run: () => editor.groupSelection(), enabled: hasSelection },
   { id: 'ungroup', label: 'Ungroup', shortcut: 'Ctrl+Shift+G', run: () => editor.ungroupSelection(), enabled: hasContainer },
   { id: 'frame-selection', label: 'Frame selection', shortcut: 'Ctrl+Alt+G', run: () => editor.frameSelection(), enabled: hasSelection },
+  { id: 'create-component', label: 'Create component', shortcut: 'Ctrl+Alt+K', run: () => createComponent(editor), enabled: canMakeComponent },
+  { id: 'detach-instance', label: 'Detach instance', shortcut: 'Ctrl+Alt+B', run: () => detachSelection(editor), enabled: hasInstance },
+  { id: 'reset-instance', label: 'Reset all changes', run: () => resetSelection(editor), enabled: () => editor.selectedNodes().some((n) => n.type === 'INSTANCE' || !!n.sourceId) },
+  { id: 'libraries', label: 'Libraries', run: () => editor.setUI({ librariesOpen: true }) },
+  { id: 'variables', label: 'Local variables', shortcut: 'Ctrl+Alt+V', run: () => editor.setUI({ variablesOpen: true }) },
+  { id: 'go-to-main', label: 'Go to main component', run: () => goToMainComponent(editor), enabled: hasInstance },
+  {
+    id: 'combine-variants',
+    label: 'Combine as variants',
+    run: () => combineAsVariants(editor),
+    enabled: () => {
+      const sel = editor.selectedNodes();
+      return sel.length > 1 && sel.every((n) => n.type === 'COMPONENT' && editor.doc.get(n.parentId)?.type !== 'COMPONENT_SET');
+    },
+  },
   { id: 'add-auto-layout', label: 'Add auto layout', shortcut: 'Shift+A', run: () => addAutoLayout(editor), enabled: hasSelection },
   {
     id: 'remove-auto-layout',
@@ -123,6 +145,11 @@ export const CANVAS_MENU = [
   '-',
   'group',
   'ungroup',
+  'create-component',
+  'combine-variants',
+  'detach-instance',
+  'reset-instance',
+  'go-to-main',
   'frame-selection',
   'add-auto-layout',
   'remove-auto-layout',

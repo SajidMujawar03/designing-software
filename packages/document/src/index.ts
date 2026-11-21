@@ -6,4 +6,8 @@ export * from './scene';
 export * from './vector';
 export * from './text';
 export * from './autolayout';
+export * from './components';
+export * from './variants';
+export * from './variables';
+export * from './library';
 export { computeAutoLayout, defaultGrid, gridSpans, gridLines, gridSnapEdges, DEFAULT_CONSTRAINTS } from '@figma/layout';

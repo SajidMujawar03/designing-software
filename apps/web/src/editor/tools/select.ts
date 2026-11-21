@@ -1,14 +1,4 @@
-import {
-  childOfGroupContaining,
-  hitTest,
-  isAutoLayout,
-  isGroupLike,
-  worldTransform,
-  nodesInRect,
-  selectableAncestor,
-  type NodeId,
-  type NodePatch,
-} from '@figma/document';
+import { isLayoutChild, isInInstance, canReparent, childOfGroupContaining, hitTest, isAutoLayout, isGroupLike, worldTransform, nodesInRect, selectableAncestor, type NodeId, type NodePatch } from '@figma/document';
 import { applyToPoint, invert, rectContainsPoint, rectFromPoints, type Mat2D, type Rect, type Vec2 } from '@figma/geometry';
 import { getSelectionFrame, handleCursor, hitHandle, HANDLES, type HandleId, type SelectionFrame } from '../canvas/handles';
 import type { Editor } from '../editor';
@@ -212,8 +202,16 @@ export class SelectTool implements Tool {
     }
 
     // Dragging over a frame moves the layers into it; dragging out moves them to the page.
-    const target =
+    let target =
       hitTest(this.doc, this.ed.pageId, e.world, { framesOnly: true, exclude: new Set(g.tops) })?.id ?? this.ed.pageId;
+    // Layers inside an instance stay in it (moving them is a position override);
+    // a component can't be dropped inside itself.
+    const pinned = g.tops.some((id) => isInInstance(this.doc, id));
+    if (pinned || !canReparent(this.doc, g.tops, target)) {
+      const own = this.doc.get(g.tops[0])!.parentId!;
+      if (pinned && isLayoutChild(this.doc.get(g.tops[0])!, this.doc.get(own))) return;
+      target = own;
+    }
 
     // Over an auto layout frame, the layers are slotted into its order instead of positioned.
     const tf = this.doc.get(target);

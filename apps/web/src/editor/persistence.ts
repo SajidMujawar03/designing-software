@@ -1,18 +1,27 @@
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { editor } from './editor';
+import { currentFileId, fileStoreName, touchFile } from './files';
 import { fonts } from './fonts';
+import { refreshLibraries, watchFileMeta } from './libraryStore';
 
-const FILE_KEY = 'figma-clone:file:default';
-
-/** Saves the document in the browser (IndexedDB) and loads it on start. */
+/** Saves the open file in the browser (IndexedDB) and loads it on start. */
 export function startPersistence(): Promise<void> {
-  const provider = new IndexeddbPersistence(FILE_KEY, editor.doc.ydoc);
+  const provider = new IndexeddbPersistence(fileStoreName(currentFileId()), editor.doc.ydoc);
   return new Promise((resolve) => {
     let done = false;
     const finish = () => {
       if (done) return;
       done = true;
       editor.onReady();
+      watchFileMeta(editor);
+      void refreshLibraries();
+      // Keep the file list ordered by recent edits (at most every few seconds).
+      let last = 0;
+      editor.doc.subscribe(() => {
+        if (Date.now() - last < 5000) return;
+        last = Date.now();
+        touchFile();
+      });
       // Google Fonts used in the file need the catalog to load.
       void fonts.loadCatalog();
       resolve();

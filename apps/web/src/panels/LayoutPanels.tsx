@@ -1,4 +1,5 @@
 import {
+  isFrameLike,
   defaultGrid,
   DEFAULT_CONSTRAINTS,
   isAutoLayout,
@@ -331,7 +332,7 @@ function toggleSide(cur: ConstraintType, side: 'MIN' | 'MAX', shift: boolean): C
 export function ConstraintsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const applies = nodes.every((n) => {
     const p = parentOf(n);
-    return p?.type === 'FRAME' && (!isAutoLayout(p) || n.layoutPositioning === 'ABSOLUTE');
+    return isFrameLike(p) && (!isAutoLayout(p) || n.layoutPositioning === 'ABSOLUTE');
   });
   if (!applies) return null;
   const c = (n: SceneNode): Constraints => n.constraints ?? DEFAULT_CONSTRAINTS;
@@ -375,7 +376,7 @@ function gridSummary(g: LayoutGrid): string {
 
 export function LayoutGridSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const [open, setOpen] = useState<number | null>(null);
-  if (!nodes.every((n) => n.type === 'FRAME')) return null;
+  if (!nodes.every((n) => isFrameLike(n))) return null;
   const grids = common(nodes.map((n) => n.layoutGrids ?? []));
   const list = grids === MIXED ? [] : grids;
   const set = (next: LayoutGrid[], live = false) => apply(ids, { layoutGrids: next }, live);

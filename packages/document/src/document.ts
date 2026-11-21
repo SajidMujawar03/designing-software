@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { defaultProps } from './defaults';
 import {
+  isFrameLike,
   isGroupLike,
   type EffectStyle,
   type FillStyle,
@@ -14,8 +15,15 @@ import {
   type TextRun,
   type TextStyle,
   type TextStyleProps,
+  type Variable,
+  type VariableCollection,
+  type VariableType,
+  type VariableValue,
+  type VariableAlias,
 } from './types';
 import { applyChildConstraints, layoutFrame, layoutRoots } from './autolayout';
+import { propagate, structureSource, syncChildren } from './components';
+import { applyVariables, defaultValue, detachedFields } from './variables';
 import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
@@ -70,6 +78,17 @@ export class DesignDocument {
   /** Shared color, text and effect styles by id. */
   readonly yStyles: Y.Map<Y.Map<unknown>>;
   private stylesById = new Map<string, SharedStyle>();
+  /** Variables and their collections by id (plain values, replaced whole on change). */
+  readonly yVariables: Y.Map<Variable>;
+  readonly yCollections: Y.Map<VariableCollection>;
+  /** Layers with bound variables. */
+  private boundNodes = new Set<NodeId>();
+  /** Every bound layer must be re-resolved (a variable or collection changed). */
+  private varsAll = false;
+  /** Layers whose bound variables (or those of layers inside them) must be re-resolved. */
+  private varsDirty = new Set<NodeId>();
+  /** Work the document does on its own (layout, propagation): it never unbinds variables. */
+  private internal = 0;
 
   private nodes = new Map<NodeId, SceneNode>();
   private childrenCache = new Map<NodeId, NodeId[]>();
@@ -83,6 +102,13 @@ export class DesignDocument {
   private layoutDirty = new Set<NodeId>();
   /** Text layers whose width changed and must be measured again. */
   private fitDirty = new Set<NodeId>();
+  /** Layers whose children were added, removed or reordered (their mirrors must follow). */
+  private structDirty = new Set<NodeId>();
+  /** Mirrors by the layer they mirror (`sourceId`), and instances by main component. */
+  private bySource = new Map<NodeId, Set<NodeId>>();
+  private byComponent = new Map<NodeId, Set<NodeId>>();
+  /** Nesting of component propagation (guards against cycles). */
+  private propagating = 0;
   /**
    * Re-measures a text layer (set by the app, which owns text shaping).
    * Without it, text keeps its size when layouts change its width.
@@ -94,14 +120,22 @@ export class DesignDocument {
     this.yNodes = ydoc.getMap<YNode>('nodes');
     this.yImages = ydoc.getMap<Uint8Array>('images');
     this.yStyles = ydoc.getMap<Y.Map<unknown>>('styles');
-    this.undoManager = new Y.UndoManager([this.yNodes, this.yStyles], {
+    this.yVariables = ydoc.getMap<Variable>('variables');
+    this.yCollections = ydoc.getMap<VariableCollection>('variableCollections');
+    this.undoManager = new Y.UndoManager([this.yNodes, this.yStyles, this.yVariables, this.yCollections], {
       trackedOrigins: new Set([LOCAL_ORIGIN]),
       captureTimeout: Number.POSITIVE_INFINITY,
     });
 
-    this.yNodes.forEach((y, id) => this.nodes.set(id, snapshot(id, y)));
+    this.yNodes.forEach((y, id) => this.setSnapshot(id, snapshot(id, y)));
     this.yNodes.observeDeep((events) => this.onYEvents(events));
     this.yStyles.forEach((y, id) => this.stylesById.set(id, { ...(y.toJSON() as SharedStyle), id }));
+    const notify = () => {
+      this._version++;
+      for (const l of this.listeners) l();
+    };
+    this.yVariables.observe(notify);
+    this.yCollections.observe(notify);
     this.yStyles.observeDeep((events) => {
       for (const e of events) {
         const ids = e.target === this.yStyles ? [...e.changes.keys.keys()] : [(e.target as Y.Map<unknown>).get('id') as string];
@@ -201,6 +235,20 @@ export class DesignDocument {
     return out;
   }
 
+  /**
+   * Layers that mirror `id`: copies of it inside instances, and (for a main
+   * component) its instances, including swapped nested ones.
+   */
+  dependentsOf(id: NodeId): NodeId[] {
+    const out = new Set(this.bySource.get(id) ?? []);
+    for (const i of this.byComponent.get(id) ?? []) {
+      const n = this.nodes.get(i);
+      if (n && structureSource(this, n) === id) out.add(i);
+    }
+    out.delete(id);
+    return [...out];
+  }
+
   /** Encoded bytes of a stored image, if present. */
   getImage(hash: string): Uint8Array | undefined {
     return this.yImages.get(hash);
@@ -237,7 +285,43 @@ export class DesignDocument {
 
   /** Lays out every auto layout frame touched by this change, until nothing moves. */
   private runLayout(): void {
-    for (let pass = 0; pass < 10 && (this.layoutDirty.size || this.fitDirty.size); pass++) {
+    this.internal++;
+    try {
+      this.layoutPasses();
+    } finally {
+      this.internal--;
+    }
+    this.layoutDirty.clear();
+    this.fitDirty.clear();
+    this.structDirty.clear();
+    this.varsDirty.clear();
+    this.varsAll = false;
+  }
+
+  private layoutPasses(): void {
+    for (
+      let pass = 0;
+      pass < 32 && (this.layoutDirty.size || this.fitDirty.size || this.structDirty.size || this.varsDirty.size || this.varsAll);
+      pass++
+    ) {
+      const struct = [...this.structDirty];
+      this.structDirty.clear();
+      for (const p of struct) {
+        if (!this.nodes.has(p)) continue;
+        for (const d of this.dependentsOf(p)) {
+          const n = this.nodes.get(d);
+          if (n && structureSource(this, n) === p) syncChildren(this, d, p);
+        }
+      }
+      if (this.varsAll || this.varsDirty.size) {
+        const all = this.varsAll;
+        const roots = [...this.varsDirty];
+        this.varsAll = false;
+        this.varsDirty.clear();
+        for (const id of [...this.boundNodes]) {
+          if (all || roots.some((r) => r === id || this.isAncestor(r, id))) applyVariables(this, id);
+        }
+      }
       const fit = [...this.fitDirty];
       this.fitDirty.clear();
       if (this.textFitter) for (const id of fit) if (this.nodes.has(id)) this.textFitter(id);
@@ -247,6 +331,7 @@ export class DesignDocument {
     }
     this.layoutDirty.clear();
     this.fitDirty.clear();
+    this.structDirty.clear();
   }
 
   /** Lays out an auto layout frame now (e.g. after turning auto layout on). */
@@ -277,6 +362,15 @@ export class DesignDocument {
     if (!y) return;
     const before = this.nodes.get(id);
     patch = this.withDetachedStyles(id, this.withScaledPaths(id, patch));
+    // Editing a bound property by hand unbinds it (the document's own updates don't).
+    if (before?.boundVariables && this.internal === 0 && this.propagating === 0 && !('boundVariables' in patch)) {
+      const gone = detachedFields(before, patch);
+      if (gone.length) {
+        const rest = { ...before.boundVariables };
+        for (const f of gone) delete rest[f];
+        patch = { ...patch, boundVariables: Object.keys(rest).length ? rest : null };
+      }
+    }
     this.change(() => {
       let changed = false;
       for (const [k, v] of Object.entries(patch)) {
@@ -294,12 +388,46 @@ export class DesignDocument {
       this.refresh(id, 'parentId' in patch || 'index' in patch);
       const after = this.nodes.get(id)!;
       if (
-        before?.type === 'FRAME' &&
+        isFrameLike(before) &&
         opts.constraints !== false &&
         (after.width !== before.width || after.height !== before.height)
       ) {
-        applyChildConstraints(this, id, before, after);
+        this.internal++;
+        try {
+          applyChildConstraints(this, id, before, after);
+        } finally {
+          this.internal--;
+        }
       }
+      if ('boundVariables' in patch || 'explicitVariableModes' in patch) this.varsDirty.add(id);
+      if (before) this.propagateFrom(before);
+    }, { merge: true });
+  }
+
+  /** Sends a layer's changes (since `before`) to the layers mirroring it. */
+  private propagateFrom(before: SceneNode): void {
+    const after = this.nodes.get(before.id);
+    if (!after || this.propagating > 48) return;
+    if (!this.bySource.has(before.id) && !this.byComponent.has(before.id)) return;
+    this.propagating++;
+    try {
+      propagate(this, before, after);
+    } finally {
+      this.propagating--;
+    }
+  }
+
+  /** Replaces a text layer's text and formatting outright. */
+  setRichText(id: NodeId, characters: string, runs: TextRun[]): void {
+    const before = this.nodes.get(id);
+    this.change(() => {
+      const t = this.yText(id);
+      if (!t) return;
+      if (t.length) t.delete(0, t.length);
+      t.insert(0, characters);
+      for (const r of runs) t.format(r.start, r.end - r.start, runAttrs(r));
+      this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
@@ -440,6 +568,7 @@ export class DesignDocument {
    * of the character before it (as typing does); `style` sets it exactly.
    */
   insertText(id: NodeId, index: number, text: string, style?: TextStyleProps): void {
+    const before = this.nodes.get(id);
     this.change(() => {
       const t = this.yText(id);
       if (!t || !text) return;
@@ -447,16 +576,19 @@ export class DesignDocument {
       if (style) t.insert(at, text, cleanStyle(style));
       else t.insert(at, text);
       this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
   deleteText(id: NodeId, index: number, length: number): void {
+    const before = this.nodes.get(id);
     this.change(() => {
       const t = this.yText(id);
       if (!t || length <= 0) return;
       const at = Math.max(0, Math.min(index, t.length));
       t.delete(at, Math.min(length, t.length - at));
       this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
@@ -466,11 +598,13 @@ export class DesignDocument {
    */
   formatText(id: NodeId, index: number, length: number, style: { [K in keyof TextStyleProps]?: TextStyleProps[K] | null }): void {
     if (!('textStyleId' in style) && TEXT_STYLE_KEYS.some((k) => k in style)) style = { ...style, textStyleId: null };
+    const before = this.nodes.get(id);
     this.change(() => {
       const t = this.yText(id);
       if (!t || length <= 0) return;
       t.format(index, length, style as Record<string, unknown>);
       this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
@@ -531,6 +665,30 @@ export class DesignDocument {
     }, { merge: true });
   }
 
+  /**
+   * Adds a style with its own id, or updates it (and the layers using it):
+   * used when importing from a library.
+   */
+  putStyle(style: SharedStyle): void {
+    const { id, ...rest } = style;
+    if (!this.yStyles.has(id)) {
+      this.change(() => {
+        const y = new Y.Map<unknown>();
+        for (const [k, v] of Object.entries({ ...rest, id })) if (v !== undefined) y.set(k, v);
+        this.yStyles.set(id, y);
+        this.refreshStyle(id);
+      }, { merge: true });
+      return;
+    }
+    this.change(() => {
+      const y = this.yStyles.get(id)!;
+      for (const [k, v] of Object.entries(rest)) if (v !== undefined && !['paints', 'text', 'effects'].includes(k)) y.set(k, v);
+      this.refreshStyle(id);
+      const { paints, text, effects } = style as Partial<FillStyle & TextStyle & EffectStyle>;
+      this.updateStyle(id, paints ? { paints } : text ? { text } : effects ? { effects } : {});
+    }, { merge: true });
+  }
+
   /** Removes a style; layers keep its values but are detached from it. */
   deleteStyle(id: string): void {
     this.change(() => {
@@ -583,6 +741,174 @@ export class DesignDocument {
           (n.textRuns ?? []).some((r) => r.textStyleId === styleId),
       )
       .map((n) => n.id);
+  }
+
+  // ---------------------------------------------------------------- variables
+
+  collections(): VariableCollection[] {
+    return [...this.yCollections.values()];
+  }
+
+  getCollection(id: string | null | undefined): VariableCollection | undefined {
+    return id ? this.yCollections.get(id) : undefined;
+  }
+
+  variables(collectionId?: string): Variable[] {
+    const all = [...this.yVariables.values()];
+    return collectionId ? all.filter((v) => v.collectionId === collectionId) : all;
+  }
+
+  getVariable(id: string | null | undefined): Variable | undefined {
+    return id ? this.yVariables.get(id) : undefined;
+  }
+
+  createCollection(name: string, modeNames: string[] = ['Mode 1']): string {
+    return this.change(() => {
+      const id = nanoid();
+      const modes = modeNames.map((n) => ({ modeId: nanoid(8), name: n }));
+      this.yCollections.set(id, { id, name, modes, defaultModeId: modes[0].modeId });
+      return id;
+    }, { merge: true });
+  }
+
+  updateCollection(id: string, patch: Partial<Pick<VariableCollection, 'name' | 'modes' | 'defaultModeId'>>): void {
+    const c = this.yCollections.get(id);
+    if (!c) return;
+    this.change(() => {
+      this.yCollections.set(id, { ...c, ...patch });
+      this.varsAll = true;
+    }, { merge: true });
+  }
+
+  /** Adds a mode; each variable starts with its default mode's value. */
+  addMode(collectionId: string, name: string): string | null {
+    const c = this.yCollections.get(collectionId);
+    if (!c) return null;
+    const modeId = nanoid(8);
+    this.change(() => {
+      this.yCollections.set(collectionId, { ...c, modes: [...c.modes, { modeId, name }] });
+      for (const v of this.variables(collectionId)) {
+        this.yVariables.set(v.id, { ...v, valuesByMode: { ...v.valuesByMode, [modeId]: v.valuesByMode[c.defaultModeId] } });
+      }
+    }, { merge: true });
+    return modeId;
+  }
+
+  deleteMode(collectionId: string, modeId: string): void {
+    const c = this.yCollections.get(collectionId);
+    if (!c || c.modes.length < 2) return;
+    this.change(() => {
+      const modes = c.modes.filter((m) => m.modeId !== modeId);
+      this.yCollections.set(collectionId, { ...c, modes, defaultModeId: c.defaultModeId === modeId ? modes[0].modeId : c.defaultModeId });
+      for (const v of this.variables(collectionId)) {
+        const values = { ...v.valuesByMode };
+        delete values[modeId];
+        this.yVariables.set(v.id, { ...v, valuesByMode: values });
+      }
+      // Layers that chose the mode go back to inheriting.
+      for (const n of this.nodes.values()) {
+        if (n.explicitVariableModes?.[collectionId] !== modeId) continue;
+        const rest = { ...n.explicitVariableModes };
+        delete rest[collectionId];
+        this.updateNode(n.id, { explicitVariableModes: Object.keys(rest).length ? rest : null });
+      }
+      this.varsAll = true;
+    }, { merge: true });
+  }
+
+  /** Removes a collection, its variables and their bindings (layers keep their values). */
+  deleteCollection(id: string): void {
+    this.change(() => {
+      for (const v of this.variables(id)) this.deleteVariable(v.id);
+      this.yCollections.delete(id);
+    }, { merge: true });
+  }
+
+  createVariable(collectionId: string, name: string, type: VariableType, value: VariableValue = defaultValue(type)): string {
+    const c = this.yCollections.get(collectionId);
+    if (!c) throw new Error('No such collection');
+    return this.change(() => {
+      const id = nanoid();
+      this.yVariables.set(id, { id, name, collectionId, type, valuesByMode: Object.fromEntries(c.modes.map((m) => [m.modeId, value])) });
+      return id;
+    }, { merge: true });
+  }
+
+  updateVariable(id: string, patch: Partial<Pick<Variable, 'name' | 'description' | 'valuesByMode'>>): void {
+    const v = this.yVariables.get(id);
+    if (!v) return;
+    this.change(() => {
+      this.yVariables.set(id, { ...v, ...patch });
+      this.varsAll = true;
+    }, { merge: true });
+  }
+
+  setVariableValue(id: string, modeId: string, value: VariableValue | VariableAlias): void {
+    const v = this.yVariables.get(id);
+    if (v) this.updateVariable(id, { valuesByMode: { ...v.valuesByMode, [modeId]: value } });
+  }
+
+  /** Removes a variable; bound layers keep their current values, unbound. References to it become its value. */
+  deleteVariable(id: string): void {
+    const v = this.yVariables.get(id);
+    if (!v) return;
+    this.change(() => {
+      for (const n of [...this.nodes.values()]) {
+        if (!n.boundVariables || !Object.values(n.boundVariables).includes(id)) continue;
+        const rest = Object.fromEntries(Object.entries(n.boundVariables).filter(([, x]) => x !== id));
+        this.updateNode(n.id, { boundVariables: Object.keys(rest).length ? rest : null });
+      }
+      const fallback = v.valuesByMode[this.yCollections.get(v.collectionId)?.defaultModeId ?? ''];
+      for (const other of this.yVariables.values()) {
+        const vals = Object.entries(other.valuesByMode);
+        if (!vals.some(([, x]) => typeof x === 'object' && (x as VariableAlias)?.type === 'VARIABLE_ALIAS' && (x as VariableAlias).id === id)) continue;
+        const next = Object.fromEntries(vals.map(([m, x]) => [m, typeof x === 'object' && (x as VariableAlias)?.id === id ? fallback : x]));
+        this.yVariables.set(other.id, { ...other, valuesByMode: next as Variable['valuesByMode'] });
+      }
+      this.yVariables.delete(id);
+      this.varsAll = true;
+    }, { merge: true });
+  }
+
+  /** Binds (or with null, unbinds) a layer field such as "fills/0" or "cornerRadius" to a variable. */
+  bindVariable(nodeId: NodeId, field: string, variableId: string | null): void {
+    const n = this.nodes.get(nodeId);
+    if (!n) return;
+    const next = { ...(n.boundVariables ?? {}) };
+    if (variableId) next[field] = variableId;
+    else delete next[field];
+    this.updateNode(nodeId, { boundVariables: Object.keys(next).length ? next : null });
+  }
+
+  /** Chooses (or with null, stops choosing) a collection's mode for a page or frame and everything in it. */
+  setVariableMode(nodeId: NodeId, collectionId: string, modeId: string | null): void {
+    const n = this.nodes.get(nodeId);
+    if (!n) return;
+    const next = { ...(n.explicitVariableModes ?? {}) };
+    if (modeId) next[collectionId] = modeId;
+    else delete next[collectionId];
+    this.updateNode(nodeId, { explicitVariableModes: Object.keys(next).length ? next : null });
+  }
+
+  /** Adds or replaces a collection as given (used when importing from a library). */
+  putCollection(c: VariableCollection): void {
+    this.change(() => {
+      this.yCollections.set(c.id, c);
+      this.varsAll = true;
+    }, { merge: true });
+  }
+
+  /** Adds or replaces a variable as given (used when importing from a library). */
+  putVariable(v: Variable): void {
+    this.change(() => {
+      this.yVariables.set(v.id, v);
+      this.varsAll = true;
+    }, { merge: true });
+  }
+
+  /** Layers bound to a variable. */
+  usesOfVariable(id: string): NodeId[] {
+    return [...this.boundNodes].filter((n) => Object.values(this.nodes.get(n)?.boundVariables ?? {}).includes(id));
   }
 
   // ---------------------------------------------------------------- internals
@@ -651,9 +977,41 @@ export class DesignDocument {
       if (old?.parentId) this.layoutDirty.add(old.parentId);
     }
     const y = this.yNodes.get(id);
-    if (y) this.nodes.set(id, snapshot(id, y));
+    const now = y ? snapshot(id, y) : undefined;
+    this.setSnapshot(id, now);
+    if (structural) {
+      this.childrenDirty = true;
+      if (this.depth > 0) {
+        if (old?.parentId) this.structDirty.add(old.parentId);
+        if (now?.parentId) this.structDirty.add(now.parentId);
+        // Moved (or new): the modes in effect around it may differ.
+        if (now && old?.parentId !== now.parentId) this.varsDirty.add(id);
+      }
+    }
+  }
+
+  /** Stores a node's snapshot (or removes it) and keeps the component indexes current. */
+  private setSnapshot(id: NodeId, n: SceneNode | undefined): void {
+    const old = this.nodes.get(id);
+    const link = (m: Map<NodeId, Set<NodeId>>, from: NodeId | null | undefined, to: NodeId | null | undefined) => {
+      if (from === to) return;
+      if (from) {
+        const s = m.get(from);
+        s?.delete(id);
+        if (s && !s.size) m.delete(from);
+      }
+      if (to) {
+        let s = m.get(to);
+        if (!s) m.set(to, (s = new Set()));
+        s.add(id);
+      }
+    };
+    if (n?.boundVariables && Object.keys(n.boundVariables).length) this.boundNodes.add(id);
+    else this.boundNodes.delete(id);
+    link(this.bySource, old?.sourceId, n?.sourceId);
+    link(this.byComponent, old?.componentId, n?.componentId);
+    if (n) this.nodes.set(id, n);
     else this.nodes.delete(id);
-    if (structural) this.childrenDirty = true;
   }
 
   private onYEvents(events: Array<Y.YEvent<Y.AbstractType<unknown>>>): void {
@@ -682,8 +1040,7 @@ export class DesignDocument {
         if (old?.parentId) relayout.add(old.parentId);
       }
       const y = this.yNodes.get(id);
-      if (y) this.nodes.set(id, snapshot(id, y));
-      else this.nodes.delete(id);
+      this.setSnapshot(id, y ? snapshot(id, y) : undefined);
     }
     this._version++;
     for (const l of this.listeners) l();

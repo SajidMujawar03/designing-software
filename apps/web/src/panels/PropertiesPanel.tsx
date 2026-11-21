@@ -1,4 +1,4 @@
-import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
+import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   AlignJustify,
   ArrowDownToLine,
@@ -43,6 +43,8 @@ import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transform
 import { ColorPicker } from './ColorPicker';
 import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { AutoLayoutSection, ConstraintsSection, LayoutGridSection, SizingRow } from './LayoutPanels';
+import { ComponentSection } from './ComponentPanel';
+import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -93,7 +95,7 @@ export function PropertiesPanel() {
   const allText = types === 'TEXT';
   const val = <K extends keyof SceneNode>(k: K) => common(nodes.map((n) => n[k])) as SceneNode[K] | Mixed;
   const num = (k: keyof SceneNode) => val(k) as number | Mixed;
-  const hasRadius = nodes.every((n) => n.type === 'RECTANGLE' || n.type === 'FRAME');
+  const hasRadius = nodes.every((n) => n.type === 'RECTANGLE' || isFrameLike(n));
   const isLine = types === 'LINE';
 
   return (
@@ -104,6 +106,10 @@ export function PropertiesPanel() {
       </div>
 
       <AlignBar count={editor.topLevelSelection().length} />
+
+      <ComponentSection nodes={nodes} />
+      {nodes.length === 1 && <VariableModes nodeId={nodes[0].id} />}
+      <VariableBindings nodes={nodes} />
 
       {nodes.some((n) => isGroupLike(n)) ? (
         <BoxLayout ids={ids} />
@@ -164,7 +170,7 @@ export function PropertiesPanel() {
           )}
         </div>
         <SizingRow ids={ids} nodes={nodes} />
-        {types === 'FRAME' && (
+        {nodes.every(isFrameLike) && (
           <label className="checkbox">
             <input
               type="checkbox"
@@ -466,7 +472,7 @@ function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]
   const paints = common(nodes.map((n) => n[prop]));
   const add = () =>
     apply(ids, (n) => {
-      const color = prop === 'strokes' || n.type === 'TEXT' ? '#000000' : n.type === 'FRAME' ? '#FFFFFF' : '#D9D9D9';
+      const color = prop === 'strokes' || n.type === 'TEXT' ? '#000000' : isFrameLike(n) ? '#FFFFFF' : '#D9D9D9';
       return { [prop]: [...(paints === MIXED ? [] : n[prop]), solid(color)] } as NodePatch;
     });
   const set = (next: Paint[], live: boolean) => apply(ids, { [prop]: next } as NodePatch, live);
@@ -600,6 +606,16 @@ function PageProperties() {
         />
       </Section>
       <LocalStyles />
+      <VariableModes nodeId={page.id} />
+      <Section title="Variables">
+        <div className="hint">
+          {editor.doc.variables().length} variable{editor.doc.variables().length === 1 ? '' : 's'} in {editor.doc.collections().length} collection
+          {editor.doc.collections().length === 1 ? '' : 's'}
+        </div>
+        <button type="button" className="btn" onClick={() => editor.setUI({ variablesOpen: true })}>
+          Open variables
+        </button>
+      </Section>
       <Section title="File">
         <button type="button" className="btn" onClick={exportJson}>
           Export file as JSON

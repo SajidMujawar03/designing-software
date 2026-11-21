@@ -1,4 +1,5 @@
 import { hitTest, paintColor, selectableAncestor } from '@figma/document';
+import { ASSET_MIME, insertInstanceAt } from '../componentCommands';
 import { Canvas2DRenderer, CanvasKitRenderer, type SceneRenderer } from '@figma/renderer';
 import type { CanvasKit } from 'canvaskit-wasm';
 import { useEffect, useRef, useState } from 'react';
@@ -331,9 +332,16 @@ export function CanvasView() {
       className="canvas-wrap"
       ref={wrapRef}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+        if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes(ASSET_MIME)) e.preventDefault();
       }}
       onDrop={(e) => {
+        const asset = e.dataTransfer.getData(ASSET_MIME);
+        if (asset) {
+          e.preventDefault();
+          const r = wrapRef.current!.getBoundingClientRect();
+          insertInstanceAt(editor, asset, editor.screenToWorld({ x: e.clientX - r.left, y: e.clientY - r.top }));
+          return;
+        }
         const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
         if (!files.length) return;
         e.preventDefault();

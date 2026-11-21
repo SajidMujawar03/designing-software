@@ -1,14 +1,18 @@
-import type { NodeId, NodeType, SceneNode } from '@figma/document';
-import { Combine, Contrast, Star, Triangle } from 'lucide-react';
+import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
+import { Boxes, Combine, Component, Contrast, Diamond, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import { useEffect, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
+import { AssetsPanel } from './AssetsPanel';
 import { IconButton } from './controls';
 
 const ICONS: Partial<Record<NodeType, typeof Square>> = {
   FRAME: Hash,
+  COMPONENT: Component,
+  COMPONENT_SET: Boxes,
+  INSTANCE: Diamond,
   GROUP: SquareDashed,
   RECTANGLE: Square,
   ELLIPSE: Circle,
@@ -20,13 +24,44 @@ const ICONS: Partial<Record<NodeType, typeof Square>> = {
   BOOLEAN: Combine,
 };
 
+const TAB_KEY = 'figma-clone:left-tab';
+
 export function LayersPanel() {
   useDocVersion();
+  const [tab, setTab] = useState<'layers' | 'assets'>(() => {
+    try {
+      return localStorage.getItem(TAB_KEY) === 'assets' ? 'assets' : 'layers';
+    } catch {
+      return 'layers';
+    }
+  });
+  const pick = (t: 'layers' | 'assets') => {
+    setTab(t);
+    try {
+      localStorage.setItem(TAB_KEY, t);
+    } catch {
+      // storage unavailable
+    }
+  };
   return (
     <div className="layers">
-      <PagesList />
-      <div className="panel-head">Layers</div>
-      <LayerTree />
+      <div className="side-tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'layers'} className={tab === 'layers' ? 'active' : ''} onClick={() => pick('layers')}>
+          Layers
+        </button>
+        <button role="tab" aria-selected={tab === 'assets'} className={tab === 'assets' ? 'active' : ''} onClick={() => pick('assets')}>
+          Assets
+        </button>
+      </div>
+      {tab === 'assets' ? (
+        <AssetsPanel />
+      ) : (
+        <>
+          <PagesList />
+          <div className="panel-head">Layers</div>
+          <LayerTree />
+        </>
+      )}
     </div>
   );
 }
@@ -126,7 +161,7 @@ function LayerTree() {
     e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const t = (e.clientY - r.top) / r.height;
-    const canNest = n.type === 'FRAME';
+    const canNest = isFrameLike(n);
     const pos: DropPos = canNest ? (t < 0.25 ? 'above' : t > 0.75 ? 'below' : 'inside') : t < 0.5 ? 'above' : 'below';
     if (drop?.id !== n.id || drop.pos !== pos) setDrop({ id: n.id, pos });
   };
@@ -201,7 +236,10 @@ function LayerRow(p: LayerRowProps) {
   const hovered = useUI((s) => s.hoverId === node.id);
   const hasKids = editor.doc.childIds(node.id).length > 0;
   const Icon = node.isMask ? Contrast : (ICONS[node.type] ?? Square);
-  const parentHidden = editor.doc.ancestors(node.id).some((a) => !a.visible);
+  const ancestors = editor.doc.ancestors(node.id);
+  const parentHidden = ancestors.some((a) => !a.visible);
+  const compType = (t: string) => t === 'COMPONENT' || t === 'INSTANCE' || t === 'COMPONENT_SET';
+  const isComp = compType(node.type) || ancestors.some((a) => compType(a.type));
 
   return (
     <div
@@ -209,6 +247,7 @@ function LayerRow(p: LayerRowProps) {
         'layer-row',
         p.selected && 'selected',
         hovered && 'hovered',
+        isComp && 'component-layer',
         (!node.visible || parentHidden) && 'hidden-layer',
         p.dropPos && `drop-${p.dropPos}`,
       ]
