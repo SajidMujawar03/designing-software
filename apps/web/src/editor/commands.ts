@@ -4,7 +4,7 @@ import { combineAsVariants, createComponent, detachSelection, goToMainComponent,
 import { editor } from './editor';
 import { placeImages } from './shortcuts';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
-import { exportJson } from './export';
+import { copyAsPng, copyAsSvg, exportJson, exportLayers, saveFiles } from './export';
 
 export interface Command {
   id: string;
@@ -36,6 +36,15 @@ export const COMMANDS: Command[] = [
   { id: 'undo', label: 'Undo', shortcut: 'Ctrl+Z', run: () => editor.undo(), enabled: () => editor.doc.canUndo() },
   { id: 'redo', label: 'Redo', shortcut: 'Ctrl+Shift+Z', run: () => editor.redo(), enabled: () => editor.doc.canRedo() },
   { id: 'copy', label: 'Copy', shortcut: 'Ctrl+C', run: () => void editor.copy(), enabled: hasSelection },
+  { id: 'copy-png', label: 'Copy as PNG', shortcut: 'Ctrl+Shift+C', run: () => void copyAsPng(), enabled: hasSelection },
+  { id: 'copy-svg', label: 'Copy as SVG', run: () => void copyAsSvg(), enabled: hasSelection },
+  {
+    id: 'export-selection',
+    label: 'Export selection',
+    shortcut: 'Ctrl+Shift+E',
+    run: () => void exportLayers(editor.topLevelSelection()).then((f) => saveFiles(f)),
+    enabled: hasSelection,
+  },
   { id: 'cut', label: 'Cut', shortcut: 'Ctrl+X', run: () => void editor.cut(), enabled: hasSelection },
   { id: 'paste', label: 'Paste', shortcut: 'Ctrl+V', run: () => void editor.paste() },
   { id: 'duplicate', label: 'Duplicate', shortcut: 'Ctrl+D', run: () => editor.duplicateSelection(), enabled: hasSelection },
@@ -141,6 +150,8 @@ export function isEnabled(c: Command): boolean {
 /** Context menu layout: command ids, with '-' as a divider. */
 export const CANVAS_MENU = [
   'copy',
+  'copy-png',
+  'copy-svg',
   'paste',
   'duplicate',
   'delete',

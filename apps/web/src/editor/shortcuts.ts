@@ -1,4 +1,5 @@
 import type { BooleanOperation } from '@figma/document';
+import { copyAsPng, exportLayers, saveFiles } from './export';
 import { follow, usePresence } from '../cloud/presence';
 import { createComponent, detachSelection } from './componentCommands';
 import { addAutoLayout, removeAutoLayout } from './layoutCommands';
@@ -76,6 +77,8 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyM') return run(() => editor.useAsMask());
     }
     if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') return run(() => void flattenSelection(editor));
+    if (mod && e.shiftKey && !e.altKey && (e.code === 'KeyC' || key === 'c')) return run(() => void copyAsPng());
+    if (mod && e.shiftKey && !e.altKey && (e.code === 'KeyE' || key === 'e')) return run(() => void exportLayers(editor.topLevelSelection()).then((f) => saveFiles(f)));
 
     // Alignment: Alt+A/D/H (left/right/center), Alt+W/S/V (top/bottom/middle); with Shift, H/V distribute.
     if (e.altKey && !mod) {

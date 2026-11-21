@@ -270,6 +270,9 @@ export interface SceneNode {
   /** Hidden holder of components imported from a library (a child of the document root). */
   library?: LibraryRef | null;
 
+  /** Export settings: one file per entry (format, size and file name suffix). */
+  exportSettings?: ExportSetting[] | null;
+
   // PAGE
   guides?: Guide[];
 
@@ -368,6 +371,16 @@ export interface ComponentPropertyReferences {
 
 /** Text properties a text style controls (color comes from fills, as in Figma). */
 export type TextStyleValues = Required<Omit<TextStyleProps, 'color' | 'textStyleId'>>;
+
+export type ExportFormat = 'PNG' | 'JPG' | 'SVG' | 'PDF';
+
+/** One export of a layer. Size is a scale (2 = @2x), or a width or height in pixels. */
+export interface ExportSetting {
+  format: ExportFormat;
+  constraint: { type: 'SCALE' | 'WIDTH' | 'HEIGHT'; value: number };
+  /** Added to the file name, e.g. "@2x". */
+  suffix: string;
+}
 
 /** Where something imported from a library came from. */
 export interface LibraryRef {
