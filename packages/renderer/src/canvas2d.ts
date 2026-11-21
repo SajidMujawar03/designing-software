@@ -45,6 +45,12 @@ const paintStyle = (p: Paint): string => {
 const bitmaps = new Map<string, ImageBitmap | 'loading' | 'failed'>();
 const imageListeners = new Set<() => void>();
 
+/** Calls `fn` whenever an image finishes decoding (things drawn before it may need redrawing). */
+export function onImageDecoded(fn: () => void): () => void {
+  imageListeners.add(fn);
+  return () => imageListeners.delete(fn);
+}
+
 /** Decoded image for a hash, or null while it decodes (listeners are told when ready). */
 function bitmap(hash: string, doc: DesignDocument): ImageBitmap | null {
   const b = bitmaps.get(hash);

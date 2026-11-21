@@ -129,6 +129,7 @@ export const COMMANDS: Command[] = [
   { id: 'minimize-ui', label: 'Minimize UI', shortcut: 'Ctrl+Shift+\\', run: toggleMinimizedUI, checked: () => prefs().ui === 'minimized', setting: true },
   { id: 'hide-ui', label: 'Show UI', shortcut: 'Ctrl+\\', run: toggleHiddenUI, checked: () => prefs().ui !== 'hidden', setting: true },
   { id: 'multiplayer-cursors', label: 'Multiplayer cursors', shortcut: 'Ctrl+Alt+\\', run: () => setPrefs({ showCursors: !prefs().showCursors }), checked: () => prefs().showCursors, setting: true },
+  { id: 'layer-thumbnails', label: 'Layer thumbnails', run: () => setPrefs({ layerThumbnails: !prefs().layerThumbnails }), checked: () => prefs().layerThumbnails, setting: true },
   { id: 'find-replace', label: 'Find and replace…', shortcut: 'Ctrl+F', run: () => editor.setUI({ findOpen: true }) },
   { id: 'nudge-amount', label: 'Nudge amount…', run: () => editor.setUI({ nudgeOpen: true }), setting: true },
   {

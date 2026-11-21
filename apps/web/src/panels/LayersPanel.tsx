@@ -1,9 +1,11 @@
 import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
-import { Boxes, Combine, Component, Contrast, Diamond, Star, Triangle } from 'lucide-react';
+import { Boxes, Combine, Component, Contrast, Diamond, Image as ImageIcon, ImageOff, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
-import React, { memo, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
+import { subscribeThumb, thumbOf, THUMB_SIZE } from '../editor/layerThumbs';
+import { setPrefs, usePrefs } from '../editor/prefs';
 import { useUI } from '../editor/store';
 import { AssetsPanel } from './AssetsPanel';
 import { IconButton } from './controls';
@@ -58,7 +60,10 @@ export function LayersPanel() {
       ) : (
         <>
           <PagesList />
-          <div className="panel-head">Layers</div>
+          <div className="panel-head">
+            Layers
+            <ThumbnailsToggle />
+          </div>
           <LayerTree />
         </>
       )}
@@ -337,6 +342,7 @@ function LayerRowView(p: LayerRowProps) {
   const isComp = p.inComponent;
   const [renaming, setRenaming] = useState(false);
   const hovered = useUI((s) => s.hoverId === node.id);
+  const thumbnails = usePrefs((s) => s.layerThumbnails);
   const Icon = node.isMask ? Contrast : (ICONS[node.type] ?? Square);
 
   return (
@@ -386,7 +392,7 @@ function LayerRowView(p: LayerRowProps) {
       >
         {hasKids ? p.expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : null}
       </span>
-      <Icon size={12} className="layer-icon" />
+      {thumbnails ? <LayerThumb id={node.id} Icon={Icon} /> : <Icon size={12} className="layer-icon" />}
       {renaming ? (
         <InlineRename
           value={node.name}
@@ -407,5 +413,28 @@ function LayerRowView(p: LayerRowProps) {
         </IconButton>
       </span>
     </div>
+  );
+}
+
+/** A layer's preview (its type icon until drawn, or when there's nothing to draw). */
+function LayerThumb({ id, Icon }: { id: NodeId; Icon: typeof Square }) {
+  const url = useSyncExternalStore(
+    (fn) => subscribeThumb(id, fn),
+    () => thumbOf(id),
+  );
+  return (
+    <span className="layer-thumb" aria-hidden>
+      {url ? <img src={url} alt="" width={THUMB_SIZE} height={THUMB_SIZE} draggable={false} /> : <Icon size={12} className="layer-icon" />}
+    </span>
+  );
+}
+
+/** Switches the layers panel between previews and type icons. */
+function ThumbnailsToggle() {
+  const on = usePrefs((s) => s.layerThumbnails);
+  return (
+    <IconButton title={on ? 'Show layer icons' : 'Show layer thumbnails'} active={on} onClick={() => setPrefs({ layerThumbnails: !on })}>
+      {on ? <ImageIcon size={14} /> : <ImageOff size={14} />}
+    </IconButton>
   );
 }
