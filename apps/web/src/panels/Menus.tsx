@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { breadcrumb } from '../errors';
 import { CANVAS_MENU, COMMANDS, command, EMPTY_CANVAS_MENU, isEnabled, type Command } from '../editor/commands';
 import { editor } from '../editor/editor';
@@ -92,7 +92,9 @@ export function CommandPalette() {
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return COMMANDS.filter((c) => isEnabled(c) && (!q || c.label.toLowerCase().includes(q) || c.id.includes(q)));
+    const found = COMMANDS.filter((c) => isEnabled(c) && (!q || c.label.toLowerCase().includes(q) || c.id.includes(q)));
+    // Before searching, view settings come last under their own heading.
+    return q ? found : [...found.filter((c) => !c.setting), ...found.filter((c) => c.setting)];
     // Recompute when the palette opens so enabled states are fresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, open]);
@@ -135,25 +137,39 @@ export function CommandPalette() {
               e.preventDefault();
               setActive((a) => Math.max(0, a - 1));
             }
-            if (e.key === 'Enter') run(results[active]);
+            if (e.key === 'Enter') {
+              // The command may open a dialog and focus it; Enter mustn't also reach (and submit) that.
+              e.preventDefault();
+              run(results[active]);
+            }
           }}
         />
         <div className="palette-list" role="listbox">
           {results.length === 0 && <div className="palette-empty">No matching commands</div>}
-          {results.map((c, i) => (
-            <button
-              key={c.id}
-              type="button"
-              role="option"
-              aria-selected={i === active}
-              className={`palette-item${i === active ? ' active' : ''}`}
-              onMouseEnter={() => setActive(i)}
-              onClick={() => run(c)}
-            >
-              <span>{c.label}</span>
-              {c.shortcut && <kbd>{c.shortcut}</kbd>}
-            </button>
-          ))}
+          {results.map((c, i) => {
+            const checked = c.checked?.();
+            const heading = !query.trim() && c.setting && !results[i - 1]?.setting;
+            return (
+              <Fragment key={c.id}>
+                {heading && <div className="palette-heading">Common settings</div>}
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={i === active}
+                  aria-checked={checked === undefined ? undefined : checked}
+                  className={`palette-item${i === active ? ' active' : ''}`}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => run(c)}
+                >
+                  <span className="palette-label">
+                    {checked !== undefined && <span className={`palette-check${checked ? ' on' : ''}`} aria-hidden />}
+                    {c.label}
+                  </span>
+                  {c.shortcut && <kbd>{c.shortcut}</kbd>}
+                </button>
+              </Fragment>
+            );
+          })}
         </div>
       </div>
     </div>

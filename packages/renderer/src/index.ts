@@ -5,3 +5,4 @@ export * from './text';
 export * from './svg';
 export * from './pathops';
 export * from './textlayout';
+export * from './markers';

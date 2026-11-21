@@ -52,7 +52,7 @@ export type NativeEditAction = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'sel
 
 /** An item of a native menu, described by the page. */
 export type MenuModelItem =
-  | { type: 'command'; id: string; label: string; accelerator?: string; enabled: boolean }
+  | { type: 'command'; id: string; label: string; accelerator?: string; enabled: boolean; /** Settings: shown with a check mark. */ checked?: boolean }
   | { type: 'separator' }
   | { type: 'submenu'; label: string; items: MenuModelItem[] };
 

@@ -1,4 +1,4 @@
-import { hitTest, worldBounds, type NodeId, type NodeType } from '@figma/document';
+import { hitTest, worldBounds, type NodeId, type NodePatch, type NodeType } from '@figma/document';
 import { rectContainsRect, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { fitText, placementIn, reparentKeepingPosition, setLineEndpoints, worldRotation } from '../transforms';
@@ -9,11 +9,11 @@ const DEFAULT_SIZE = 100;
 
 function nextName(ed: Editor, type: NodeType, base: string): string {
   let count = 0;
-  for (const n of ed.doc.allNodes()) if (n.type === type) count++;
+  for (const n of ed.doc.allNodes()) if (n.type === type && n.name.startsWith(base)) count++;
   return `${base} ${count + 1}`;
 }
 
-/** Draws frames, rectangles, ellipses and lines by dragging. */
+/** Draws frames, rectangles, ellipses and lines (and arrows: lines with an arrowhead) by dragging. */
 export class ShapeTool implements Tool {
   cursor = 'crosshair';
   private start: ToolEvent | null = null;
@@ -23,6 +23,8 @@ export class ShapeTool implements Tool {
   constructor(
     private ed: Editor,
     private type: 'FRAME' | 'RECTANGLE' | 'ELLIPSE' | 'POLYGON' | 'STAR' | 'LINE',
+    /** Extra properties and name for variants, e.g. an arrow is a line with an end marker. */
+    private variant?: { name: string; props: NodePatch },
   ) {}
 
   private get doc() {
@@ -71,9 +73,10 @@ export class ShapeTool implements Tool {
     const id = this.doc.createNode({
       type: this.type,
       parentId: this.parentId!,
-      name: nextName(this.ed, this.type, names[this.type]),
+      name: nextName(this.ed, this.type, this.variant?.name ?? names[this.type]),
       width: 0,
       height: 0,
+      ...this.variant?.props,
     });
     this.ed.select([id]);
     return id;

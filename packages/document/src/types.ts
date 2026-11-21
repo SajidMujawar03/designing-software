@@ -140,6 +140,8 @@ export interface BlurEffect {
 
 export type Effect = ShadowEffect | BlurEffect;
 export type StrokeCap = 'NONE' | 'ROUND' | 'SQUARE';
+/** Arrowheads and dots drawn at the ends of lines and open paths (Figma's names). */
+export type StrokeMarker = 'NONE' | 'ARROW_LINES' | 'ARROW_EQUILATERAL' | 'CIRCLE_FILLED' | 'DIAMOND_FILLED';
 export type StrokeJoin = 'MITER' | 'BEVEL' | 'ROUND';
 
 export type TextAlign = 'LEFT' | 'CENTER' | 'RIGHT' | 'JUSTIFIED';
@@ -202,9 +204,15 @@ export interface SceneNode {
   strokeAlign?: StrokeAlign;
   strokeCap?: StrokeCap;
   strokeJoin?: StrokeJoin;
+  /** Lines and open paths: markers at the first and last point of each open contour. */
+  startMarker?: StrokeMarker;
+  endMarker?: StrokeMarker;
   /** Alternating dash and gap lengths; empty = solid line. */
   dashPattern?: number[];
   cornerRadius: number;
+
+  // PAGE: exports of its top-level layers are drawn on the page's background color.
+  exportBackground?: boolean;
 
   // FRAME
   clipsContent?: boolean;

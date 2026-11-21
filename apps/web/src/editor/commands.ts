@@ -7,6 +7,7 @@ import { addAutoLayout, removeAutoLayout } from './layoutCommands';
 import { combineAsVariants, createComponent, detachSelection, goToMainComponent, resetSelection } from './componentCommands';
 import { editor } from './editor';
 import { placeImages } from './shortcuts';
+import { prefs, setPrefs, toggleHiddenUI, toggleMinimizedUI } from './prefs';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import { copyAsPng, copyAsSvg, exportJson, exportLayers, saveFiles } from './export';
 
@@ -17,6 +18,10 @@ export interface Command {
   shortcut?: string;
   run: () => void;
   enabled?: () => boolean;
+  /** Settings that are on or off: shown with a checkbox in the palette and menus. */
+  checked?: () => boolean;
+  /** Listed under "Common settings" when the palette opens. */
+  setting?: boolean;
 }
 
 const hasSelection = () => editor.ui.selection.length > 0;
@@ -119,7 +124,12 @@ export const COMMANDS: Command[] = [
   { id: 'zoom-100', label: 'Zoom to 100%', shortcut: 'Shift+0', run: () => editor.zoomTo(1) },
   { id: 'zoom-fit', label: 'Zoom to fit', shortcut: 'Shift+1', run: () => editor.zoomToFit() },
   { id: 'zoom-selection', label: 'Zoom to selection', shortcut: 'Shift+2', run: () => editor.zoomToSelection(), enabled: hasSelection },
-  { id: 'rulers', label: 'Show/Hide rulers', shortcut: 'Shift+R', run: () => editor.setUI({ showRulers: !editor.ui.showRulers }) },
+  { id: 'rulers', label: 'Show rulers', shortcut: 'Shift+R', run: () => editor.setUI({ showRulers: !editor.ui.showRulers }), checked: () => editor.ui.showRulers, setting: true },
+  { id: 'snap-pixel', label: 'Snap to pixel grid', shortcut: "Ctrl+Shift+'", run: () => setPrefs({ snapToPixel: !prefs().snapToPixel }), checked: () => prefs().snapToPixel, setting: true },
+  { id: 'minimize-ui', label: 'Minimize UI', shortcut: 'Ctrl+Shift+\\', run: toggleMinimizedUI, checked: () => prefs().ui === 'minimized', setting: true },
+  { id: 'hide-ui', label: 'Show UI', shortcut: 'Ctrl+\\', run: toggleHiddenUI, checked: () => prefs().ui !== 'hidden', setting: true },
+  { id: 'multiplayer-cursors', label: 'Multiplayer cursors', shortcut: 'Ctrl+Alt+\\', run: () => setPrefs({ showCursors: !prefs().showCursors }), checked: () => prefs().showCursors, setting: true },
+  { id: 'nudge-amount', label: 'Nudge amount…', run: () => editor.setUI({ nudgeOpen: true }), setting: true },
   {
     id: 'layout-grids',
     label: 'Show/Hide layout grids',

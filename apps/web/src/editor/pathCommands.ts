@@ -9,7 +9,7 @@ import {
   type SceneNode,
   type VectorPath,
 } from '@figma/document';
-import { booleanPath, fromSkPath, strokeOutline } from '@figma/renderer';
+import { booleanPath, fromSkPath, markerVectorPaths, nodeMarkers, strokeOutline, toSkPath } from '@figma/renderer';
 import type { CanvasKit } from 'canvaskit-wasm';
 import { getCanvasKit } from './canvaskit';
 import type { Editor } from './editor';
@@ -133,13 +133,26 @@ export async function outlineStrokeSelection(ed: Editor): Promise<void> {
   doc.change(() => {
     for (const n of targets) {
       const closed = n.type !== 'LINE' && (n.type !== 'VECTOR' || (n.vectorPaths ?? []).every((p) => p.closed));
-      const sk = strokeOutline(ck, mapPaths(shapePaths(n), worldTransform(doc, n.id)), n.strokeWeight, {
+      const world = worldTransform(doc, n.id);
+      let sk = strokeOutline(ck, mapPaths(shapePaths(n), world), n.strokeWeight, {
         align: closed ? n.strokeAlign : 'CENTER',
         cap: n.strokeCap,
         join: n.strokeJoin,
         dash: n.dashPattern,
       });
       if (!sk) continue;
+      // Arrowheads and dots become part of the outline.
+      for (const m of nodeMarkers(n)) {
+        const paths = mapPaths(markerVectorPaths(m), world);
+        const mp = m.mode === 'fill' ? toSkPath(ck, paths) : strokeOutline(ck, paths, n.strokeWeight, { cap: n.strokeCap, join: n.strokeJoin });
+        if (!mp) continue;
+        const merged = ck.Path.MakeFromOp(sk, mp, ck.PathOp.Union);
+        mp.delete();
+        if (merged) {
+          sk.delete();
+          sk = merged;
+        }
+      }
       const paths = fromSkPath(ck, sk);
       sk.delete();
       const visibleStrokes = n.strokes.filter((s) => s.visible);

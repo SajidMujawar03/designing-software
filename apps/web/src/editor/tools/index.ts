@@ -15,6 +15,7 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     polygon: new ShapeTool(ed, 'POLYGON'),
     star: new ShapeTool(ed, 'STAR'),
     line: new ShapeTool(ed, 'LINE'),
+    arrow: new ShapeTool(ed, 'LINE', { name: 'Arrow', props: { endMarker: 'ARROW_LINES' } }),
     pen: new PenTool(ed),
     pencil: new PencilTool(ed),
     text: new TextTool(ed),

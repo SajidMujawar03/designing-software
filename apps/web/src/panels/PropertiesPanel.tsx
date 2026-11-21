@@ -1,4 +1,4 @@
-import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
+import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   AlignJustify,
   ArrowDownToLine,
@@ -574,6 +574,10 @@ function PageProperties() {
           onChange={(p, live) => apply([page.id], { fills: [{ ...p, opacity: 1, visible: true }] }, live)}
           onRemove={() => apply([page.id], { fills: [] })}
         />
+        <label className="checkbox" title="Exports of layers placed directly on this page get the background color">
+          <input type="checkbox" checked={page.exportBackground === true} onChange={(e) => apply([page.id], { exportBackground: e.target.checked })} />
+          Show in exports
+        </label>
       </Section>
       <LocalStyles />
       <VariableModes nodeId={page.id} />
@@ -856,7 +860,12 @@ function StrokeOptions({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const join = val((n) => n.strokeJoin ?? 'MITER');
   const dash = val((n) => n.dashPattern?.[0] ?? 0);
   const gap = val((n) => n.dashPattern?.[1] ?? n.dashPattern?.[0] ?? 0);
-  const hasOpen = nodes.some((n) => n.type === 'LINE' || (n.type === 'VECTOR' && (n.vectorPaths ?? []).some((p) => !p.closed)));
+  const isOpen = (n: SceneNode) => n.type === 'LINE' || (n.type === 'VECTOR' && (n.vectorPaths ?? []).some((p) => !p.closed));
+  const hasOpen = nodes.some(isOpen);
+  const openNodes = nodes.filter(isOpen);
+  const startMarker = common(openNodes.map((n) => n.startMarker ?? 'NONE'));
+  const endMarker = common(openNodes.map((n) => n.endMarker ?? 'NONE'));
+  const openIds = openNodes.map((n) => n.id);
   const setDash = (d: number, g: number, live: boolean) => apply(ids, { dashPattern: d > 0 ? [d, g > 0 ? g : d] : [] }, live);
   const select = <T extends string>(label: string, value: T | Mixed, options: Array<[T, string]>, onPick: (v: T) => void) => (
     <select className="select" value={value === MIXED ? '' : value} onChange={(e) => onPick(e.target.value as T)} aria-label={label} title={label}>
@@ -895,9 +904,30 @@ function StrokeOptions({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
             apply(ids, { strokeCap: v }),
           )}
       </div>
+      {hasOpen && (
+        <div className="row end-points">
+          {select('Start point', startMarker, MARKERS, (v) => apply(openIds, { startMarker: v }))}
+          <IconButton
+            title="Swap start and end points"
+            onClick={() => apply(openIds, (n) => ({ startMarker: n.endMarker ?? 'NONE', endMarker: n.startMarker ?? 'NONE' }))}
+          >
+            <ArrowLeftRight size={14} />
+          </IconButton>
+          {select('End point', endMarker, MARKERS, (v) => apply(openIds, { endMarker: v }))}
+        </div>
+      )}
     </div>
   );
 }
+
+/** Arrowheads and dots for the ends of lines and open paths. */
+const MARKERS: Array<[StrokeMarker, string]> = [
+  ['NONE', 'None'],
+  ['ARROW_LINES', 'Line arrow'],
+  ['ARROW_EQUILATERAL', 'Triangle arrow'],
+  ['CIRCLE_FILLED', 'Circle'],
+  ['DIAMOND_FILLED', 'Diamond'],
+];
 
 const BLEND_MODES: Array<[BlendMode, string]> = [
   ['NORMAL', 'Normal'],

@@ -11,6 +11,7 @@ import { importImages } from '../images';
 import { useUI } from '../store';
 import { createTools, createVectorEditTool, type Tool, type ToolEvent } from '../tools';
 import { snapPx } from '../tools/types';
+import { prefs, usePrefs } from '../prefs';
 import { drawOverlay } from './overlay';
 import { drawPresence } from './presenceOverlay';
 import { CommentsLayer } from '../../panels/CommentsLayer';
@@ -117,6 +118,7 @@ export function CanvasView() {
     const unsubDoc = editor.doc.subscribe(schedule);
     const unsubUI = useUI.subscribe(schedule);
     const unsubPresence = usePresence.subscribe(schedule);
+    const unsubPrefs = usePrefs.subscribe(schedule);
     const unsubFonts = fonts.onLoad(schedule);
 
     const ro = new ResizeObserver(() => {
@@ -141,6 +143,7 @@ export function CanvasView() {
       unsubDoc();
       unsubUI();
       unsubPresence();
+      unsubPrefs();
       unsubFonts();
       ro.disconnect();
       if (frame) cancelAnimationFrame(frame);
@@ -176,7 +179,7 @@ export function CanvasView() {
       return {
         screen,
         world,
-        px: snapPx(world),
+        px: prefs().snapToPixel ? snapPx(world) : world,
         shift: e.shiftKey,
         alt: e.altKey,
         mod: e.ctrlKey || e.metaKey,

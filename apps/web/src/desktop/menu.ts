@@ -5,6 +5,7 @@ import { editor } from '../editor/editor';
 import { allPlugins, notify, runPlugin, usePlugins } from '../plugins/host';
 import type { MenuModel, MenuModelItem, NativeEditAction } from './api';
 import { bridgeMessage, renameDisk, saveDiskAs, saveNow, useDiskFile } from './diskFile';
+import { usePrefs } from '../editor/prefs';
 import { desktop } from '.';
 
 /**
@@ -72,6 +73,13 @@ const MENUS = (): Array<{ label: string; items: Entry[] }> => [
       '-',
       'rulers',
       'clear-guides',
+      '-',
+      'snap-pixel',
+      'multiplayer-cursors',
+      'nudge-amount',
+      '-',
+      'minimize-ui',
+      'hide-ui',
       '-',
       { label: 'Theme', items: ['theme-light', 'theme-dark', 'theme-system'] },
     ],
@@ -147,7 +155,9 @@ function item(id: string): MenuModelItem | null {
   if (a) return { type: 'command', id, label: a.label, accelerator: toAccelerator(a.shortcut), enabled: safe(a.enabled) };
   const c = command(id);
   if (!c) return null;
-  return { type: 'command', id, label: c.label, accelerator: toAccelerator(c.shortcut), enabled: safe(() => isEnabled(c)) };
+  const it: MenuModelItem = { type: 'command', id, label: c.label, accelerator: toAccelerator(c.shortcut), enabled: safe(() => isEnabled(c)) };
+  if (c.checked) it.checked = safe(c.checked);
+  return it;
 }
 
 function build(entries: Entry[]): MenuModelItem[] {
@@ -221,6 +231,7 @@ export function startDesktopMenus(): void {
   };
   useUI.subscribe(publish);
   usePlugins.subscribe(publish);
+  usePrefs.subscribe(publish);
   editor.doc.subscribe(publish);
   publish();
 }

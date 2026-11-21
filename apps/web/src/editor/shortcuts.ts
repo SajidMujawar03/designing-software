@@ -8,6 +8,7 @@ import { editor } from './editor';
 import { importImages, pickImageFiles } from './images';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import type { ToolId } from './store';
+import { prefs, setPrefs, toggleHiddenUI, toggleMinimizedUI } from './prefs';
 
 const TOOL_KEYS: Record<string, ToolId> = {
   v: 'select',
@@ -67,6 +68,13 @@ export function installShortcuts(): () => void {
       if (e.key === 'Escape') run(() => editor.setUI({ variablesOpen: false }));
       return;
     }
+
+    // View settings: Ctrl+\ (hide UI), Ctrl+Shift+\ (minimize UI), Ctrl+Alt+\ (cursors), Ctrl+Shift+' (pixel snapping).
+    if (mod && e.code === 'Backslash') {
+      if (e.altKey) return run(() => setPrefs({ showCursors: !prefs().showCursors }));
+      return run(() => (e.shiftKey ? toggleMinimizedUI() : toggleHiddenUI()));
+    }
+    if (mod && e.shiftKey && !e.altKey && e.code === 'Quote') return run(() => setPrefs({ snapToPixel: !prefs().snapToPixel }));
 
     if (mod && e.altKey) {
       const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
@@ -128,6 +136,7 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyP') return run(() => editor.setTool('pencil'));
       if (e.code === 'KeyG') return run(() => editor.setTool('polygon'));
       if (e.code === 'KeyS') return run(() => editor.setTool('star'));
+      if (e.code === 'KeyL') return run(() => editor.setTool('arrow'));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());
@@ -154,7 +163,7 @@ export function installShortcuts(): () => void {
       case 'ArrowRight':
       case 'ArrowUp':
       case 'ArrowDown': {
-        const step = e.shiftKey ? 10 : 1;
+        const step = e.shiftKey ? prefs().bigNudge : prefs().nudge;
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
         const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
         return run(() => editor.nudge(dx, dy));

@@ -1,5 +1,5 @@
-import { type ExportSetting, type NodeId } from '@figma/document';
-import { exportSvg, renderBounds, renderNodeToCanvas } from '@figma/renderer';
+import { paintColor, rgbToHex, type ExportSetting, type NodeId } from '@figma/document';
+import { exportSvg, renderBounds, renderNodeToCanvas, withSvgBackground } from '@figma/renderer';
 import { getCanvasKit } from './canvaskit';
 import { editor } from './editor';
 import { booleanSvgPathData } from './pathCommands';
@@ -51,35 +51,61 @@ function scaleFor(id: NodeId, c: ExportSetting['constraint']): number {
   return c.value / Math.max(1, c.type === 'WIDTH' ? b.width : b.height);
 }
 
+/**
+ * The page color behind an export, as "#RRGGBB": for layers placed directly
+ * on a page whose background is set to show in exports.
+ */
+export function exportBackground(id: NodeId): string | null {
+  const doc = editor.doc;
+  const n = doc.get(id);
+  const page = n?.parentId ? doc.get(n.parentId) : null;
+  if (!page || page.type !== 'PAGE' || !page.exportBackground) return null;
+  // Same as the canvas: the page's first fill, or the default canvas grey when it has none.
+  const fill = page.fills[0];
+  return fill ? `#${rgbToHex(paintColor(fill).color)}` : '#F5F5F5';
+}
+
 async function svgOf(id: NodeId): Promise<string> {
   // Boolean layers need Skia's path operations to export their combined outline.
   const ck = await getCanvasKit().catch(() => null);
   const eng = textEngine();
-  return exportSvg(editor.doc, id, {
+  const svg = exportSvg(editor.doc, id, {
     booleanPathData: ck ? (bid) => booleanSvgPathData(ck, editor.doc, bid) : undefined,
     textSpans: eng ? (n) => eng.spans(n, editor.doc) : undefined,
   });
+  return withSvgBackground(svg, exportBackground(id));
 }
 
-async function pngOf(id: NodeId, scale: number): Promise<Blob | null> {
+/** The layer as rendered (transparent around it). */
+async function rawPngOf(id: NodeId, scale: number): Promise<Blob | null> {
   // Export with the renderer on screen so the file matches what you see.
   if (editor.renderer) return editor.renderer.exportPng(editor.doc, id, scale);
   return new Promise<Blob | null>((r) => renderNodeToCanvas(editor.doc, id, scale).toBlob(r, 'image/png'));
 }
 
-/** JPG has no transparency: the layer goes on white. */
-async function jpgOf(id: NodeId, scale: number): Promise<Blob | null> {
-  const png = await pngOf(id, scale);
-  if (!png) return null;
+/** Draws an image on a solid color. */
+async function onColor(png: Blob, color: string, type: 'image/png' | 'image/jpeg'): Promise<Blob | null> {
   const img = await createImageBitmap(png);
   const c = document.createElement('canvas');
   c.width = img.width;
   c.height = img.height;
   const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = color;
   ctx.fillRect(0, 0, c.width, c.height);
   ctx.drawImage(img, 0, 0);
-  return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+  return new Promise((r) => c.toBlob(r, type, type === 'image/jpeg' ? 0.92 : undefined));
+}
+
+async function pngOf(id: NodeId, scale: number): Promise<Blob | null> {
+  const png = await rawPngOf(id, scale);
+  const bg = exportBackground(id);
+  return png && bg ? onColor(png, bg, 'image/png') : png;
+}
+
+/** JPG has no transparency: the layer goes on the page color when it shows in exports, otherwise white. */
+async function jpgOf(id: NodeId, scale: number): Promise<Blob | null> {
+  const png = await rawPngOf(id, scale);
+  return png ? onColor(png, exportBackground(id) ?? '#FFFFFF', 'image/jpeg') : null;
 }
 
 async function pdfOf(id: NodeId, scale: number): Promise<Blob> {

@@ -271,6 +271,60 @@ button {
   border-left: 1px solid var(--border);
 }
 
+/* Minimize UI hides the side panels; Show/Hide UI leaves only the canvas. */
+.ui-minimized .sidebar,
+.ui-hidden .sidebar,
+.ui-hidden .toolbar {
+  display: none;
+}
+
+.restore-ui {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.restore-ui.faint {
+  opacity: 0.35;
+}
+.restore-ui.faint:hover,
+.restore-ui.faint:focus-visible {
+  opacity: 1;
+}
+
+.nudge-modal {
+  width: min(360px, 100%);
+}
+.nudge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.nudge-row input {
+  width: 80px;
+}
+.nudge-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .canvas-area {
   flex: 1;
   position: relative;
@@ -482,6 +536,18 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px 8px;
+}
+
+/* Start point, swap, end point for lines and open paths. */
+.end-points {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.end-points .select {
+  flex: 1;
+  min-width: 0;
 }
 
 .num-field {
@@ -744,6 +810,35 @@ button {
 .palette-empty {
   padding: 12px 16px;
   color: var(--muted);
+}
+
+.palette-heading {
+  padding: 10px 16px 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.palette-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A checkbox for settings that are on or off. */
+.palette-check {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #666;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.palette-check.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='white' stroke-width='1.8'/%3E%3C/svg%3E");
+}
+.palette-item.active .palette-check.on {
+  border-color: #fff;
 }
 
 .align-bar {

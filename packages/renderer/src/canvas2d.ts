@@ -18,6 +18,7 @@ import {
 import { multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '@figma/geometry';
 import { renderBounds } from './canvaskit';
 import { imageMatrix } from './ckpaint';
+import { nodeMarkers, traceMarker } from './markers';
 import { drawText, layoutText } from './text';
 import type { SceneOptions, SceneRenderer } from './types';
 
@@ -267,6 +268,18 @@ function strokeShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: Scen
   ctx.lineJoin = n.strokeJoin === 'ROUND' ? 'round' : n.strokeJoin === 'BEVEL' ? 'bevel' : 'miter';
   ctx.setLineDash((n.dashPattern ?? []).filter((v) => v > 0));
   for (const s of strokes) paintPath(ctx, n, s, doc, 'stroke');
+  ctx.restore();
+  // Arrowheads and dots at the ends of lines and open paths (never dashed).
+  const markers = nodeMarkers(n);
+  if (!markers.length) return;
+  ctx.save();
+  ctx.lineWidth = n.strokeWeight;
+  ctx.lineCap = n.strokeCap === 'ROUND' ? 'round' : n.strokeCap === 'SQUARE' ? 'square' : 'butt';
+  ctx.lineJoin = n.strokeJoin === 'ROUND' ? 'round' : n.strokeJoin === 'BEVEL' ? 'bevel' : 'miter';
+  for (const m of markers) {
+    traceMarker(ctx, m);
+    for (const s of strokes) paintPath(ctx, n, s, doc, m.mode);
+  }
   ctx.restore();
 }
 

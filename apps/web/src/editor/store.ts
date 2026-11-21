@@ -11,6 +11,7 @@ export type ToolId =
   | 'polygon'
   | 'star'
   | 'line'
+  | 'arrow'
   | 'pen'
   | 'pencil'
   | 'text'
@@ -47,6 +48,8 @@ export interface UIState {
   /** Open context menu position (CSS px in the window). */
   contextMenu: { x: number; y: number } | null;
   paletteOpen: boolean;
+  /** The nudge amount dialog. */
+  nudgeOpen: boolean;
   /** The local variables window. */
   variablesOpen: boolean;
   /** The libraries window. */
@@ -118,6 +121,7 @@ export const useUI = create<UIState>()(() => ({
   showRulers: true,
   contextMenu: null,
   paletteOpen: false,
+  nudgeOpen: false,
   variablesOpen: false,
   librariesOpen: false,
   historyOpen: false,
