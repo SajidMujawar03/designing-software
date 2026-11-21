@@ -105,6 +105,7 @@ function geometryTag(c: SvgContext, n: SceneNode): string | null {
     case 'FRAME':
     case 'SECTION':
     case 'CODE_SNIPPET':
+    case 'SPEC':
     case 'COMPONENT':
     case 'COMPONENT_SET':
     case 'INSTANCE': {

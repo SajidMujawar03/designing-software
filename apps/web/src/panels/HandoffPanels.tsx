@@ -13,10 +13,12 @@ import {
   type SceneNode,
 } from '@figma/document';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor/editor';
 import { useUI } from '../editor/store';
 import { IconButton, Section } from './controls';
+import { copyMarkdown } from './SpecEditor';
+import { refreshEmbeds } from '../editor/specEmbeds';
 
 /** Language and theme of a code snippet, and a button to edit its code. */
 export function CodeSnippetSection({ node }: { node: SceneNode }) {
@@ -116,5 +118,35 @@ function AnnotationEditor({ node, a }: { node: SceneNode; a: Annotation }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/** A spec's actions: edit it in place or full screen, copy it as Markdown, recapture its frame embeds. */
+export function SpecSection({ node }: { node: SceneNode }) {
+  const [note, setNote] = useState('');
+  const embeds = (node.specBlocks ?? []).filter((b) => b.type === 'embed' && b.nodeId).length;
+  const flash = (t: string) => {
+    setNote(t);
+    setTimeout(() => setNote(''), 2000);
+  };
+  return (
+    <Section title="Spec">
+      <div className="grid2">
+        <button type="button" className="btn small" onClick={() => editor.editSpec(node.id)} title="Edit on the canvas (or double-click it)">
+          Edit
+        </button>
+        <button type="button" className="btn small" onClick={() => editor.editSpec(node.id, { fullscreen: true })}>
+          Full screen
+        </button>
+        <button type="button" className="btn small" onClick={() => void copyMarkdown(node.id).then(() => flash('Copied as Markdown'))}>
+          Copy Markdown
+        </button>
+        <button type="button" className="btn small" disabled={!embeds} title="Capture the embedded frames again" onClick={() => void refreshEmbeds(node.id).then((n) => flash(`Refreshed ${n} embed${n === 1 ? '' : 's'}`))}>
+          Refresh embeds
+        </button>
+      </div>
+      {note && <div className="hint">{note}</div>}
+      <div className="hint">{(node.specBlocks ?? []).length} blocks</div>
+    </Section>
   );
 }

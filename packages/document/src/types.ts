@@ -8,6 +8,24 @@ export type LayoutMode = 'NONE' | 'HORIZONTAL' | 'VERTICAL';
 /** Measurements an annotation can show, read live from its layer. */
 export type AnnotationProperty = 'width' | 'height' | 'fills' | 'strokes' | 'cornerRadius' | 'opacity' | 'effects' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'padding' | 'itemSpacing';
 
+export type SpecBlockType = 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet' | 'numbered' | 'todo' | 'quote' | 'divider' | 'code' | 'image' | 'embed';
+
+/** One block of a Spec document. */
+export interface SpecBlock {
+  id: string;
+  type: SpecBlockType;
+  /** Text of text blocks, code of code blocks, caption of images and embeds. */
+  text: string;
+  /** To-do blocks. */
+  checked?: boolean;
+  /** Code blocks. */
+  language?: CodeLanguage;
+  /** Image blocks, and the snapshot of an embedded frame. */
+  image?: { hash: string; width: number; height: number };
+  /** Embed blocks: the frame shown. */
+  nodeId?: NodeId;
+}
+
 /** A note pinned to a layer for handoff. */
 export interface Annotation {
   id: string;
@@ -28,6 +46,8 @@ export type NodeType =
   | 'SLICE'
   /** Syntax-highlighted code: a box (auto layout, hugging) holding one text layer. */
   | 'CODE_SNIPPET'
+  /** A document on the canvas: blocks of text, lists, code, images and frame embeds, drawn as generated child layers. */
+  | 'SPEC'
   | 'COMPONENT'
   | 'COMPONENT_SET'
   | 'INSTANCE'
@@ -235,6 +255,9 @@ export interface SceneNode {
   // CODE_SNIPPET: how its text is highlighted.
   codeLanguage?: CodeLanguage;
   codeTheme?: CodeTheme;
+
+  // SPEC: its document, as blocks (its child layers are generated from them).
+  specBlocks?: SpecBlock[];
 
   /** Annotations pinned to this layer (notes and the measurements to show next to it). */
   annotations?: Annotation[];
@@ -540,7 +563,10 @@ export const hasOwnTransform = (n: SceneNode): boolean =>
 
 /** Frames, sections, main components and instances: boxes that hold (and frames clip and lay out) children. */
 export const isFrameLike = (n: SceneNode | undefined | null): n is SceneNode => !!n && FRAME_LIKE.has(n.type);
-const FRAME_LIKE = new Set<NodeType>(['FRAME', 'SECTION', 'CODE_SNIPPET', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
+const FRAME_LIKE = new Set<NodeType>(['FRAME', 'SECTION', 'CODE_SNIPPET', 'SPEC', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
+
+/** Layers whose children are generated from their own data: picked, moved and edited as a whole. */
+export const isSealed = (n: SceneNode | undefined | null): boolean => n?.type === 'CODE_SNIPPET' || n?.type === 'SPEC';
 
 /** Sections only sit on a page or inside another section. */
 export const canHoldSection = (n: SceneNode | undefined | null): boolean => n?.type === 'PAGE' || n?.type === 'SECTION';

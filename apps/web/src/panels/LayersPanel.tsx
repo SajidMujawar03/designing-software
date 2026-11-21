@@ -1,5 +1,5 @@
 import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
-import { Boxes, Braces, Combine, Component, Contrast, Diamond, Image as ImageIcon, ImageOff, PanelTop, Slice, Star, Triangle } from 'lucide-react';
+import { Boxes, Braces, FileText, Combine, Component, Contrast, Diamond, Image as ImageIcon, ImageOff, PanelTop, Slice, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
@@ -15,6 +15,7 @@ const ICONS: Partial<Record<NodeType, typeof Square>> = {
   SECTION: PanelTop,
   SLICE: Slice,
   CODE_SNIPPET: Braces,
+  SPEC: FileText,
   COMPONENT: Component,
   COMPONENT_SET: Boxes,
   INSTANCE: Diamond,

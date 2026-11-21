@@ -25,6 +25,7 @@ import { usePrefs } from './editor/prefs';
 import { startLayerThumbs } from './editor/layerThumbs';
 import { NudgeDialog, RestoreUIButton } from './panels/ViewSettings';
 import { FindReplacePanel } from './panels/FindReplace';
+import { SpecEditorLayer } from './panels/SpecEditor';
 import { VariablesModal } from './panels/VariablesPanel';
 
 let started = false;
@@ -91,6 +92,7 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
             <CanvasView />
           </ErrorBoundary>
           <FindReplacePanel />
+          <SpecEditorLayer />
         </main>
         <aside className="sidebar right">
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>

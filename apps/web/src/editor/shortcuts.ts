@@ -24,6 +24,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
   c: 'comment',
   s: 'slice',
   k: 'scale',
+  d: 'spec',
 };
 
 function isTyping(target: EventTarget | null): boolean {
@@ -162,6 +163,7 @@ export function installShortcuts(): () => void {
           const sel = editor.selectedNodes();
           if (sel.length === 1 && sel[0].type === 'TEXT') editor.startTextEdit(sel[0].id);
           else if (sel.length === 1 && sel[0].type === 'CODE_SNIPPET' && snippetTextOf(editor.doc, sel[0].id)) editor.startTextEdit(snippetTextOf(editor.doc, sel[0].id)!);
+          else if (sel.length === 1 && sel[0].type === 'SPEC') editor.editSpec(sel[0].id);
           else if (sel.length === 1 && sel[0].type === 'VECTOR') editor.enterVectorEdit(sel[0].id);
           else editor.selectChildren();
         });

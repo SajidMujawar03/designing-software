@@ -127,6 +127,7 @@ export function ShortcutsSheet() {
     ['Frame', 'F'],
     ['Section', 'Shift+S'],
     ['Slice', 'S'],
+    ['Spec', 'D'],
     ['Rectangle', 'R'],
     ['Ellipse', 'O'],
     ['Line', 'L'],

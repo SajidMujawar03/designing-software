@@ -11,6 +11,7 @@ export type ToolId =
   | 'scale'
   | 'snippet'
   | 'annotate'
+  | 'spec'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'
@@ -22,6 +23,13 @@ export type ToolId =
   | 'text'
   | 'hand'
   | 'comment';
+
+/** Where the caret goes in a Spec editor: a block, at its start or end, or with its text selected. */
+export interface SpecFocus {
+  blockId: string;
+  at?: 'start' | 'end';
+  select?: boolean;
+}
 
 /** A point on a vector path: [path index, point index]. */
 export type PointRef = [number, number];
@@ -57,6 +65,8 @@ export interface UIState {
   nudgeOpen: boolean;
   /** The find and replace panel (Ctrl+F). */
   findOpen: boolean;
+  /** The Spec document being edited (over the canvas, or full screen), and a block to put the caret in. */
+  editingSpec: { id: NodeId; fullscreen: boolean; focus?: SpecFocus } | null;
   /** An annotation just added, whose note field should take focus. */
   editingAnnotation: { nodeId: NodeId; id: string } | null;
   /** The local variables window. */
@@ -133,6 +143,7 @@ export const useUI = create<UIState>()(() => ({
   nudgeOpen: false,
   findOpen: false,
   editingAnnotation: null,
+  editingSpec: null,
   variablesOpen: false,
   librariesOpen: false,
   historyOpen: false,
