@@ -53,16 +53,26 @@ jobs:
       - name: Package
         shell: bash
         working-directory: apps/desktop
-        run: node build.mjs && pnpm exec electron-builder ${{ matrix.builder }} --publish never
+        run: |
+          # Signing and notarization settings are passed on only when their secrets are set:
+          # electron-builder treats an empty CSC_LINK as a (missing) certificate path and fails.
+          if [ -n "$SIGN_CERTIFICATE" ]; then
+            export CSC_LINK="$SIGN_CERTIFICATE" CSC_KEY_PASSWORD="$SIGN_PASSWORD"
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          for v in APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID DESKTOP_SENTRY_DSN VITE_SENTRY_DSN; do
+            [ -z "${!v}" ] && unset "$v"
+          done
+          node build.mjs && pnpm exec electron-builder ${{ matrix.builder }} --publish never
         env:
           # Optional: crash and error reports to Sentry.
           DESKTOP_SENTRY_DSN: ${{ secrets.DESKTOP_SENTRY_DSN }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           # Optional signing. Windows: a .pfx (base64) and password. macOS: a Developer ID .p12, plus
           # an Apple ID app-specific password and team id for notarization.
-          CSC_LINK: ${{ matrix.platform == 'win' && secrets.WINDOWS_CERTIFICATE || matrix.platform == 'mac' && secrets.MAC_CERTIFICATE || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'win' && secrets.WINDOWS_CERTIFICATE_PASSWORD || matrix.platform == 'mac' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform == 'mac' && secrets.MAC_CERTIFICATE != '' }}
+          SIGN_CERTIFICATE: ${{ matrix.platform == 'win' && secrets.WINDOWS_CERTIFICATE || matrix.platform == 'mac' && secrets.MAC_CERTIFICATE || '' }}
+          SIGN_PASSWORD: ${{ matrix.platform == 'win' && secrets.WINDOWS_CERTIFICATE_PASSWORD || matrix.platform == 'mac' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
