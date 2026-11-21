@@ -18,6 +18,7 @@ import {
 import { multiply, translation } from '@figma/geometry';
 import { renderBounds } from './canvaskit';
 import { imageMatrix } from './ckpaint';
+import { markerPathData, nodeMarkers } from './markers';
 import { layoutText } from './text';
 
 const esc = (s: string) =>
@@ -160,7 +161,21 @@ function paintedShape(c: SvgContext, n: SceneNode, geo: string): string {
   }
   out += wrapOpen;
   for (const s of strokes) out += `${geo}${attrs}${paintAttr(c, n, s, 'stroke')}/>`;
-  return out + wrapClose;
+  out += wrapClose;
+  // Arrowheads and dots at the ends of lines and open paths (never dashed).
+  for (const m of nodeMarkers(n)) {
+    const d = markerPathData(m);
+    for (const s of strokes) {
+      if (m.mode === 'fill') out += `<path d="${d}"${paintAttr(c, n, s, 'fill')}/>`;
+      else {
+        let a = ` fill="none" stroke-width="${num(n.strokeWeight)}"`;
+        if (n.strokeCap && n.strokeCap !== 'NONE') a += ` stroke-linecap="${n.strokeCap.toLowerCase()}"`;
+        if (n.strokeJoin && n.strokeJoin !== 'MITER') a += ` stroke-linejoin="${n.strokeJoin.toLowerCase()}"`;
+        out += `<path d="${d}"${a}${paintAttr(c, n, s, 'stroke')}/>`;
+      }
+    }
+  }
+  return out;
 }
 
 function transformAttr(n: SceneNode): string {
@@ -307,4 +322,13 @@ export function exportSvg(doc: DesignDocument, id: NodeId, options: SvgOptions =
     `<g transform="matrix(${m.map(num).join(' ')})">${content}</g>` +
     `</svg>`
   );
+}
+
+/** Puts a full-size rectangle of `color` behind everything in an exported SVG (null leaves it as is). */
+export function withSvgBackground(svg: string, color: string | null): string {
+  if (!color) return svg;
+  const start = svg.indexOf('<svg');
+  const open = start < 0 ? -1 : svg.indexOf('>', start);
+  if (open < 0) return svg;
+  return `${svg.slice(0, open + 1)}<rect width="100%" height="100%" fill="${color}"/>${svg.slice(open + 1)}`;
 }

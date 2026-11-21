@@ -9,7 +9,7 @@ import { LibraryAssets, LibraryUpdates } from './LibraryPanels';
 
 const THUMB = 64;
 
-interface Asset {
+export interface Asset {
   /** The main component, or the component set. */
   node: SceneNode;
   page: SceneNode;
@@ -20,7 +20,7 @@ interface Asset {
 }
 
 /** Local components (and component sets) of the file, by page and folder. */
-function collectAssets(query: string): Asset[] {
+export function collectAssets(query: string): Asset[] {
   const doc = editor.doc;
   const q = query.trim().toLowerCase();
   const out: Asset[] = [];

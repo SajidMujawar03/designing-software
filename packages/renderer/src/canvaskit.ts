@@ -27,6 +27,7 @@ import type {
 } from 'canvaskit-wasm';
 import { CkPaints, toCk } from './ckpaint';
 import { booleanKey, booleanPath } from './pathops';
+import { markerPathData, markerReach, nodeMarkers } from './markers';
 import { SkText } from './textlayout';
 import type { FontRegistry, SceneOptions, SceneRenderer } from './types';
 
@@ -557,6 +558,30 @@ export class CanvasKitRenderer implements SceneRenderer {
     if (clipPath) c.restore();
     paint.setPathEffect(null);
     effect?.delete();
+    const markers = nodeMarkers(n);
+    if (markers.length) this.drawMarkers(c, n, markers);
+  }
+
+  /** Arrowheads and dots at the ends of lines and open paths, in every visible stroke paint (never dashed). */
+  private drawMarkers(c: Canvas, n: SceneNode, markers: ReturnType<typeof nodeMarkers>): void {
+    const ck = this.ck;
+    const paint = this.paint;
+    paint.setStrokeWidth(n.strokeWeight);
+    const paths = markers.map((m) => ({ m, path: ck.Path.MakeFromSVGString(markerPathData(m)) }));
+    const box = this.paintBox(n);
+    for (const p of n.strokes) {
+      if (!p.visible) continue;
+      const shader = this.paints.apply(paint, p, box, this.doc!);
+      if (shader === false) continue;
+      for (const { m, path } of paths) {
+        if (!path) continue;
+        paint.setStyle(m.mode === 'fill' ? ck.PaintStyle.Fill : ck.PaintStyle.Stroke);
+        c.drawPath(path, paint);
+      }
+      shader?.delete();
+    }
+    paint.setShader(null);
+    for (const { path } of paths) path?.delete();
   }
 
   // ------------------------------------------------------------ text
@@ -603,7 +628,8 @@ const sigma = (radius: number) => Math.max(0, radius / 2);
 export function strokeOutset(n: SceneNode): number {
   if (!n.strokeWeight || !n.strokes?.some((p) => p.visible !== false)) return 0;
   const w = n.strokeWeight;
-  if (!isClosedShape(n)) return w / 2; // centred; round and square caps reach w/2 past the ends too
+  // Centred; round and square caps reach w/2 past the ends too, arrowheads and dots further.
+  if (!isClosedShape(n)) return Math.max(w / 2, markerReach(n));
   const align = n.strokeAlign ?? 'CENTER';
   if (align === 'INSIDE') return 0;
   const out = align === 'OUTSIDE' ? w : w / 2;

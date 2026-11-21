@@ -1,4 +1,4 @@
-import { Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { ArrowUpRight, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -19,6 +19,7 @@ const TOOLS: Array<{ id: ToolId; label: string; key: string; Icon: typeof Square
   { id: 'polygon', label: 'Polygon', key: 'Shift+G', Icon: Triangle },
   { id: 'star', label: 'Star', key: 'Shift+S', Icon: Star },
   { id: 'line', label: 'Line', key: 'L', Icon: Minus },
+  { id: 'arrow', label: 'Arrow', key: 'Shift+L', Icon: ArrowUpRight },
   { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
   { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   { id: 'text', label: 'Text', key: 'T', Icon: Type },

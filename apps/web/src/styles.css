@@ -271,6 +271,60 @@ button {
   border-left: 1px solid var(--border);
 }
 
+/* Minimize UI hides the side panels; Show/Hide UI leaves only the canvas. */
+.ui-minimized .sidebar,
+.ui-hidden .sidebar,
+.ui-hidden .toolbar {
+  display: none;
+}
+
+.restore-ui {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.restore-ui.faint {
+  opacity: 0.35;
+}
+.restore-ui.faint:hover,
+.restore-ui.faint:focus-visible {
+  opacity: 1;
+}
+
+.nudge-modal {
+  width: min(360px, 100%);
+}
+.nudge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.nudge-row input {
+  width: 80px;
+}
+.nudge-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .canvas-area {
   flex: 1;
   position: relative;
@@ -482,6 +536,18 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px 8px;
+}
+
+/* Start point, swap, end point for lines and open paths. */
+.end-points {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.end-points .select {
+  flex: 1;
+  min-width: 0;
 }
 
 .num-field {
@@ -744,6 +810,77 @@ button {
 .palette-empty {
   padding: 12px 16px;
   color: var(--muted);
+}
+
+.palette-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #333;
+}
+.palette-tab {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.palette-tab:hover {
+  color: #fff;
+}
+.palette-tab.active {
+  background: #383838;
+  color: #fff;
+}
+
+.palette-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.palette-detail {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+.palette-item.active .palette-detail {
+  color: #e5f4ff;
+}
+
+.palette-heading {
+  padding: 10px 16px 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.palette-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A checkbox for settings that are on or off. */
+.palette-check {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #666;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.palette-check.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='white' stroke-width='1.8'/%3E%3C/svg%3E");
+}
+.palette-item.active .palette-check.on {
+  border-color: #fff;
 }
 
 .align-bar {
@@ -3869,4 +4006,113 @@ a.btn {
 .disk-retry {
   margin-left: 6px;
   font-size: 11px;
+}
+
+/* ---------- find and replace ---------- */
+
+.find-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  width: min(340px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+}
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.find-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+}
+.find-count {
+  min-width: 52px;
+  text-align: right;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.find-options {
+  gap: 4px;
+}
+.find-toggle {
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.find-toggle.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.find-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+.find-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.find-result:hover {
+  background: var(--hover, rgba(127, 127, 127, 0.12));
+}
+.find-result.active {
+  background: rgba(13, 153, 255, 0.16);
+}
+.find-snippet {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.find-snippet mark {
+  background: rgba(255, 200, 0, 0.45);
+  color: inherit;
+  border-radius: 2px;
+}
+.find-where {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.find-more {
+  padding: 4px 6px;
+  color: var(--text-dim);
 }

@@ -34,6 +34,7 @@ function pageItems(win: BrowserWindow, items: MenuModelItem[]): MenuItemConstruc
     return {
       label: it.label,
       enabled: it.enabled,
+      ...(typeof it.checked === 'boolean' ? { type: 'checkbox' as const, checked: it.checked } : {}),
       accelerator: it.accelerator,
       // macOS always captures menu shortcuts; elsewhere they're only shown.
       registerAccelerator: false,
@@ -162,7 +163,7 @@ function isModel(v: unknown): v is MenuModel {
   const item = (i: MenuModelItem, depth: number): boolean =>
     !!i &&
     (i.type === 'separator' ||
-      (i.type === 'command' && typeof i.id === 'string' && typeof i.label === 'string' && i.label.length < 200 && (i.accelerator === undefined || typeof i.accelerator === 'string')) ||
+      (i.type === 'command' && typeof i.id === 'string' && typeof i.label === 'string' && i.label.length < 200 && (i.accelerator === undefined || typeof i.accelerator === 'string') && (i.checked === undefined || typeof i.checked === 'boolean')) ||
       (i.type === 'submenu' && depth < 3 && typeof i.label === 'string' && Array.isArray(i.items) && i.items.every((x) => item(x, depth + 1))));
   return !!m && Array.isArray(m.file) && Array.isArray(m.menus) && m.menus.length < 20 && m.file.every((i) => item(i, 0)) && m.menus.every((x) => typeof x.label === 'string' && Array.isArray(x.items) && x.items.every((i) => item(i, 0)));
 }

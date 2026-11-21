@@ -127,6 +127,7 @@ export function ShortcutsSheet() {
     ['Rectangle', 'R'],
     ['Ellipse', 'O'],
     ['Line', 'L'],
+    ['Arrow', 'Shift+L'],
     ['Pen', 'P'],
     ['Pencil', 'Shift+P'],
     ['Text', 'T'],

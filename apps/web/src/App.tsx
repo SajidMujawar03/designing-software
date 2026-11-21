@@ -21,6 +21,9 @@ import { maybeStartTour, ShortcutsSheet, Tour } from './panels/Onboarding';
 import { PluginHost, PluginManager } from './panels/PluginPanels';
 import { Toolbar } from './panels/Toolbar';
 import { ErrorBoundary } from './panels/ErrorBoundary';
+import { usePrefs } from './editor/prefs';
+import { NudgeDialog, RestoreUIButton } from './panels/ViewSettings';
+import { FindReplacePanel } from './panels/FindReplace';
 import { VariablesModal } from './panels/VariablesPanel';
 
 let started = false;
@@ -58,9 +61,10 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
   useEffect(() => maybeStartTour(), []);
   // In the desktop app: the native menus follow this editor.
   useEffect(() => startDesktopMenus(), []);
+  const uiMode = usePrefs((s) => s.ui);
 
   return (
-    <div className="app">
+    <div className={`app${uiMode === 'full' ? '' : ` ui-${uiMode}`}`}>
       <Toolbar />
       {route.kind === 'file' && <VersionPreviewBar />}
       {editor.doc.schema?.tooNew && (
@@ -84,6 +88,7 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
           <ErrorBoundary name="canvas" variant="panel">
             <CanvasView />
           </ErrorBoundary>
+          <FindReplacePanel />
         </main>
         <aside className="sidebar right">
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>
@@ -110,6 +115,8 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
       <PluginManager />
       <PluginHost />
       <ShortcutsSheet />
+      <NudgeDialog />
+      <RestoreUIButton />
     </div>
   );
 }

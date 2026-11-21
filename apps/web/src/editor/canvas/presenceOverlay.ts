@@ -1,6 +1,7 @@
 import { isGroupLike, worldBounds, worldTransform } from '@figma/document';
 import { applyToPoint } from '@figma/geometry';
 import { usePresence } from '../../cloud/presence';
+import { prefs } from '../prefs';
 import type { Editor } from '../editor';
 
 /** Draws other people's selections and cursors (screen space, CSS pixels). */
@@ -41,7 +42,7 @@ export function drawPresence(ctx: CanvasRenderingContext2D, ed: Editor): void {
   ctx.font = '600 11px Inter, system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   for (const p of here) {
-    if (!p.cursor) continue;
+    if (!p.cursor || !prefs().showCursors) continue;
     const s = ed.worldToScreen(p.cursor);
     if (s.x < -20 || s.y < -20 || s.x > ed.canvasSize.width + 20 || s.y > ed.canvasSize.height + 20) continue;
     ctx.save();
