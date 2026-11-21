@@ -98,7 +98,7 @@ export async function startCloudFile(id: string): Promise<void> {
     setTimeout(finish, 5000);
   });
 
-  startThumbnails(id);
+  if (!location.pathname.includes('/present')) startThumbnails(id);
   window.addEventListener('beforeunload', (e) => {
     if (useCloudFile.getState().unsynced) e.preventDefault();
   });

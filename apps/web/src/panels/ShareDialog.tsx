@@ -1,4 +1,6 @@
-import { Check, Globe, Link2, Lock, Users, X } from 'lucide-react';
+import { Check, Globe, Link2, Lock, Play, Users, X } from 'lucide-react';
+import { flowsOf } from '@figma/document';
+import { presentUrl } from '../cloud/route';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { api, type CloudUser, type LinkAccess, type Role } from '../cloud/api';
 import { useCloudFile } from '../cloud/cloudFile';
@@ -194,6 +196,21 @@ export function ShareDialog() {
               }}
             >
               {copied ? <Check size={14} /> : <Link2 size={14} />} {copied ? 'Copied' : 'Copy link'}
+            </button>
+            <button
+              className="btn"
+              title="People with access (or the link) open the prototype in present mode"
+              onClick={async () => {
+                const proto = `${location.origin}${presentUrl(editor.pageId, flowsOf(editor.doc, editor.pageId)[0]?.nodeId ?? null)}`;
+                try {
+                  await navigator.clipboard.writeText(proto);
+                } catch {
+                  prompt('Copy this prototype link', proto);
+                }
+                setNotice('Prototype link copied.');
+              }}
+            >
+              <Play size={14} /> Copy prototype link
             </button>
           </div>
         </div>

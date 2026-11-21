@@ -70,6 +70,7 @@ export function installShortcuts(): () => void {
       const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
       if (e.code === 'KeyG') return run(() => editor.frameSelection());
       if (e.code === 'KeyK') return run(() => createComponent(editor));
+      if (e.key === 'Enter') return run(() => (document.querySelector('.present-btn') as HTMLButtonElement | null)?.click());
       if (e.code === 'KeyV') return run(() => editor.setUI({ variablesOpen: true }));
       if (e.code === 'KeyB') return run(() => detachSelection(editor));
       if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));

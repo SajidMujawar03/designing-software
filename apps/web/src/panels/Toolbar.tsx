@@ -2,6 +2,9 @@ import { Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Penc
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
+import { presentUrl } from '../cloud/route';
+import { flowsOf, screenOf } from '@figma/document';
+import { Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -63,6 +66,7 @@ export function Toolbar() {
       </div>
       <div className="toolbar-right">
         <Avatars />
+        <PresentButton />
         <ShareButton />
         <ZoomMenu zoom={zoom} />
       </div>
@@ -138,5 +142,20 @@ function Avatars() {
         {me.name.slice(0, 1).toUpperCase()}
       </span>
     </div>
+  );
+}
+
+/** Plays the prototype in a new tab: from the selected frame, else the page's first flow. */
+function PresentButton() {
+  if (new URLSearchParams(location.search).has('version')) return null;
+  const open = () => {
+    const sel = editor.ui.selection[0];
+    const start = sel ? (screenOf(editor.doc, sel)?.id ?? null) : (flowsOf(editor.doc, editor.pageId)[0]?.nodeId ?? null);
+    window.open(presentUrl(editor.pageId, start), '_blank');
+  };
+  return (
+    <button type="button" className="tool-btn present-btn" title="Present (Ctrl+Alt+Enter)" aria-label="Present" onClick={open}>
+      <Play size={16} strokeWidth={1.75} />
+    </button>
   );
 }
