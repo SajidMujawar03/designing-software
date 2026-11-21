@@ -131,6 +131,7 @@ export const COMMANDS: Command[] = [
   { id: 'multiplayer-cursors', label: 'Multiplayer cursors', shortcut: 'Ctrl+Alt+\\', run: () => setPrefs({ showCursors: !prefs().showCursors }), checked: () => prefs().showCursors, setting: true },
   { id: 'show-annotations', label: 'Show annotations', shortcut: 'Shift+Y', run: () => setPrefs({ showAnnotations: !prefs().showAnnotations }), checked: () => prefs().showAnnotations, setting: true },
   { id: 'layer-thumbnails', label: 'Layer thumbnails', run: () => setPrefs({ layerThumbnails: !prefs().layerThumbnails }), checked: () => prefs().layerThumbnails, setting: true },
+  { id: 'draw-mode', label: 'Draw mode', run: () => editor.setDrawMode(!editor.ui.drawMode), checked: () => editor.ui.drawMode },
   { id: 'code-snippet', label: 'Insert code snippet', run: () => editor.setTool('snippet') },
   { id: 'annotate', label: 'Annotate a layer', run: () => editor.setTool('annotate') },
   { id: 'find-replace', label: 'Find and replace…', shortcut: 'Ctrl+F', run: () => editor.setUI({ findOpen: true }) },

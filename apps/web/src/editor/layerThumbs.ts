@@ -8,8 +8,8 @@ import { onImageDecoded, renderBounds, renderNodeToCanvas } from '@figma/rendere
  * is idle, so big files and fast edits stay smooth.
  */
 
-/** Thumbnail box in CSS pixels. */
-export const THUMB_SIZE = 20;
+/** Thumbnail box in CSS pixels (big enough for draw mode's larger previews). */
+export const THUMB_SIZE = 32;
 const SETTLE_MS = 300;
 /** Time per idle slice spent drawing thumbnails. */
 const BUDGET_MS = 8;

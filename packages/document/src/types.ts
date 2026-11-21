@@ -10,6 +10,11 @@ export type AnnotationProperty = 'width' | 'height' | 'fills' | 'strokes' | 'cor
 
 export type SpecBlockType = 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet' | 'numbered' | 'todo' | 'quote' | 'divider' | 'code' | 'image' | 'embed';
 
+/** Draw mode's freehand tools (Pen is the regular vector pen). */
+export type DrawTool = 'brush' | 'pencil';
+/** Brush styles (stretch and scatter, as in Figma Draw) and pencil line styles. */
+export type BrushStyle = 'stretch-smooth' | 'stretch-tapered' | 'stretch-rough' | 'scatter-dots' | 'scatter-dashes' | 'solid' | 'dashed' | 'dotted';
+
 /** A code layer's source. */
 export interface CodeFiles {
   html: string;
@@ -267,6 +272,9 @@ export interface SceneNode {
 
   // SPEC: its document, as blocks (its child layers are generated from them).
   specBlocks?: SpecBlock[];
+
+  // VECTOR drawn in draw mode: which brush made it (its shape follows the style once width profiles exist).
+  brush?: { tool: DrawTool; style: BrushStyle };
 
   // CODE_LAYER: its files, and which version of them its snapshot (image fill) shows.
   codeFiles?: CodeFiles;

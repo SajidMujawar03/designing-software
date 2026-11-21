@@ -13,6 +13,7 @@ export type ToolId =
   | 'annotate'
   | 'spec'
   | 'code'
+  | 'brush'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'
@@ -68,6 +69,8 @@ export interface UIState {
   findOpen: boolean;
   /** The Spec document being edited (over the canvas, or full screen), and a block to put the caret in. */
   editingSpec: { id: NodeId; fullscreen: boolean; focus?: SpecFocus } | null;
+  /** Draw mode: the toolbar offers Pen, Brush and Pencil, and the sidebar becomes stroke sliders. */
+  drawMode: boolean;
   /** The code layer whose code editor panel is open. */
   codeEditorFor: NodeId | null;
   /** Code layers that are running, with a counter that restarts them when it changes. */
@@ -150,6 +153,7 @@ export const useUI = create<UIState>()(() => ({
   editingAnnotation: null,
   editingSpec: null,
   codeEditorFor: null,
+  drawMode: false,
   runningCode: {},
   variablesOpen: false,
   librariesOpen: false,

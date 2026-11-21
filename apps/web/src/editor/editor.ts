@@ -687,6 +687,17 @@ export class Editor {
     this.setUI({ textSelection: sel });
   }
 
+  /** Switches between Design and Draw mode (Draw: Pen, Brush and Pencil, and stroke sliders). */
+  setDrawMode(on: boolean): void {
+    if (on === this.ui.drawMode) return;
+    this.commitTextEdit();
+    const drawTools: ToolId[] = ['select', 'scale', 'pen', 'brush', 'pencil', 'text', 'hand', 'comment'];
+    // Entering starts with the brush; leaving puts away tools Design mode doesn't show.
+    const tool = on ? 'brush' : drawTools.includes(this.ui.tool) && this.ui.tool !== 'brush' ? this.ui.tool : 'select';
+    this.setUI({ drawMode: on });
+    this.setTool(tool);
+  }
+
   /** Opens a code layer's code editor panel. */
   openCodeEditor(id: NodeId): void {
     if (this.doc.get(id)?.type !== 'CODE_LAYER') return;

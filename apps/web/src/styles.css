@@ -4722,3 +4722,125 @@ a.btn {
 .code-handle.selected {
   background: var(--blue);
 }
+
+/* ---------- draw mode ---------- */
+
+.mode-switch {
+  display: inline-flex;
+  margin: 0 8px 0 4px;
+  padding: 2px;
+  border-radius: 6px;
+  background: #383838;
+}
+.mode-switch button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #bbb;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mode-switch button.active {
+  background: #fff;
+  color: #1e1e1e;
+}
+
+/* Brush and Pencil settings, floating at the top of the canvas. */
+.brush-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 18;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.brush-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 6px;
+  background: rgba(13, 153, 255, 0.95);
+  color: #fff;
+  white-space: nowrap;
+}
+.brush-hint .icon-btn {
+  color: #fff;
+}
+.brush-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+.brush-color {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.brush-weight-num {
+  width: 46px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+}
+.brush-weight {
+  width: 110px;
+}
+
+.draw-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.draw-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.draw-row .select {
+  grid-column: 2 / 4;
+}
+.draw-row input[type='color'] {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+}
+.draw-value {
+  text-align: right;
+  color: var(--text-dim);
+}
+
+/* Draw mode: bigger layer previews in taller rows. */
+.layers.draw .layer-row {
+  height: 40px;
+}
+.layers.draw .layer-thumb,
+.layers.draw .layer-thumb img {
+  width: 32px;
+  height: 32px;
+}

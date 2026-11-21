@@ -1,4 +1,4 @@
-import { ArrowUpRight, Braces, FileText, SquareCode, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { ArrowUpRight, Braces, Brush, FileText, SquareCode, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -32,6 +32,7 @@ const T = {
   arrow: { id: 'arrow', label: 'Arrow', key: 'Shift+L', Icon: ArrowUpRight },
   pen: { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
   pencil: { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
+  brush: { id: 'brush', label: 'Brush', key: '', Icon: Brush },
   text: { id: 'text', label: 'Text', key: 'T', Icon: Type },
   code: { id: 'code', label: 'Code', key: 'B', Icon: SquareCode },
   spec: { id: 'spec', label: 'Spec', key: 'D', Icon: FileText },
@@ -58,6 +59,9 @@ const TOOLS: ToolDef[][] = [
   [T.hand],
   [T.comment],
 ];
+
+/** Draw mode's toolbar, as in Figma Draw: Pen, Brush and Pencil (plus moving, text and panning). */
+const DRAW_TOOLS: ToolDef[][] = [[T.select, T.scale], [T.pen], [T.brush], [T.pencil], [T.text], [T.hand], [T.comment]];
 
 const tip = (t: ToolDef) => (t.key ? `${t.label} (${t.key})` : t.label);
 
@@ -125,6 +129,7 @@ function ToolSlot({ tools, tool }: { tools: ToolDef[]; tool: ToolId }) {
 export function Toolbar() {
   useDocVersion();
   const tool = useUI((s) => s.tool);
+  const drawMode = useUI((s) => s.drawMode);
   const zoom = useUI((s) => s.viewport.zoom);
   const pageId = useUI((s) => s.pageId);
   const page = editor.doc.get(pageId);
@@ -135,7 +140,21 @@ export function Toolbar() {
         <div className="logo" aria-hidden>
           ◆
         </div>
-        {TOOLS.filter((g) => g[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
+        <div className="mode-switch" role="radiogroup" aria-label="Mode">
+          {(['design', 'draw'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={(m === 'draw') === drawMode}
+              className={(m === 'draw') === drawMode ? 'active' : ''}
+              onClick={() => editor.setDrawMode(m === 'draw')}
+            >
+              {m === 'draw' ? 'Draw' : 'Design'}
+            </button>
+          ))}
+        </div>
+        {(drawMode ? DRAW_TOOLS : TOOLS).filter((g) => g[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
           <ToolSlot key={g[0].id} tools={g} tool={tool} />
         ))}
         <span className="divider" />
