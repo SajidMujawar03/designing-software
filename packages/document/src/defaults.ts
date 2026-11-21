@@ -24,6 +24,7 @@ const NAMES: Record<NodeType, string> = {
   FRAME: 'Frame',
   SECTION: 'Section',
   SLICE: 'Slice',
+  CODE_BLOCK: 'Code',
   COMPONENT: 'Component',
   COMPONENT_SET: 'Component set',
   INSTANCE: 'Instance',
@@ -53,6 +54,19 @@ export function defaultProps(type: NodeType): NodeProps {
       p.strokeAlign = 'INSIDE';
       p.cornerRadius = 4;
       p.clipsContent = false;
+      break;
+    case 'CODE_BLOCK':
+      // Hugs its text; colors follow the theme (dark by default).
+      p.fills = [solid('#1E1E1E')];
+      p.cornerRadius = 8;
+      p.clipsContent = true;
+      p.layoutMode = 'VERTICAL';
+      p.paddingTop = p.paddingBottom = 16;
+      p.paddingLeft = p.paddingRight = 20;
+      p.layoutSizingHorizontal = 'HUG';
+      p.layoutSizingVertical = 'HUG';
+      p.codeLanguage = 'javascript';
+      p.codeTheme = 'dark';
       break;
     case 'SLICE':
       p.exportSettings = [{ format: 'PNG', constraint: { type: 'SCALE', value: 1 }, suffix: '' }];

@@ -1,8 +1,20 @@
 import type { Constraints, CounterAlign, LayoutGrid, PrimaryAlign, Sizing } from '@figma/layout';
+import type { CodeLanguage, CodeTheme } from './code';
 
 export type { ConstraintType, Constraints, CounterAlign, GridAlignment, GridPattern, LayoutGrid, PrimaryAlign, Sizing } from '@figma/layout';
 
 export type LayoutMode = 'NONE' | 'HORIZONTAL' | 'VERTICAL';
+
+/** Measurements a spec annotation can show, read live from its layer. */
+export type AnnotationProperty = 'width' | 'height' | 'fills' | 'strokes' | 'cornerRadius' | 'opacity' | 'effects' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'padding' | 'itemSpacing';
+
+/** A note pinned to a layer for handoff. */
+export interface Annotation {
+  id: string;
+  /** Free text (may be empty when it only shows measurements). */
+  note: string;
+  properties: AnnotationProperty[];
+}
 
 export type NodeId = string;
 
@@ -14,6 +26,8 @@ export type NodeType =
   | 'SECTION'
   /** An export area: invisible, drawn only as an outline while selected. */
   | 'SLICE'
+  /** Syntax-highlighted code: a box (auto layout, hugging) holding one text layer. */
+  | 'CODE_BLOCK'
   | 'COMPONENT'
   | 'COMPONENT_SET'
   | 'INSTANCE'
@@ -217,6 +231,13 @@ export interface SceneNode {
 
   // PAGE: exports of its top-level layers are drawn on the page's background color.
   exportBackground?: boolean;
+
+  // CODE_BLOCK: how its text is highlighted.
+  codeLanguage?: CodeLanguage;
+  codeTheme?: CodeTheme;
+
+  /** Spec annotations pinned to this layer (notes and the measurements to show next to it). */
+  annotations?: Annotation[];
 
   // FRAME
   clipsContent?: boolean;
@@ -519,7 +540,7 @@ export const hasOwnTransform = (n: SceneNode): boolean =>
 
 /** Frames, sections, main components and instances: boxes that hold (and frames clip and lay out) children. */
 export const isFrameLike = (n: SceneNode | undefined | null): n is SceneNode => !!n && FRAME_LIKE.has(n.type);
-const FRAME_LIKE = new Set<NodeType>(['FRAME', 'SECTION', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
+const FRAME_LIKE = new Set<NodeType>(['FRAME', 'SECTION', 'CODE_BLOCK', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
 
 /** Sections only sit on a page or inside another section. */
 export const canHoldSection = (n: SceneNode | undefined | null): boolean => n?.type === 'PAGE' || n?.type === 'SECTION';

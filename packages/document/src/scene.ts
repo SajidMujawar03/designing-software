@@ -116,8 +116,8 @@ export interface HitTestOptions {
 /** Top-most visible, unlocked node under the point; returns the deepest hit. */
 export function hitTest(doc: DesignDocument, pageId: NodeId, p: Vec2, opts: HitTestOptions = {}): SceneNode | null {
   const tol = opts.tolerance ?? 0;
-  // With framesOnly, a point over an instance stops the search: the frame
-  // holding the instance is the target (layers can't go inside instances).
+  // With framesOnly, a point over an instance or code block stops the search: the
+  // frame holding it is the target (layers can't go inside instances or code blocks).
   const BLOCKED = {} as SceneNode;
   const visit = (parentId: NodeId): SceneNode | null => {
     const kids = doc.children(parentId);
@@ -125,7 +125,7 @@ export function hitTest(doc: DesignDocument, pageId: NodeId, p: Vec2, opts: HitT
       const n = kids[i];
       if (!n.visible || n.locked || opts.exclude?.has(n.id)) continue;
       const inside = shapeContainsPoint(doc, n, p, isFrameLike(n) ? 0 : tol);
-      if (opts.framesOnly && n.type === 'INSTANCE') {
+      if (opts.framesOnly && (n.type === 'INSTANCE' || n.type === 'CODE_BLOCK')) {
         if (inside) return BLOCKED;
         continue;
       }

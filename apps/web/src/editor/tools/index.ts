@@ -3,6 +3,7 @@ import type { ToolId } from '../store';
 import { HandTool, ShapeTool, TextTool } from './create';
 import { SelectTool } from './select';
 import { CommentTool } from './comment';
+import { CodeBlockTool, SpecTool } from './handoff';
 import { PencilTool, PenTool, VectorEditTool } from './vector';
 import type { Tool } from './types';
 
@@ -13,6 +14,8 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     section: new ShapeTool(ed, 'SECTION'),
     slice: new ShapeTool(ed, 'SLICE'),
     scale: new SelectTool(ed, { scale: true }),
+    code: new CodeBlockTool(ed),
+    spec: new SpecTool(ed),
     rectangle: new ShapeTool(ed, 'RECTANGLE'),
     ellipse: new ShapeTool(ed, 'ELLIPSE'),
     polygon: new ShapeTool(ed, 'POLYGON'),

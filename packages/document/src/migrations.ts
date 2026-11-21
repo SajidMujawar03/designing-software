@@ -20,7 +20,7 @@ import * as Y from 'yjs';
  */
 
 /** The schema version this code writes. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Origin of migration transactions (not undoable). */
 export const MIGRATION_ORIGIN = Symbol('migration');
@@ -59,6 +59,11 @@ export const MIGRATIONS: Migration[] = [
   {
     to: 2,
     description: 'Sections and slices (new layer types). Nothing to convert: the version stops older apps from editing files that may contain them.',
+    up() {},
+  },
+  {
+    to: 3,
+    description: 'Code blocks (a new layer type) and spec annotations. Nothing to convert.',
     up() {},
   },
 ];

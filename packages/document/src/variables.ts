@@ -18,7 +18,7 @@ export interface BindableField {
 }
 
 const has = (k: keyof SceneNode) => (n: SceneNode) => n[k] !== undefined;
-const isFrameish = (n: SceneNode) => n.type === 'FRAME' || n.type === 'SECTION' || n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'COMPONENT_SET';
+const isFrameish = (n: SceneNode) => n.type === 'FRAME' || n.type === 'SECTION' || n.type === 'CODE_BLOCK' || n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'COMPONENT_SET';
 
 /** Number fields, in panel order. Paint colors are `fills/<i>` and `strokes/<i>`. */
 export const NUMBER_FIELDS: BindableField[] = [

@@ -271,5 +271,16 @@ export function composeText(doc: DesignDocument, n: SceneNode): string {
 export type CodeLanguage = 'css' | 'swiftui' | 'compose';
 
 export function codeFor(doc: DesignDocument, n: SceneNode, lang: CodeLanguage): string {
-  return lang === 'css' ? cssText(doc, n) : lang === 'swiftui' ? swiftUIText(doc, n) : composeText(doc, n);
+  const code = lang === 'css' ? cssText(doc, n) : lang === 'swiftui' ? swiftUIText(doc, n) : composeText(doc, n);
+  return annotationComment(n, lang === 'css' ? 'block' : 'line') + code;
+}
+
+/** The layer's spec notes as a comment above its code ("" when it has none). */
+export function annotationComment(n: SceneNode, style: 'block' | 'line'): string {
+  const notes = (n.annotations ?? []).map((a) => a.note.trim()).filter(Boolean);
+  if (!notes.length) return '';
+  const lines = notes.flatMap((t) => t.split('\n'));
+  if (style === 'line') return lines.map((l) => `// ${l}`).join('\n') + '\n';
+  // "*/" inside a note would end the comment early.
+  return `/*\n${lines.map((l) => ` * ${l.replace(/\*\//g, '* /')}`).join('\n')}\n */\n`;
 }
