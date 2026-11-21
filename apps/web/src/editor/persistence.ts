@@ -9,6 +9,7 @@ import { editor } from './editor';
 import { currentFileId, fileStoreName, touchFile } from './files';
 import { fonts } from './fonts';
 import { refreshLibraries, watchFileMeta } from './libraryStore';
+import { startDisk } from '../desktop/diskFile';
 
 /** Loads a file kept in this browser only (IndexedDB). */
 function startLocal(): Promise<void> {
@@ -23,6 +24,7 @@ function startLocal(): Promise<void> {
 /** Opens the file for the route (a cloud file, or one in this browser) and starts the editor. */
 export async function startPersistence(route: Route): Promise<void> {
   if (route.kind === 'file') await startCloudFile(route.id);
+  else if (route.kind === 'disk') await startDisk();
   else await startLocal();
   editor.onReady();
   const me = useSession.getState().user;
@@ -41,7 +43,7 @@ export async function startPersistence(route: Route): Promise<void> {
   }
   watchFileMeta(editor);
   void refreshLibraries();
-  if (route.kind !== 'file') {
+  if (route.kind === 'local') {
     // Keep the local file list ordered by recent edits (at most every few seconds).
     let last = 0;
     editor.doc.subscribe(() => {

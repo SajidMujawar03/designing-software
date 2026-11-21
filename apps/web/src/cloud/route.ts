@@ -6,15 +6,19 @@ export type Route =
   | { kind: 'dashboard' }
   | { kind: 'file'; id: string }
   | { kind: 'local' }
+  /** A .design file on disk (desktop app): the window's file. */
+  | { kind: 'disk' }
   | { kind: 'signin' }
-  /** Playing a prototype: a cloud file (id) or a browser file (id null). */
-  | { kind: 'present'; id: string | null };
+  /** Playing a prototype: a cloud file (id), a browser file (id null), or the window's disk file. */
+  | { kind: 'present'; id: string | null; disk?: boolean };
 
 export function currentRoute(): Route {
   const path = location.pathname;
   const p = /^\/file\/([\w-]+)\/present/.exec(path);
   if (p) return { kind: 'present', id: p[1] };
   if (path.startsWith('/local/present')) return { kind: 'present', id: null };
+  if (path.startsWith('/disk/present')) return { kind: 'present', id: null, disk: true };
+  if (path.startsWith('/disk')) return { kind: 'disk' };
   const m = /^\/file\/([\w-]+)/.exec(path);
   if (m) return { kind: 'file', id: m[1] };
   if (path.startsWith('/local')) return { kind: 'local' };
@@ -34,6 +38,7 @@ export function presentUrl(pageId: string, nodeId?: string | null): string {
   if (nodeId) q.set('node', nodeId);
   const cloud = /^\/file\/([\w-]+)/.exec(location.pathname)?.[1];
   if (cloud) return `/file/${cloud}/present?${q}`;
+  if (location.pathname.startsWith('/disk')) return `/disk/present?${q}`;
   const file = /[#&]file=([\w-]+)/.exec(location.hash)?.[1];
   return `/local/present?${q}${file ? `#file=${file}` : ''}`;
 }

@@ -1,5 +1,10 @@
 import { libraryStatus, type PublishedComponent, type PublishedLibrary } from '@figma/document';
-import { BookOpen, Boxes, History, ChevronDown, Component, FilePlus, FileText, RefreshCw, Trash2, X } from 'lucide-react';
+import { BookOpen, Boxes, History, ChevronDown, Component, FilePlus, FileText, HardDriveDownload, RefreshCw, Trash2, X } from 'lucide-react';
+import * as Y from 'yjs';
+import { desktop } from '../desktop';
+import { DiskFileMenu } from '../desktop/DiskFileMenu';
+import { bridgeMessage } from '../desktop/diskFile';
+import { notify } from '../plugins/host';
 import { useEffect, useRef, useState } from 'react';
 import { ASSET_MIME, insertInstanceAt } from '../editor/componentCommands';
 import { editor } from '../editor/editor';
@@ -50,7 +55,24 @@ function useFiles(): FileEntry[] {
 // ------------------------------------------------------------ file menu (toolbar)
 
 export function FileMenu() {
+  if (location.pathname.startsWith('/disk')) return <DiskFileMenu />;
   return location.pathname.startsWith('/file/') ? <CloudFileMenu /> : <LocalFileMenu />;
+}
+
+/** In the desktop app: saves the open document as a new .design file and opens it. */
+function SaveToDiskItem({ name, onDone }: { name: string; onDone: () => void }) {
+  if (!desktop) return null;
+  return (
+    <button
+      role="menuitem"
+      onClick={() => {
+        onDone();
+        desktop!.file.saveCopy(Y.encodeStateAsUpdate(editor.doc.ydoc), name).catch((e) => notify(bridgeMessage(e), { error: true }));
+      }}
+    >
+      <HardDriveDownload size={12} /> Save a copy to disk…
+    </button>
+  );
 }
 
 /** Toolbar title of a cloud file: name, sync status and the file menu. */
@@ -128,6 +150,7 @@ function CloudFileMenu() {
           <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ historyOpen: true }))}>
             <History size={12} /> Version history
           </button>
+          <SaveToDiskItem name={file?.name ?? 'Untitled'} onDone={() => setOpen(false)} />
           <ThemeSwitch role="menuitem" />
         </div>
       )}
@@ -182,7 +205,7 @@ function LocalFileMenu() {
             Rename file
           </button>
           <button role="menuitem" onClick={() => location.assign('/')}>
-            <FileText size={12} /> Your account's files
+            <FileText size={12} /> {desktop ? 'Back to start' : "Your account's files"}
           </button>
           <button role="menuitem" onClick={() => openFile(createFile())}>
             <FilePlus size={12} /> New file
@@ -190,6 +213,7 @@ function LocalFileMenu() {
           <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ librariesOpen: true }))}>
             <BookOpen size={12} /> Libraries…
           </button>
+          <SaveToDiskItem name={me.name} onDone={() => setOpen(false)} />
           <ThemeSwitch role="menuitem" />
           <div className="menu-sep" />
           <div className="menu-label">Files in this browser</div>
