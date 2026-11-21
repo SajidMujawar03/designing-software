@@ -11,11 +11,15 @@ import { versionRoutes } from './routes/versions';
 import { libraryRoutes } from './routes/libraries';
 import { counts, errorRoutes, installProcessHandlers } from './errors';
 import { realtimeStats } from './realtime';
+import { staticRoutes } from './static';
 
 async function main(): Promise<void> {
   installProcessHandlers();
+  if (process.env.NODE_ENV === 'production' && !process.env.PUBLIC_URL) {
+    console.warn('[server] PUBLIC_URL is not set: share links and Google sign-in will point at http://localhost:5280.');
+  }
   await initDb();
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'warn' }, bodyLimit: 50 * 1024 * 1024 });
+  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'warn' }, bodyLimit: 50 * 1024 * 1024, trustProxy: config.trustProxy });
   await app.register(cookie);
   authRoutes(app);
   errorRoutes(app);
@@ -40,9 +44,15 @@ async function main(): Promise<void> {
     };
   });
 
+  const servingApp = staticRoutes(app);
+
   startRealtime(app.server);
   await app.listen({ port: config.port, host: '0.0.0.0' });
-  console.log(`[server] API and realtime on http://localhost:${config.port} (web app proxies /api and /collab)`);
+  console.log(
+    servingApp
+      ? `[server] app, API and realtime on http://localhost:${config.port} (public URL ${config.publicUrl})`
+      : `[server] API and realtime on http://localhost:${config.port} (web app proxies /api and /collab)`,
+  );
 
   const stop = async () => {
     await flushAll().catch((e) => console.error('[server] saving on shutdown failed', e));

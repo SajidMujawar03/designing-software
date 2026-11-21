@@ -67,6 +67,12 @@ const BOOTSTRAP = String.raw`
 })();
 `;
 
+/** The page's script nonce (set by the server in production): plugin frames inherit its CSP. */
+function pageNonce(): string {
+  const n = document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content ?? '';
+  return /^[A-Za-z0-9+/=]+$/.test(n) ? n : '';
+}
+
 const escapeScript = (code: string) => code.replace(/<\/script/gi, '<\\/script');
 const domainOk = (d: string) => /^[a-z0-9.-]+(:\d+)?$/i.test(d);
 
@@ -80,6 +86,8 @@ export function sandboxDocument(plugin: PluginManifest, theme: 'light' | 'dark')
     'font-src data:',
     `connect-src ${connect || "'none'"}`,
   ].join('; ');
+  const nonce = pageNonce();
+  const n = nonce ? ` nonce="${nonce}"` : '';
   const fg = theme === 'dark' ? '#ededed' : '#1e1e1e';
   const bg = theme === 'dark' ? '#2c2c2c' : '#ffffff';
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -92,9 +100,9 @@ export function sandboxDocument(plugin: PluginManifest, theme: 'light' | 'dark')
   input, select, textarea { font: inherit; padding: 5px 8px; border: 1px solid #ccc; border-radius: 6px; background: transparent; color: inherit; box-sizing: border-box; }
   label { display: block; margin: 0 0 8px; }
 </style>
-<script>${BOOTSTRAP}</script>
+<script${n}>${BOOTSTRAP}</script>
 </head><body>
-<script>(async () => {
+<script${n}>(async () => {
 ${escapeScript(plugin.code)}
 })().catch((e) => design.notify('Plugin error: ' + (e && e.message || e), { error: true }));</script>
 </body></html>`;
