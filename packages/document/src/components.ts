@@ -1,4 +1,5 @@
 import type { DesignDocument } from './document';
+import { boundProps } from './variables';
 import { type NodeId, type NodePatch, type SceneNode, type TextRun } from './types';
 
 /**
@@ -47,8 +48,11 @@ export function propagate(doc: DesignDocument, before: SceneNode, after: SceneNo
     const d = doc.get(depId);
     if (!d) continue;
     const patch: Record<string, unknown> = {};
+    // Properties the mirror resolves from variables itself (its modes may differ).
+    const own = boundProps(d);
     for (const k of keys) {
       if (fromMain && INSTANCE_OWN.has(k)) continue;
+      if (own.has(k) && k !== 'boundVariables') continue;
       const v = (after as never)[k];
       if (v === undefined) continue;
       if (same((d as never)[k], (before as never)[k])) patch[k] = v;
@@ -355,8 +359,10 @@ export function overridesOf(doc: DesignDocument, id: NodeId): string[] {
   if (!d || !s) return [];
   const root = s.type === 'COMPONENT';
   const out: string[] = [];
+  // Values from the same variables differ only because modes differ: not overrides.
+  const varDriven = same(d.boundVariables, s.boundVariables) ? boundProps(d) : new Set<string>();
   for (const k of new Set([...Object.keys(d), ...Object.keys(s)])) {
-    if (NEVER_SYNC.has(k) || (root && INSTANCE_OWN.has(k)) || ['x', 'y', 'width', 'height'].includes(k)) continue;
+    if (NEVER_SYNC.has(k) || (root && INSTANCE_OWN.has(k)) || ['x', 'y', 'width', 'height'].includes(k) || varDriven.has(k)) continue;
     if (!same((d as never)[k], (s as never)[k])) out.push(k);
   }
   if (d.characters !== s.characters || !same(runsOf(d), runsOf(s))) out.push('characters');

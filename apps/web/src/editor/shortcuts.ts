@@ -49,11 +49,16 @@ export function installShortcuts(): () => void {
 
     if (mod && !e.altKey && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
+    if (ui.variablesOpen) {
+      if (e.key === 'Escape') run(() => editor.setUI({ variablesOpen: false }));
+      return;
+    }
 
     if (mod && e.altKey) {
       const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
       if (e.code === 'KeyG') return run(() => editor.frameSelection());
       if (e.code === 'KeyK') return run(() => createComponent(editor));
+      if (e.code === 'KeyV') return run(() => editor.setUI({ variablesOpen: true }));
       if (e.code === 'KeyB') return run(() => detachSelection(editor));
       if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));
       if (e.code === 'KeyO') return run(() => void outlineStrokeSelection(editor));

@@ -44,6 +44,7 @@ import { ColorPicker } from './ColorPicker';
 import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { AutoLayoutSection, ConstraintsSection, LayoutGridSection, SizingRow } from './LayoutPanels';
 import { ComponentSection } from './ComponentPanel';
+import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -107,6 +108,8 @@ export function PropertiesPanel() {
       <AlignBar count={editor.topLevelSelection().length} />
 
       <ComponentSection nodes={nodes} />
+      {nodes.length === 1 && <VariableModes nodeId={nodes[0].id} />}
+      <VariableBindings nodes={nodes} />
 
       {nodes.some((n) => isGroupLike(n)) ? (
         <BoxLayout ids={ids} />
@@ -603,6 +606,16 @@ function PageProperties() {
         />
       </Section>
       <LocalStyles />
+      <VariableModes nodeId={page.id} />
+      <Section title="Variables">
+        <div className="hint">
+          {editor.doc.variables().length} variable{editor.doc.variables().length === 1 ? '' : 's'} in {editor.doc.collections().length} collection
+          {editor.doc.collections().length === 1 ? '' : 's'}
+        </div>
+        <button type="button" className="btn" onClick={() => editor.setUI({ variablesOpen: true })}>
+          Open variables
+        </button>
+      </Section>
       <Section title="File">
         <button type="button" className="btn" onClick={exportJson}>
           Export file as JSON

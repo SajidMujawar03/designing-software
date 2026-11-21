@@ -261,6 +261,12 @@ export interface SceneNode {
   /** Layers inside a main component: which of its properties drive this layer. */
   componentPropertyReferences?: ComponentPropertyReferences | null;
 
+  // Variables
+  /** Properties driven by variables: field ("fills/0", "cornerRadius", ...) → variable id. */
+  boundVariables?: Record<string, string> | null;
+  /** Pages and frames: the mode each variable collection uses inside them (others inherit). */
+  explicitVariableModes?: Record<string, string> | null;
+
   // PAGE
   guides?: Guide[];
 
@@ -297,6 +303,43 @@ export interface SceneNode {
   strokeStyleId?: string | null;
   effectStyleId?: string | null;
   textStyleId?: string | null;
+}
+
+export type VariableType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
+
+export interface RGBA extends RGB {
+  a: number;
+}
+
+export interface VariableAlias {
+  type: 'VARIABLE_ALIAS';
+  id: string;
+}
+
+export type VariableValue = RGBA | number | string | boolean;
+
+export interface VariableMode {
+  modeId: string;
+  name: string;
+}
+
+/** A group of variables sharing a set of modes (such as Light and Dark). */
+export interface VariableCollection {
+  id: string;
+  name: string;
+  modes: VariableMode[];
+  defaultModeId: string;
+}
+
+export interface Variable {
+  id: string;
+  /** Slashes group variables, e.g. "Colors/Primary". */
+  name: string;
+  collectionId: string;
+  type: VariableType;
+  /** A value (or a reference to another variable) for each mode of the collection. */
+  valuesByMode: Record<string, VariableValue | VariableAlias>;
+  description?: string;
 }
 
 export type ComponentPropertyType = 'BOOLEAN' | 'TEXT' | 'INSTANCE_SWAP';
