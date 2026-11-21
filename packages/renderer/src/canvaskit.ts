@@ -218,6 +218,7 @@ export class CanvasKitRenderer implements SceneRenderer {
         return;
       case 'FRAME':
       case 'COMPONENT':
+      case 'COMPONENT_SET':
       case 'INSTANCE':
         if (draw) this.fill(c, n);
         inner();

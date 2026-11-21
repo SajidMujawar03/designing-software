@@ -178,6 +178,7 @@ export function shapePaths(n: SceneNode): VectorPath[] {
     case 'RECTANGLE':
     case 'FRAME':
     case 'COMPONENT':
+    case 'COMPONENT_SET':
     case 'INSTANCE':
       return [rectPath(n.width, n.height, n.cornerRadius || 0)];
     case 'ELLIPSE':

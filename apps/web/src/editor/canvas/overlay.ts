@@ -19,7 +19,7 @@ const PURPLE = '#9747FF';
 
 /** Components, instances and the layers inside them are outlined in purple. */
 function isComponentLayer(doc: Editor['doc'], n: SceneNode): boolean {
-  const isComp = (x: SceneNode) => x.type === 'COMPONENT' || x.type === 'INSTANCE';
+  const isComp = (x: SceneNode) => x.type === 'COMPONENT' || x.type === 'INSTANCE' || x.type === 'COMPONENT_SET';
   return isComp(n) || doc.ancestors(n.id).some(isComp);
 }
 
@@ -45,9 +45,9 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     const p = ed.worldToScreen(applyToPoint(worldTransform(doc, n.id), { x: 0, y: 0 }));
     const maxW = n.width * viewport.zoom;
     if (maxW < 20) continue;
-    const comp = n.type === 'COMPONENT' || n.type === 'INSTANCE';
+    const comp = n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'COMPONENT_SET';
     ctx.fillStyle = comp ? PURPLE : selected.has(n.id) || hoverId === n.id ? BLUE : '#8C8C8C';
-    ctx.fillText(ellipsize(ctx, (n.type === 'COMPONENT' ? '\u2756 ' : n.type === 'INSTANCE' ? '\u25C7 ' : '') + n.name, maxW), p.x, p.y - 4);
+    ctx.fillText(ellipsize(ctx, (n.type === 'COMPONENT' || n.type === 'COMPONENT_SET' ? '\u2756 ' : n.type === 'INSTANCE' ? '\u25C7 ' : '') + n.name, maxW), p.x, p.y - 4);
   }
 
   const outline = (id: NodeId, width: number) => {

@@ -103,6 +103,7 @@ function geometryTag(c: SvgContext, n: SceneNode): string | null {
     case 'RECTANGLE':
     case 'FRAME':
     case 'COMPONENT':
+    case 'COMPONENT_SET':
     case 'INSTANCE': {
       const r = n.cornerRadius ? ` rx="${num(n.cornerRadius)}"` : '';
       return `<rect width="${num(n.width)}" height="${num(n.height)}"${r}`;

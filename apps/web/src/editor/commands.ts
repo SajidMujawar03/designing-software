@@ -1,6 +1,6 @@
 import { isAutoLayout, isFrameLike, isGroupLike } from '@figma/document';
 import { addAutoLayout, removeAutoLayout } from './layoutCommands';
-import { createComponent, detachSelection, goToMainComponent, resetSelection } from './componentCommands';
+import { combineAsVariants, createComponent, detachSelection, goToMainComponent, resetSelection } from './componentCommands';
 import { editor } from './editor';
 import { placeImages } from './shortcuts';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
@@ -27,7 +27,7 @@ const hasContainer = () =>
 
 const canMakeComponent = () => {
   const sel = editor.selectedNodes();
-  return sel.length > 0 && !(sel.length === 1 && (sel[0].type === 'COMPONENT' || sel[0].type === 'INSTANCE'));
+  return sel.length > 0 && !(sel.length === 1 && ['COMPONENT', 'INSTANCE', 'COMPONENT_SET'].includes(sel[0].type));
 };
 const hasInstance = () => editor.selectedNodes().some((n) => n.type === 'INSTANCE');
 
@@ -49,6 +49,15 @@ export const COMMANDS: Command[] = [
   { id: 'detach-instance', label: 'Detach instance', shortcut: 'Ctrl+Alt+B', run: () => detachSelection(editor), enabled: hasInstance },
   { id: 'reset-instance', label: 'Reset all changes', run: () => resetSelection(editor), enabled: () => editor.selectedNodes().some((n) => n.type === 'INSTANCE' || !!n.sourceId) },
   { id: 'go-to-main', label: 'Go to main component', run: () => goToMainComponent(editor), enabled: hasInstance },
+  {
+    id: 'combine-variants',
+    label: 'Combine as variants',
+    run: () => combineAsVariants(editor),
+    enabled: () => {
+      const sel = editor.selectedNodes();
+      return sel.length > 1 && sel.every((n) => n.type === 'COMPONENT' && editor.doc.get(n.parentId)?.type !== 'COMPONENT_SET');
+    },
+  },
   { id: 'add-auto-layout', label: 'Add auto layout', shortcut: 'Shift+A', run: () => addAutoLayout(editor), enabled: hasSelection },
   {
     id: 'remove-auto-layout',
@@ -135,6 +144,7 @@ export const CANVAS_MENU = [
   'group',
   'ungroup',
   'create-component',
+  'combine-variants',
   'detach-instance',
   'reset-instance',
   'go-to-main',

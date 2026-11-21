@@ -237,7 +237,8 @@ export class Editor {
         // A pasted main component becomes an instance of it (while it exists).
         const orig = clip.roots[i]?.node;
         const placed = this.doc.get(id)!;
-        if (orig?.type === 'COMPONENT' && this.doc.get(orig.id)?.type === 'COMPONENT') {
+        const live = this.doc.get(orig?.id)?.type;
+        if (orig && (orig.type === 'COMPONENT' || orig.type === 'COMPONENT_SET') && live === orig.type) {
           const inst = createInstance(this.doc, orig.id, parentId, { x: placed.x, y: placed.y }, id);
           if (inst) {
             this.doc.updateNode(inst, { rotation: placed.rotation });

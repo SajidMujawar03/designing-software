@@ -11,6 +11,7 @@ export type NodeType =
   | 'PAGE'
   | 'FRAME'
   | 'COMPONENT'
+  | 'COMPONENT_SET'
   | 'INSTANCE'
   | 'GROUP'
   | 'BOOLEAN'
@@ -248,8 +249,17 @@ export interface SceneNode {
    * overrides and survive.
    */
   sourceId?: NodeId | null;
-  /** COMPONENT: shown in the assets panel and inspector. */
+  /** COMPONENT / COMPONENT_SET: shown in the assets panel and inspector. */
   description?: string;
+  /**
+   * COMPONENT (or the COMPONENT_SET of variants): boolean, text and
+   * instance-swap properties. Their values live on the layers bound to them
+   * (see `componentPropertyReferences`), so instances override them like any
+   * other change.
+   */
+  componentPropertyDefinitions?: Record<string, ComponentPropertyDefinition>;
+  /** Layers inside a main component: which of its properties drive this layer. */
+  componentPropertyReferences?: ComponentPropertyReferences | null;
 
   // PAGE
   guides?: Guide[];
@@ -287,6 +297,23 @@ export interface SceneNode {
   strokeStyleId?: string | null;
   effectStyleId?: string | null;
   textStyleId?: string | null;
+}
+
+export type ComponentPropertyType = 'BOOLEAN' | 'TEXT' | 'INSTANCE_SWAP';
+
+export interface ComponentPropertyDefinition {
+  type: ComponentPropertyType;
+  /** INSTANCE_SWAP: components offered when swapping (empty = all). */
+  preferredValues?: NodeId[];
+}
+
+export interface ComponentPropertyReferences {
+  /** BOOLEAN property: shows or hides the layer. */
+  visible?: string;
+  /** TEXT property: the layer's text. */
+  characters?: string;
+  /** INSTANCE_SWAP property: which component a nested instance shows. */
+  mainComponent?: string;
 }
 
 /** Text properties a text style controls (color comes from fills, as in Figma). */
@@ -339,7 +366,7 @@ export const hasOwnTransform = (n: SceneNode): boolean =>
 
 /** Frames, main components and instances: boxes that hold, clip and lay out children. */
 export const isFrameLike = (n: SceneNode | undefined | null): n is SceneNode => !!n && FRAME_LIKE.has(n.type);
-const FRAME_LIKE = new Set<NodeType>(['FRAME', 'COMPONENT', 'INSTANCE']);
+const FRAME_LIKE = new Set<NodeType>(['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
 
 /** A frame that lays out its children (auto layout). */
 export const isAutoLayout = (n: SceneNode | undefined | null): boolean =>

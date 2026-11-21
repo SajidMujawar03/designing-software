@@ -1,5 +1,5 @@
 import type { DesignDocument } from './document';
-import { type NodeId, type NodePatch, type SceneNode } from './types';
+import { type NodeId, type NodePatch, type SceneNode, type TextRun } from './types';
 
 /**
  * Components and instances.
@@ -13,9 +13,11 @@ import { type NodeId, type NodePatch, type SceneNode } from './types';
  */
 
 /** Never copied from a source: identity, tree position and links. */
-const NEVER_SYNC = new Set<string>(['id', 'parentId', 'index', 'sourceId', 'componentId', 'type', 'textRuns', 'characters', 'description']);
-/** An instance keeps its own placement, visibility and lock (the main's don't apply to it). */
-const INSTANCE_OWN = new Set<string>(['x', 'y', 'rotation', 'constraints', 'layoutPositioning', 'visible', 'locked']);
+const NEVER_SYNC = new Set<string>([
+  'id', 'parentId', 'index', 'sourceId', 'componentId', 'type', 'textRuns', 'characters', 'description', 'componentPropertyDefinitions',
+]);
+/** An instance keeps its own name, placement, visibility and lock (the main's don't apply to it). */
+const INSTANCE_OWN = new Set<string>(['name', 'x', 'y', 'rotation', 'constraints', 'layoutPositioning', 'visible', 'locked']);
 /** Changes that need a text layer measured again. */
 const TEXT_KEYS = new Set<string>(['fontFamily', 'fontSize', 'fontWeight', 'italic', 'lineHeight', 'letterSpacing', 'textCase', 'textAutoResize', 'width']);
 
@@ -68,6 +70,7 @@ export function instantiate(doc: DesignDocument, srcId: NodeId, parentId: NodeId
   const isMain = s.type === 'COMPONENT';
   const id = doc.createNode({
     ...syncedProps(s, false),
+    ...(isMain ? { name: displayName(doc, s) } : {}),
     type: isMain ? 'INSTANCE' : s.type,
     componentId: isMain ? s.id : s.componentId,
     characters: s.characters,
@@ -83,6 +86,8 @@ export function instantiate(doc: DesignDocument, srcId: NodeId, parentId: NodeId
 
 /** Places a new instance of a main component. */
 export function createInstance(doc: DesignDocument, componentId: NodeId, parentId: NodeId, at?: { x: number; y: number }, aboveId: NodeId | null = null): NodeId | null {
+  const set = doc.get(componentId);
+  if (set?.type === 'COMPONENT_SET') componentId = doc.children(set.id).find((c) => c.type === 'COMPONENT')?.id ?? componentId;
   const main = doc.get(componentId);
   if (main?.type !== 'COMPONENT' || !canHoldInstance(doc, componentId, parentId)) return null;
   return doc.change(() => {
@@ -126,19 +131,98 @@ export function syncChildren(doc: DesignDocument, dstId: NodeId, srcId: NodeId):
 }
 
 /** Swaps an instance to another main component (its children are rebuilt). */
-export function swapInstance(doc: DesignDocument, id: NodeId, componentId: NodeId): void {
+export function swapInstance(doc: DesignDocument, id: NodeId, componentId: NodeId, opts: { keepOverrides?: boolean } = {}): void {
   const n = doc.get(id);
+  const set = doc.get(componentId);
+  if (set?.type === 'COMPONENT_SET') componentId = doc.children(set.id).find((c) => c.type === 'COMPONENT')?.id ?? componentId;
   const main = doc.get(componentId);
   if (n?.type !== 'INSTANCE' || main?.type !== 'COMPONENT' || n.componentId === componentId && doc.childIds(id).length) return;
   const parent = n.parentId;
   if (parent && !canHoldInstance(doc, componentId, parent)) return;
+  const saved = opts.keepOverrides ? collectOverrides(doc, id) : null;
+  const oldMain = doc.get(n.componentId);
+  // Switching between variants of one set keeps the instance's name.
+  const sameSet = !!oldMain && oldMain.parentId === main.parentId && doc.get(main.parentId)?.type === 'COMPONENT_SET';
   doc.change(() => {
     doc.deleteNodes(doc.childIds(id));
     const topLevel = !doc.get(n.sourceId) || doc.get(n.sourceId)!.type === 'COMPONENT';
-    doc.updateNode(id, { ...syncedProps(main, true), componentId, ...(topLevel ? { sourceId: componentId } : {}) }, { constraints: false });
+    doc.updateNode(
+      id,
+      { ...syncedProps(main, true), componentId, ...(sameSet ? {} : { name: displayName(doc, main) }), ...(topLevel ? { sourceId: componentId } : {}) },
+      { constraints: false },
+    );
     let prev: NodeId | null = null;
     for (const c of doc.children(componentId)) prev = instantiate(doc, c.id, id, prev);
+    if (saved) applyOverrides(doc, id, '', saved);
   }, { merge: true });
+}
+
+interface SavedOverride {
+  /** Property → [overridden value, the source's value it replaced]. */
+  props: Map<string, [unknown, unknown]>;
+  text?: { value: [string, TextRun[]]; was: [string, TextRun[]] };
+}
+
+/** Layer paths by name ("Icon/Glyph", with #n for repeated names) inside an instance. */
+function childPaths(doc: DesignDocument, id: NodeId, path: string): Array<[NodeId, string]> {
+  const seen = new Map<string, number>();
+  return doc.children(id).map((c) => {
+    const k = seen.get(c.name) ?? 0;
+    seen.set(c.name, k + 1);
+    return [c.id, `${path}/${c.name}${k ? `#${k}` : ''}`];
+  });
+}
+
+/** An instance's overrides by layer path, with the values they replaced. */
+function collectOverrides(doc: DesignDocument, instId: NodeId): Map<string, SavedOverride> {
+  const out = new Map<string, SavedOverride>();
+  const visit = (id: NodeId, path: string) => {
+    const d = doc.get(id)!;
+    const src = doc.get(d.sourceId);
+    if (src) {
+      const entry: SavedOverride = { props: new Map() };
+      for (const k of overridesOf(doc, id)) {
+        if (k === 'characters') {
+          entry.text = { value: [d.characters ?? '', runsOf(d)], was: [src.characters ?? '', runsOf(src)] };
+        } else entry.props.set(k, [(d as never)[k], (src as never)[k]]);
+      }
+      if (entry.props.size || entry.text) out.set(path, entry);
+    }
+    for (const [c, p] of childPaths(doc, id, path)) visit(c, p);
+  };
+  visit(instId, '');
+  return out;
+}
+
+/**
+ * Puts saved overrides back on the layers with the same paths, where the new
+ * source agrees with the old one (otherwise the new variant's value wins).
+ */
+function applyOverrides(doc: DesignDocument, id: NodeId, path: string, saved: Map<string, SavedOverride>): void {
+  const entry = saved.get(path);
+  const d = doc.get(id);
+  const src = doc.get(d?.sourceId);
+  if (entry && d && src) {
+    const swapTo = entry.props.get('componentId');
+    if (swapTo && d.type === 'INSTANCE' && same(src.componentId, swapTo[1])) swapInstance(doc, id, swapTo[0] as NodeId, { keepOverrides: true });
+    const patch: Record<string, unknown> = {};
+    for (const [k, [value, was]] of entry.props) {
+      if (k !== 'componentId' && same((src as never)[k], was)) patch[k] = value;
+    }
+    if (Object.keys(patch).length) doc.updateNode(id, patch as NodePatch, { constraints: false });
+    const t = entry.text;
+    if (t && src.characters === t.was[0] && same(runsOf(src), t.was[1])) {
+      doc.setRichText(id, t.value[0], t.value[1]);
+      doc.requestTextFit(id);
+    }
+  }
+  for (const [c, p] of childPaths(doc, id, path)) applyOverrides(doc, c, p, saved);
+}
+
+/** The name an instance of a main gets: its set's name for a variant. */
+export function displayName(doc: DesignDocument, main: SceneNode): string {
+  const set = doc.get(main.parentId);
+  return set?.type === 'COMPONENT_SET' ? set.name : main.name;
 }
 
 /** Puts every layer of an instance back to its source's values (drops all overrides). */

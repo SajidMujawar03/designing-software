@@ -1,5 +1,5 @@
 import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
-import { Combine, Component, Contrast, Diamond, Star, Triangle } from 'lucide-react';
+import { Boxes, Combine, Component, Contrast, Diamond, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import { useEffect, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
@@ -10,6 +10,7 @@ import { IconButton } from './controls';
 const ICONS: Partial<Record<NodeType, typeof Square>> = {
   FRAME: Hash,
   COMPONENT: Component,
+  COMPONENT_SET: Boxes,
   INSTANCE: Diamond,
   GROUP: SquareDashed,
   RECTANGLE: Square,
@@ -205,7 +206,8 @@ function LayerRow(p: LayerRowProps) {
   const Icon = node.isMask ? Contrast : (ICONS[node.type] ?? Square);
   const ancestors = editor.doc.ancestors(node.id);
   const parentHidden = ancestors.some((a) => !a.visible);
-  const isComp = node.type === 'COMPONENT' || node.type === 'INSTANCE' || ancestors.some((a) => a.type === 'COMPONENT' || a.type === 'INSTANCE');
+  const compType = (t: string) => t === 'COMPONENT' || t === 'INSTANCE' || t === 'COMPONENT_SET';
+  const isComp = compType(node.type) || ancestors.some((a) => compType(a.type));
 
   return (
     <div

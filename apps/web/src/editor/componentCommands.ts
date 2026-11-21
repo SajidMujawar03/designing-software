@@ -1,6 +1,13 @@
 import {
+  addVariantProperty,
   createInstance,
   detachInstance,
+  fitComponentSet,
+  formatVariantName,
+  parseVariantName,
+  setOf,
+  variantProperties,
+  variantsOf,
   isFrameLike,
   isInInstance,
   outerInstance,
@@ -9,6 +16,7 @@ import {
   type NodeId,
 } from '@figma/document';
 import type { Editor } from './editor';
+import { boundsOf, placementIn, reparentKeepingPosition, worldRotation } from './transforms';
 
 /**
  * Ctrl+Alt+K: a selected plain frame becomes a main component; anything else
@@ -19,7 +27,7 @@ export function createComponent(ed: Editor): void {
   const sel = ed.topLevelSelection();
   if (!sel.length || sel.some((id) => isInInstance(doc, id))) return;
   const one = sel.length === 1 ? doc.get(sel[0]) : undefined;
-  if (one?.type === 'COMPONENT' || one?.type === 'INSTANCE') return;
+  if (one?.type === 'COMPONENT' || one?.type === 'INSTANCE' || one?.type === 'COMPONENT_SET') return;
   doc.change(() => {
     if (one?.type === 'FRAME') {
       doc.updateNode(one.id, { type: 'COMPONENT' });
@@ -70,11 +78,13 @@ export function goToMainComponent(ed: Editor): void {
 /** Places a new instance of a main component to the right of it. */
 export function placeInstance(ed: Editor, componentId: NodeId): void {
   const doc = ed.doc;
-  const main = doc.get(componentId);
-  if (main?.type !== 'COMPONENT' || !main.parentId) return;
-  const parent = isFrameLike(doc.get(main.parentId)) ? doc.pageOf(main.id)!.id : main.parentId;
+  let main = doc.get(componentId);
+  if (main?.type === 'COMPONENT_SET') main = variantsOf(doc, main.id)[0] ? doc.get(main.id) : undefined;
+  if ((main?.type !== 'COMPONENT' && main?.type !== 'COMPONENT_SET') || !main.parentId) return;
+  const anchor = setOf(doc, main.id) ?? main;
+  const parent = isFrameLike(doc.get(anchor.parentId)) ? doc.pageOf(anchor.id)!.id : anchor.parentId!;
   const id = doc.change(() => {
-    const pos = parent === main.parentId ? { x: main.x + main.width + 40, y: main.y } : undefined;
+    const pos = parent === anchor.parentId ? { x: anchor.x + anchor.width + 40, y: anchor.y } : undefined;
     return createInstance(doc, componentId, parent, pos);
   });
   if (id) ed.select([id]);
@@ -90,4 +100,76 @@ export function swapSelection(ed: Editor, componentId: NodeId): void {
 /** Main components in the file, by page order. */
 export function allComponents(ed: Editor) {
   return ed.doc.pages().flatMap((p) => ed.doc.descendants(p.id).filter((n) => n.type === 'COMPONENT'));
+}
+
+/** What an instance can be swapped to: components outside sets, and sets (as their first variant). */
+export function swapTargets(ed: Editor) {
+  return ed.doc
+    .pages()
+    .flatMap((p) => ed.doc.descendants(p.id))
+    .filter((n) => n.type === 'COMPONENT_SET' || (n.type === 'COMPONENT' && !setOf(ed.doc, n.id)));
+}
+
+/** Selected main components (outside sets) become variants of a new component set. */
+export function combineAsVariants(ed: Editor): void {
+  const doc = ed.doc;
+  const mains = ed.sortByZ(ed.topLevelSelection()).map((id) => doc.get(id)!).filter((n) => n.type === 'COMPONENT' && !setOf(doc, n.id));
+  if (!mains.length || new Set(mains.map((m) => m.parentId)).size > 1) return;
+  const b = boundsOf(doc, mains.map((m) => m.id))!;
+  const parentId = mains[0].parentId!;
+  const setId = doc.change(() => {
+    const set = doc.createNode({ type: 'COMPONENT_SET', parentId, aboveId: mains[mains.length - 1].id, name: mains[0].name });
+    doc.updateNode(set, placementIn(doc, parentId, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, worldRotation(doc, parentId), b.width, b.height));
+    for (const m of mains) {
+      reparentKeepingPosition(doc, m.id, set);
+      if (!parseVariantName(m.name)) doc.updateNode(m.id, { name: `Property 1=${m.name}` });
+    }
+    fitComponentSet(doc, set);
+    return set;
+  });
+  ed.select([setId]);
+}
+
+/**
+ * Adds a variant: a copy of the selected variant (or the set's last one) next
+ * to the others, with its first property set to a new value. A component
+ * outside a set is first combined with its copy into a new set.
+ */
+export function addVariant(ed: Editor, id: NodeId): void {
+  const doc = ed.doc;
+  let n = doc.get(id);
+  if (n?.type === 'COMPONENT' && !setOf(doc, n.id)) {
+    ed.select([n.id]);
+    combineAsVariants(ed);
+    n = doc.get(id);
+  }
+  const set = n?.type === 'COMPONENT_SET' ? n : setOf(doc, id);
+  if (!set) return;
+  const variants = variantsOf(doc, set.id);
+  const from = n?.type === 'COMPONENT' ? n : variants[variants.length - 1];
+  if (!from) return;
+  const props = variantProperties(doc, set.id);
+  const first = props[0]?.name ?? 'Property 1';
+  const taken = new Set(props[0]?.values ?? []);
+  let k = variants.length + 1;
+  while (taken.has(`Variant${k}`)) k++;
+  const values = { ...(parseVariantName(from.name) ?? {}), [first]: `Variant${k}` };
+  const copy = doc.change(() => {
+    const [cid] = ed.duplicateInPlace([from.id]);
+    const right = Math.max(...variants.map((v) => v.x + v.width));
+    const vertical = set.height > set.width * 1.5;
+    const bottom = Math.max(...variants.map((v) => v.y + v.height));
+    doc.updateNode(cid, {
+      name: formatVariantName(values, props.map((p) => p.name)),
+      ...(vertical ? { x: from.x, y: bottom + 20 } : { x: right + 20, y: from.y }),
+    });
+    fitComponentSet(doc, set.id);
+    return cid;
+  });
+  ed.select([copy]);
+}
+
+/** Adds a variant property (every variant gets "Default"). */
+export function addVariantPropertyTo(ed: Editor, setId: NodeId): void {
+  addVariantProperty(ed.doc, setId);
 }

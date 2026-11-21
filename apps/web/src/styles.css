@@ -1510,3 +1510,39 @@ button.swatch {
   color: var(--component, #9747ff);
   font-size: 11px;
 }
+.prop-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  min-width: 0;
+}
+.prop-row > * {
+  min-width: 0;
+}
+.prop-row input,
+.prop-row select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.prop-label,
+.prop-type,
+.prop-values {
+  color: var(--text-dim, #8c8c8c);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.prop-def {
+  border-top: 1px solid var(--border, #e6e6e6);
+  padding-top: 4px;
+  margin-top: 6px;
+}
+.prop-def > select,
+.prop-def > input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+}
