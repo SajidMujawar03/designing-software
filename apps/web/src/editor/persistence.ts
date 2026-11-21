@@ -2,6 +2,7 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { provider, startCloudFile } from '../cloud/cloudFile';
 import { startPresence } from '../cloud/presence';
 import { startComments } from '../cloud/comments';
+import { watchVersions } from '../cloud/versions';
 import { useSession } from '../cloud/session';
 import type { Route } from '../cloud/route';
 import { editor } from './editor';
@@ -28,6 +29,7 @@ export async function startPersistence(route: Route): Promise<void> {
   if (route.kind === 'file' && provider && me) {
     startPresence(provider, me);
     startComments();
+    watchVersions();
   }
   watchFileMeta(editor);
   void refreshLibraries();

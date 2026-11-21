@@ -4,6 +4,7 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { create } from 'zustand';
 import { editor } from '../editor/editor';
 import { setCloudFileName } from '../editor/files';
+import { startVersionPreview } from './versions';
 import { api, ApiError, type CloudFile, type Role } from './api';
 
 /**
@@ -52,6 +53,13 @@ export async function startCloudFile(id: string): Promise<void> {
     useCloudFile.setState({ file: meta.file, role: meta.role, team: meta.team, project: meta.project });
     setCloudFileName(meta.file.name);
     if (meta.role === 'viewer') editor.doc.readOnly = true;
+  }
+
+  // Previewing a saved version: load it read-only, without syncing.
+  const versionId = new URLSearchParams(location.search).get('version');
+  if (versionId) {
+    await startVersionPreview(versionId);
+    return;
   }
 
   const cache = new IndexeddbPersistence(cacheName(id), editor.doc.ydoc);

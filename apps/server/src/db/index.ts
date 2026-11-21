@@ -107,6 +107,19 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX comments_thread ON comments(thread_id, created_at);
   `,
+  `
+  CREATE TABLE file_versions (
+    id text PRIMARY KEY,
+    file_id text NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    kind text NOT NULL,
+    name text,
+    description text,
+    state bytea NOT NULL,
+    created_by text REFERENCES users(id),
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX file_versions_file ON file_versions(file_id, created_at);
+  `,
 ];
 
 async function migrate(): Promise<void> {

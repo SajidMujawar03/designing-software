@@ -1,5 +1,5 @@
 import { libraryStatus, type PublishedComponent, type PublishedLibrary } from '@figma/document';
-import { BookOpen, Boxes, ChevronDown, Component, FilePlus, FileText, RefreshCw, Trash2, X } from 'lucide-react';
+import { BookOpen, Boxes, History, ChevronDown, Component, FilePlus, FileText, RefreshCw, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ASSET_MIME, insertInstanceAt } from '../editor/componentCommands';
 import { editor } from '../editor/editor';
@@ -67,8 +67,10 @@ function CloudFileMenu() {
     document.title = `${file?.name ?? 'File'} – Figma Clone`;
   }, [file?.name]);
   const canEdit = role === 'owner' || role === 'editor';
-  const sync =
-    status === 'connected' ? (unsynced ? 'Saving…' : 'Saved') : status === 'connecting' ? 'Connecting…' : unsynced ? 'Offline – changes will sync' : 'Offline';
+  const previewing = new URLSearchParams(location.search).has('version');
+  const sync = previewing
+    ? 'Saved version'
+    : status === 'connected' ? (unsynced ? 'Saving…' : 'Saved') : status === 'connecting' ? 'Connecting…' : unsynced ? 'Offline – changes will sync' : 'Offline';
 
   if (renaming)
     return (
@@ -95,7 +97,7 @@ function CloudFileMenu() {
       <button type="button" className="file-name" title="File menu (double-click to rename)" onClick={() => setOpen(!open)} onDoubleClick={() => canEdit && setRenaming(true)}>
         {file?.name ?? 'Untitled'} <ChevronDown size={12} />
       </button>
-      <span className={`sync-status ${status}${unsynced ? ' unsynced' : ''}`} title={sync}>
+      <span className={`sync-status ${previewing ? 'preview' : status}${unsynced ? ' unsynced' : ''}`} title={sync}>
         <span className="sync-dot" /> {sync}
       </span>
       {role === 'viewer' && <span className="view-only">View only</span>}
@@ -120,6 +122,9 @@ function CloudFileMenu() {
           </button>
           <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ librariesOpen: true }))}>
             <BookOpen size={12} /> Libraries…
+          </button>
+          <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ historyOpen: true }))}>
+            <History size={12} /> Version history
           </button>
         </div>
       )}

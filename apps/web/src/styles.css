@@ -2715,3 +2715,115 @@ button.swatch {
 .c-check {
   color: #14ae5c;
 }
+
+/* Version history */
+.version-panel .props-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pad-x {
+  padding: 0 12px 8px;
+}
+.btn.wide {
+  width: 100%;
+  justify-content: center;
+}
+.version-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+.version-form input,
+.version-form textarea {
+  font: inherit;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.version-form textarea {
+  min-height: 56px;
+  resize: vertical;
+}
+.version-day {
+  font-size: 11px;
+  color: #888;
+  padding: 10px 12px 4px;
+}
+.version-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+}
+.version-item:hover {
+  background: #f7f7f7;
+}
+.version-item.current {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+.version-item.current svg {
+  margin-top: 2px;
+  color: #0d99ff;
+}
+.version-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0d99ff;
+  margin-top: 5px;
+  flex: none;
+}
+.version-clock {
+  color: #aaa;
+  margin-top: 3px;
+  flex: none;
+}
+.version-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+}
+.version-item:not(.named) .version-main b {
+  font-weight: 500;
+}
+.version-desc {
+  font-size: 11px;
+  color: #666;
+  white-space: pre-wrap;
+}
+.version-menu {
+  right: 8px;
+  top: 28px;
+  bottom: auto;
+}
+.version-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 16px;
+  background: #e5f4ff;
+  color: #0b5394;
+  font-size: 12px;
+}
+.version-bar span {
+  flex: 1;
+  min-width: 0;
+}
+.version-bar .btn {
+  height: 26px;
+}

@@ -119,3 +119,15 @@ export const comments = pgTable('comments', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   editedAt: timestamp('edited_at', { withTimezone: true }),
 });
+
+/** A saved state of a file: named by someone, or an automatic checkpoint. */
+export const fileVersions = pgTable('file_versions', {
+  id: text('id').primaryKey(),
+  fileId: text('file_id').notNull(),
+  kind: text('kind').$type<'named' | 'auto' | 'restore'>().notNull(),
+  name: text('name'),
+  description: text('description'),
+  state: bytea('state').notNull(),
+  createdBy: text('created_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
