@@ -120,6 +120,18 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX file_versions_file ON file_versions(file_id, created_at);
   `,
+  `
+  CREATE TABLE libraries (
+    file_id text PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+    team_id text NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    version integer NOT NULL,
+    published_at timestamptz NOT NULL DEFAULT now(),
+    published_by text REFERENCES users(id),
+    summary text NOT NULL,
+    data bytea NOT NULL
+  );
+  `,
 ];
 
 async function migrate(): Promise<void> {

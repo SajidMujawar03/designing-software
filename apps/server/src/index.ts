@@ -7,6 +7,7 @@ import { flushAll, startRealtime } from './realtime';
 import { workspaceRoutes } from './routes/workspace';
 import { commentRoutes } from './routes/comments';
 import { versionRoutes } from './routes/versions';
+import { libraryRoutes } from './routes/libraries';
 
 async function main(): Promise<void> {
   await initDb();
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
   workspaceRoutes(app);
   commentRoutes(app);
   versionRoutes(app);
+  libraryRoutes(app);
   app.get('/api/health', async () => ({ ok: true }));
 
   startRealtime(app.server);

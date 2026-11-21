@@ -1,4 +1,4 @@
-import { bigserial, customType, doublePrecision, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigserial, customType, doublePrecision, integer, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
   dataType: () => 'bytea',
@@ -130,4 +130,16 @@ export const fileVersions = pgTable('file_versions', {
   state: bytea('state').notNull(),
   createdBy: text('created_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A file's published library (compressed JSON snapshot, plus a summary for listing). */
+export const libraries = pgTable('libraries', {
+  fileId: text('file_id').primaryKey(),
+  teamId: text('team_id').notNull(),
+  name: text('name').notNull(),
+  version: integer('version').notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+  publishedBy: text('published_by'),
+  summary: text('summary').notNull(),
+  data: bytea('data').notNull(),
 });

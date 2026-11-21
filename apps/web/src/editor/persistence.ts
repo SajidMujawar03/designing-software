@@ -30,6 +30,14 @@ export async function startPersistence(route: Route): Promise<void> {
     startPresence(provider, me);
     startComments();
     watchVersions();
+    // A library this file uses was republished: show its update.
+    provider.on('stateless', ({ payload }: { payload: string }) => {
+      try {
+        if (JSON.parse(payload).type === 'library') void refreshLibraries();
+      } catch {
+        // not ours
+      }
+    });
   }
   watchFileMeta(editor);
   void refreshLibraries();

@@ -186,6 +186,17 @@ export function notifyFile(fileId: string, payload: Record<string, unknown>): vo
   hocuspocus?.documents.get(fileId)?.broadcastStateless(JSON.stringify(payload));
 }
 
+/** Tells open files that use a library (listed in their meta) that it was republished. */
+export function notifyLibraryUsers(libraryFileId: string): void {
+  if (!hocuspocus) return;
+  for (const [name, doc] of hocuspocus.documents) {
+    const used = doc.getMap('meta').get('libraries');
+    if (name === libraryFileId || (Array.isArray(used) && used.includes(libraryFileId))) {
+      doc.broadcastStateless(JSON.stringify({ type: 'library', fileId: libraryFileId }));
+    }
+  }
+}
+
 /** Disconnects everyone from a file (they reconnect, re-checking access). */
 export function closeDocument(fileId: string): void {
   hocuspocus?.closeConnections(fileId);

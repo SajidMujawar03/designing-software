@@ -10,6 +10,7 @@ import {
   deleteFileAndLibrary,
   enabledLibraries,
   getLibrary,
+  libraryCounts,
   outdatedLibraries,
   publishLibrary,
   setLibraryEnabled,
@@ -274,14 +275,20 @@ export function LibrariesModal() {
           </div>
           <div className="lib-section">
             <div className="lib-subhead">Libraries from other files</div>
-            {!others.length && <div className="hint">No other file has published a library yet. Open a file, then Libraries → Publish.</div>}
+            {!others.length && (
+              <div className="hint">
+                {location.pathname.startsWith('/file/')
+                  ? 'No library is published in files you can open. Open a file, then Libraries → Publish; your team sees it here.'
+                  : 'No other file in this browser has published a library yet. Open a file, then Libraries → Publish.'}
+              </div>
+            )}
             {others.map((l) => (
               <label key={l.fileId} className="lib-card lib-toggle">
                 <input type="checkbox" checked={enabled.has(l.fileId)} onChange={(e) => setLibraryEnabled(editor, l.fileId, e.target.checked)} />
                 <div>
                   <div className="lib-title">{l.name}</div>
                   <div className="hint">
-                    {l.components.length} components · {l.styles.length} styles · {l.variables.length} variables · version {l.version}, {ago(l.publishedAt)}
+                    {l.components.length} components · {libraryCounts(l).styles} styles · {libraryCounts(l).variables} variables · version {l.version}, {ago(l.publishedAt)}
                   </div>
                 </div>
               </label>
