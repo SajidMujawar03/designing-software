@@ -10,6 +10,7 @@ import { LibrariesModal } from './panels/LibraryPanels';
 import { CommandPalette, ContextMenu } from './panels/Menus';
 import { PaintPopover } from './panels/PaintPopover';
 import { PropertiesPanel } from './panels/PropertiesPanel';
+import { CommentsPanel } from './panels/CommentsLayer';
 import { Toolbar } from './panels/Toolbar';
 import { VariablesModal } from './panels/VariablesPanel';
 
@@ -17,6 +18,7 @@ let started = false;
 
 export function App({ route, offlineNotice = false }: { route: Route; offlineNotice?: boolean }) {
   const ready = useUI((s) => s.ready);
+  const tool = useUI((s) => s.tool);
   const error = useCloudFile((s) => s.error);
   const [failed, setFailed] = useState(false);
 
@@ -49,7 +51,7 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
           <CanvasView />
         </main>
         <aside className="sidebar right">
-          <PropertiesPanel />
+          {tool === 'comment' && route.kind === 'file' ? <CommentsPanel /> : <PropertiesPanel />}
         </aside>
       </div>
       <PaintPopover />

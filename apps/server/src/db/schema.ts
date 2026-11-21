@@ -1,4 +1,4 @@
-import { bigserial, customType, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigserial, customType, doublePrecision, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
   dataType: () => 'bytea',
@@ -93,4 +93,29 @@ export const docUpdates = pgTable('doc_updates', {
   fileId: text('file_id').notNull(),
   update: bytea('update').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A comment pin on a page: at a canvas point, or attached to a layer (offset in its own coordinates). */
+export const commentThreads = pgTable('comment_threads', {
+  id: text('id').primaryKey(),
+  fileId: text('file_id').notNull(),
+  pageId: text('page_id').notNull(),
+  nodeId: text('node_id'),
+  x: doublePrecision('x').notNull(),
+  y: doublePrecision('y').notNull(),
+  authorId: text('author_id').notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedBy: text('resolved_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const comments = pgTable('comments', {
+  id: text('id').primaryKey(),
+  threadId: text('thread_id').notNull(),
+  authorId: text('author_id').notNull(),
+  /** Text with mentions written as @[Name](userId). */
+  body: text('body').notNull(),
+  mentions: text('mentions').array().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  editedAt: timestamp('edited_at', { withTimezone: true }),
 });

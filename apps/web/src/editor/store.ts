@@ -14,7 +14,8 @@ export type ToolId =
   | 'pen'
   | 'pencil'
   | 'text'
-  | 'hand';
+  | 'hand'
+  | 'comment';
 
 /** A point on a vector path: [path index, point index]. */
 export type PointRef = [number, number];

@@ -17,6 +17,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
   p: 'pen',
   t: 'text',
   h: 'hand',
+  c: 'comment',
 };
 
 function isTyping(target: EventTarget | null): boolean {
@@ -150,6 +151,8 @@ export function installShortcuts(): () => void {
       }
     }
 
+    // Comments need an account file.
+    if (TOOL_KEYS[key] === 'comment' && !location.pathname.startsWith('/file/')) return;
     if (!e.shiftKey && !e.altKey && TOOL_KEYS[key]) return run(() => editor.setTool(TOOL_KEYS[key]));
   };
 

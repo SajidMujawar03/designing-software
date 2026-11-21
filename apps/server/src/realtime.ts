@@ -86,6 +86,11 @@ export function startRealtime(httpServer: { on(event: 'upgrade', fn: (req: Incom
   });
 }
 
+/** Tells everyone with a file open that something outside the document changed (e.g. comments). */
+export function notifyFile(fileId: string, payload: Record<string, unknown>): void {
+  hocuspocus?.documents.get(fileId)?.broadcastStateless(JSON.stringify(payload));
+}
+
 /** Disconnects everyone from a file (they reconnect, re-checking access). */
 export function closeDocument(fileId: string): void {
   hocuspocus?.closeConnections(fileId);

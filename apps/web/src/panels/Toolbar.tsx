@@ -1,4 +1,4 @@
-import { Circle, Frame, Hand, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { useEffect, useRef, useState } from 'react';
@@ -18,6 +18,7 @@ const TOOLS: Array<{ id: ToolId; label: string; key: string; Icon: typeof Square
   { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   { id: 'text', label: 'Text', key: 'T', Icon: Type },
   { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
+  { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
 ];
 
 export function Toolbar() {
@@ -33,7 +34,7 @@ export function Toolbar() {
         <div className="logo" aria-hidden>
           ◆
         </div>
-        {TOOLS.map(({ id, label, key, Icon }) => (
+        {TOOLS.filter((t) => t.id !== 'comment' || location.pathname.startsWith('/file/')).map(({ id, label, key, Icon }) => (
           <button
             key={id}
             type="button"

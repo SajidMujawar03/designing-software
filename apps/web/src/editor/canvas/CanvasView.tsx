@@ -12,6 +12,7 @@ import { createTools, createVectorEditTool, type Tool, type ToolEvent } from '..
 import { snapPx } from '../tools/types';
 import { drawOverlay } from './overlay';
 import { drawPresence } from './presenceOverlay';
+import { CommentsLayer } from '../../panels/CommentsLayer';
 import { follow, reportCursor, usePresence } from '../../cloud/presence';
 import { hitGradientHandle, moveGradientHandle } from './gradientHandles';
 import { hitGuide, RULER } from './rulers';
@@ -362,6 +363,7 @@ export function CanvasView() {
       <canvas ref={canvasRef} className="overlay-canvas" style={{ cursor: css }} data-testid="canvas" />
       <TextInput />
       <FollowFrame />
+      <CommentsLayer />
     </div>
   );
 }

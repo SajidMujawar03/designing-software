@@ -82,6 +82,31 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX doc_updates_file ON doc_updates(file_id, id);
   `,
+  `
+  CREATE TABLE comment_threads (
+    id text PRIMARY KEY,
+    file_id text NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    page_id text NOT NULL,
+    node_id text,
+    x double precision NOT NULL,
+    y double precision NOT NULL,
+    author_id text NOT NULL REFERENCES users(id),
+    resolved_at timestamptz,
+    resolved_by text REFERENCES users(id),
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX comment_threads_file ON comment_threads(file_id);
+  CREATE TABLE comments (
+    id text PRIMARY KEY,
+    thread_id text NOT NULL REFERENCES comment_threads(id) ON DELETE CASCADE,
+    author_id text NOT NULL REFERENCES users(id),
+    body text NOT NULL,
+    mentions text[] NOT NULL DEFAULT '{}',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    edited_at timestamptz
+  );
+  CREATE INDEX comments_thread ON comments(thread_id, created_at);
+  `,
 ];
 
 async function migrate(): Promise<void> {
