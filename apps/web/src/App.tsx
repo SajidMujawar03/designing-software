@@ -23,6 +23,7 @@ import { Toolbar } from './panels/Toolbar';
 import { ErrorBoundary } from './panels/ErrorBoundary';
 import { usePrefs } from './editor/prefs';
 import { NudgeDialog, RestoreUIButton } from './panels/ViewSettings';
+import { FindReplacePanel } from './panels/FindReplace';
 import { VariablesModal } from './panels/VariablesPanel';
 
 let started = false;
@@ -87,6 +88,7 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
           <ErrorBoundary name="canvas" variant="panel">
             <CanvasView />
           </ErrorBoundary>
+          <FindReplacePanel />
         </main>
         <aside className="sidebar right">
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>

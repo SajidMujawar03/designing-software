@@ -50,6 +50,8 @@ export interface UIState {
   paletteOpen: boolean;
   /** The nudge amount dialog. */
   nudgeOpen: boolean;
+  /** The find and replace panel (Ctrl+F). */
+  findOpen: boolean;
   /** The local variables window. */
   variablesOpen: boolean;
   /** The libraries window. */
@@ -122,6 +124,7 @@ export const useUI = create<UIState>()(() => ({
   contextMenu: null,
   paletteOpen: false,
   nudgeOpen: false,
+  findOpen: false,
   variablesOpen: false,
   librariesOpen: false,
   historyOpen: false,

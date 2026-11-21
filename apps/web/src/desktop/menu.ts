@@ -61,7 +61,7 @@ function fileEntries(): Entry[] {
 }
 
 const MENUS = (): Array<{ label: string; items: Entry[] }> => [
-  { label: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'select-all', '-', 'copy-png', 'copy-svg'] },
+  { label: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'select-all', 'find-replace', '-', 'copy-png', 'copy-svg'] },
   {
     label: 'View',
     items: [

@@ -115,6 +115,7 @@ export function installShortcuts(): () => void {
       if ((key === 'z' && e.shiftKey) || key === 'y') return run(() => editor.redo());
       // Copy, cut and paste arrive as clipboard events (below), which can also carry images.
       if (e.shiftKey && key === 'k') return run(() => void placeImages());
+      if (key === 'f' && !e.shiftKey) return run(() => editor.setUI({ findOpen: true }));
       if (key === 'd') return run(() => editor.duplicateSelection());
       if (key === 'a') return run(() => editor.selectAll());
       if (key === ']') return run(() => editor.reorder(e.shiftKey ? 'front' : 'forward'));
