@@ -1,6 +1,6 @@
 import type { DesignDocument } from './document';
 import { boundProps } from './variables';
-import { type NodeId, type NodePatch, type SceneNode, type TextRun } from './types';
+import { canHoldSection, type NodeId, type NodePatch, type SceneNode, type TextRun } from './types';
 
 /**
  * Components and instances.
@@ -334,6 +334,7 @@ export function canReparent(doc: DesignDocument, ids: NodeId[], parentId: NodeId
   for (const id of ids) {
     const n = doc.get(id);
     if (!n) continue;
+    if (n.type === 'SECTION' && !canHoldSection(doc.get(parentId))) return false;
     const inner = [n, ...doc.descendants(id)];
     for (const x of inner) {
       if (x.type === 'INSTANCE' && x.componentId && !canHoldInstance(doc, x.componentId, parentId)) return false;

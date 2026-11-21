@@ -39,14 +39,20 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
 
   if (ed.ui.showLayoutGrids) drawLayoutGrids(ctx, ed, multiply(screen, view));
 
-  // Frame name labels for top-level frames.
-  ctx.font = '11px Inter, system-ui, sans-serif';
-  ctx.textBaseline = 'bottom';
-  for (const n of doc.children(pageId)) {
+  // Name labels: above top-level frames (frames inside sections count as top-level), and as a chip inside sections.
+  const labelled = (parentId: NodeId): SceneNode[] =>
+    doc.children(parentId).flatMap((n) => (n.type === 'SECTION' && n.visible ? [n, ...labelled(n.id)] : [n]));
+  for (const n of labelled(pageId)) {
     if (!isFrameLike(n) || !n.visible) continue;
     const p = ed.worldToScreen(applyToPoint(worldTransform(doc, n.id), { x: 0, y: 0 }));
     const maxW = n.width * viewport.zoom;
+    if (n.type === 'SECTION') {
+      drawSectionLabel(ctx, n.name, p, maxW, selected.has(n.id) || hoverId === n.id);
+      continue;
+    }
     if (maxW < 20) continue;
+    ctx.font = '11px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'bottom';
     const comp = n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'COMPONENT_SET';
     ctx.fillStyle = comp ? PURPLE : selected.has(n.id) || hoverId === n.id ? BLUE : '#8C8C8C';
     ctx.fillText(ellipsize(ctx, (n.type === 'COMPONENT' || n.type === 'COMPONENT_SET' ? '\u2756 ' : n.type === 'INSTANCE' ? '\u25C7 ' : '') + n.name, maxW), p.x, p.y - 4);
@@ -76,7 +82,10 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineWidth = width;
     ctx.strokeStyle = color;
+    // Slices are invisible: a dashed outline shows where they are.
+    if (n.type === 'SLICE') ctx.setLineDash([4, 3]);
     ctx.stroke();
+    ctx.setLineDash([]);
   };
 
   if (hoverId && !selected.has(hoverId)) outline(hoverId, 1.5);
@@ -382,4 +391,24 @@ function drawLayoutGrids(ctx: CanvasRenderingContext2D, ed: Editor, toScreen: Ma
     }
   };
   visit(ed.pageId);
+}
+
+/** A section's name as a chip inside its top-left corner (a fixed size on screen, like Figma's). */
+function drawSectionLabel(ctx: CanvasRenderingContext2D, name: string, at: { x: number; y: number }, sectionWidth: number, active: boolean): void {
+  const pad = 6;
+  const maxW = sectionWidth - 16;
+  if (maxW < 24) return;
+  ctx.font = '600 11px Inter, system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  const text = ellipsize(ctx, name, maxW - pad * 2);
+  const w = Math.min(maxW, ctx.measureText(text).width + pad * 2);
+  const h = 20;
+  const x = at.x + 8;
+  const y = at.y + 8;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 4);
+  ctx.fillStyle = active ? BLUE : '#EBEBEB';
+  ctx.fill();
+  ctx.fillStyle = active ? '#FFFFFF' : '#333333';
+  ctx.fillText(text, x + pad, y + h / 2 + 0.5);
 }

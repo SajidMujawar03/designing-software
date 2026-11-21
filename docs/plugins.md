@@ -81,7 +81,7 @@ to 1. A fill looks like
 
 | Call | Does |
 | --- | --- |
-| `createNode(props)` | creates a layer and returns its id. `type` is one of `FRAME`, `RECTANGLE`, `ELLIPSE`, `POLYGON`, `STAR`, `LINE`, `TEXT`, `VECTOR`; `parentId` defaults to the current page. |
+| `createNode(props)` | creates a layer and returns its id. `type` is one of `FRAME`, `SECTION`, `SLICE`, `RECTANGLE`, `ELLIPSE`, `POLYGON`, `STAR`, `LINE`, `TEXT`, `VECTOR`; `parentId` defaults to the current page (a section must go on a page or in another section). |
 | `createNodes([props, …])` | creates up to 5,000 layers as one undo step; returns their ids |
 | `updateNode(id, props)` | changes a layer and returns it |
 | `updateNodes([[id, props], …])` | changes many layers as one undo step |

@@ -21,6 +21,8 @@ const TOOL_KEYS: Record<string, ToolId> = {
   t: 'text',
   h: 'hand',
   c: 'comment',
+  s: 'slice',
+  k: 'scale',
 };
 
 function isTyping(target: EventTarget | null): boolean {
@@ -136,7 +138,7 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyA') return run(() => addAutoLayout(editor));
       if (e.code === 'KeyP') return run(() => editor.setTool('pencil'));
       if (e.code === 'KeyG') return run(() => editor.setTool('polygon'));
-      if (e.code === 'KeyS') return run(() => editor.setTool('star'));
+      if (e.code === 'KeyS') return run(() => editor.setTool('section'));
       if (e.code === 'KeyL') return run(() => editor.setTool('arrow'));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());

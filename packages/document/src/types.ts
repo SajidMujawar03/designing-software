@@ -10,6 +10,10 @@ export type NodeType =
   | 'DOCUMENT'
   | 'PAGE'
   | 'FRAME'
+  /** A labelled area that organizes frames on the canvas (no clipping or auto layout). */
+  | 'SECTION'
+  /** An export area: invisible, drawn only as an outline while selected. */
+  | 'SLICE'
   | 'COMPONENT'
   | 'COMPONENT_SET'
   | 'INSTANCE'
@@ -513,13 +517,16 @@ export const isGroupLike = (n: SceneNode | undefined | null): boolean => n?.type
 export const hasOwnTransform = (n: SceneNode): boolean =>
   !isGroupLike(n) && n.type !== 'PAGE' && n.type !== 'DOCUMENT';
 
-/** Frames, main components and instances: boxes that hold, clip and lay out children. */
+/** Frames, sections, main components and instances: boxes that hold (and frames clip and lay out) children. */
 export const isFrameLike = (n: SceneNode | undefined | null): n is SceneNode => !!n && FRAME_LIKE.has(n.type);
-const FRAME_LIKE = new Set<NodeType>(['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
+const FRAME_LIKE = new Set<NodeType>(['FRAME', 'SECTION', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
 
-/** A frame that lays out its children (auto layout). */
+/** Sections only sit on a page or inside another section. */
+export const canHoldSection = (n: SceneNode | undefined | null): boolean => n?.type === 'PAGE' || n?.type === 'SECTION';
+
+/** A frame that lays out its children (auto layout). Sections never do. */
 export const isAutoLayout = (n: SceneNode | undefined | null): boolean =>
-  isFrameLike(n) && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
+  isFrameLike(n) && n.type !== 'SECTION' && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
 
 /** A child placed by its auto layout parent (rather than positioned freely). */
 export const isLayoutChild = (n: SceneNode, parent: SceneNode | undefined | null): boolean =>

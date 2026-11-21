@@ -6,6 +6,9 @@ import type { SnapGuides } from './snapping';
 export type ToolId =
   | 'select'
   | 'frame'
+  | 'section'
+  | 'slice'
+  | 'scale'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'

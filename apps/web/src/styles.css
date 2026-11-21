@@ -189,6 +189,42 @@ button {
   cursor: default;
 }
 
+/* A toolbar slot with a caret menu (Move/Scale, Frame/Section/Slice). */
+.tool-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.tool-caret {
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 36px;
+  margin-left: -2px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #bbb;
+  cursor: pointer;
+}
+.tool-caret:hover {
+  background: var(--toolbar-hover);
+  color: #fff;
+}
+.tool-menu {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  z-index: 40;
+  min-width: 170px;
+}
+.tool-menu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .divider {
   width: 1px;
   height: 24px;

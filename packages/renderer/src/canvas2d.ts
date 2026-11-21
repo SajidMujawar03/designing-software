@@ -16,7 +16,7 @@ import {
   type SceneNode,
 } from '@figma/document';
 import { multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '@figma/geometry';
-import { renderBounds } from './canvaskit';
+import { renderBounds, sliceArea } from './canvaskit';
 import { imageMatrix } from './ckpaint';
 import { nodeMarkers, traceMarker } from './markers';
 import { drawText, layoutText } from './text';
@@ -295,11 +295,19 @@ function strokeShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: Scen
  */
 export function renderNodeToCanvas(doc: DesignDocument, id: NodeId, scale = 1): HTMLCanvasElement {
   const n = doc.get(id)!;
-  const b = renderBounds(doc, id);
+  const area = sliceArea(doc, id);
+  const b = area?.rect ?? renderBounds(doc, id);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(b.width * scale));
   canvas.height = Math.max(1, Math.ceil(b.height * scale));
   const ctx = canvas.getContext('2d')!;
+  if (area) {
+    // A slice: everything on its page inside the slice's rectangle.
+    const screen: Mat2D = [scale, 0, 0, scale, -b.x * scale, -b.y * scale];
+    const identity: Mat2D = [1, 0, 0, 1, 0, 0];
+    for (const root of area.roots) drawNode(ctx, doc, root, multiply(screen, identity), identity, { view: identity, dpr: 1, visible: b, background: 'transparent' });
+    return canvas;
+  }
   const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : ([1, 0, 0, 1, 0, 0] as Mat2D);
   const screen = multiply([scale, 0, 0, scale, -b.x * scale, -b.y * scale], parentWorld);
   drawNode(ctx, doc, n, screen, parentWorld, {

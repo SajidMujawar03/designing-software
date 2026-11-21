@@ -98,6 +98,8 @@ export function PropertiesPanel() {
   const num = (k: keyof SceneNode) => val(k) as number | Mixed;
   const hasRadius = nodes.every((n) => n.type === 'RECTANGLE' || isFrameLike(n));
   const isLine = types === 'LINE';
+  // Sections and slices have no clipping, auto layout, constraints or layout grids.
+  const plainBoxes = nodes.some((n) => n.type === 'SECTION' || n.type === 'SLICE');
 
   return (
     <div className="props">
@@ -171,7 +173,7 @@ export function PropertiesPanel() {
           )}
         </div>
         <SizingRow ids={ids} nodes={nodes} />
-        {nodes.every(isFrameLike) && (
+        {nodes.every(isFrameLike) && !plainBoxes && (
           <label className="checkbox">
             <input
               type="checkbox"
@@ -184,8 +186,8 @@ export function PropertiesPanel() {
       </Section>
       )}
 
-      {!isLine && <AutoLayoutSection ids={ids} nodes={nodes} />}
-      <ConstraintsSection ids={ids} nodes={nodes} />
+      {!isLine && !plainBoxes && <AutoLayoutSection ids={ids} nodes={nodes} />}
+      {!plainBoxes && <ConstraintsSection ids={ids} nodes={nodes} />}
 
       <ShapeSection ids={ids} nodes={nodes} />
 
@@ -211,7 +213,7 @@ export function PropertiesPanel() {
       {nodes.some((n) => n.strokes.length > 0) && <StrokeOptions ids={ids} nodes={nodes} />}
 
       <EffectsSection ids={ids} nodes={nodes} />
-      <LayoutGridSection ids={ids} nodes={nodes} />
+      {!plainBoxes && <LayoutGridSection ids={ids} nodes={nodes} />}
 
       <ExportSection ids={ids} nodes={nodes} />
     </div>

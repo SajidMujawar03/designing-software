@@ -74,6 +74,8 @@ export function addAutoLayout(ed: Editor): void {
   const sel = ed.topLevelSelection();
   if (!sel.length) return;
   const one = sel.length === 1 ? doc.get(sel[0]) : undefined;
+  // Sections and slices never lay out children.
+  if (sel.some((id) => doc.get(id)?.type === 'SECTION' || doc.get(id)?.type === 'SLICE')) return;
   doc.change(() => {
     if (isFrameLike(one) && !isAutoLayout(one)) {
       convertToAutoLayout(doc, one.id);

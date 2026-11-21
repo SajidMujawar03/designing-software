@@ -1,4 +1,4 @@
-import {
+import { canHoldSection,
   isFrameLike,
   type DesignDocument,
   type NodeId,
@@ -40,7 +40,7 @@ export interface PluginManifest {
 export class PluginError extends Error {}
 
 /** Node types plugins can create. */
-const CREATABLE = new Set<NodeType>(['FRAME', 'RECTANGLE', 'ELLIPSE', 'POLYGON', 'STAR', 'LINE', 'TEXT', 'VECTOR']);
+const CREATABLE = new Set<NodeType>(['FRAME', 'SECTION', 'SLICE', 'RECTANGLE', 'ELLIPSE', 'POLYGON', 'STAR', 'LINE', 'TEXT', 'VECTOR']);
 /** Properties plugins can't set directly (structure and links are managed by the app). */
 const PROTECTED = new Set(['id', 'type', 'parentId', 'index', 'sourceId', 'componentId', 'library', 'textRuns']);
 
@@ -206,6 +206,7 @@ function createOne(ed: PluginEditor, raw: unknown): string {
   const parent = nodeOrThrow(ed, parentId);
   if (!canHold(parent)) throw new PluginError('Layers can only go on a page or in a frame or group.');
   if (parent.type === 'INSTANCE' || doc.ancestors(parentId).some((a) => a.type === 'INSTANCE')) throw new PluginError("Layers can't be added inside an instance.");
+  if (type === 'SECTION' && !canHoldSection(parent)) throw new PluginError('A section can only go on a page or inside another section.');
   const patch = cleanPatch(props);
   return doc.change(() => {
     const id = doc.createNode({ ...patch, type, parentId });

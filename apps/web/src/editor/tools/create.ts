@@ -1,4 +1,4 @@
-import { hitTest, worldBounds, type NodeId, type NodePatch, type NodeType } from '@figma/document';
+import { canHoldSection, hitTest, worldBounds, type NodeId, type NodePatch, type NodeType } from '@figma/document';
 import { rectContainsRect, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { fitText, placementIn, reparentKeepingPosition, setLineEndpoints, worldRotation } from '../transforms';
@@ -13,7 +13,7 @@ function nextName(ed: Editor, type: NodeType, base: string): string {
   return `${base} ${count + 1}`;
 }
 
-/** Draws frames, rectangles, ellipses and lines (and arrows: lines with an arrowhead) by dragging. */
+/** Draws frames, sections, slices, rectangles, ellipses and lines (and arrows: lines with an arrowhead) by dragging. */
 export class ShapeTool implements Tool {
   cursor = 'crosshair';
   private start: ToolEvent | null = null;
@@ -22,7 +22,7 @@ export class ShapeTool implements Tool {
 
   constructor(
     private ed: Editor,
-    private type: 'FRAME' | 'RECTANGLE' | 'ELLIPSE' | 'POLYGON' | 'STAR' | 'LINE',
+    private type: 'FRAME' | 'SECTION' | 'SLICE' | 'RECTANGLE' | 'ELLIPSE' | 'POLYGON' | 'STAR' | 'LINE',
     /** Extra properties and name for variants, e.g. an arrow is a line with an end marker. */
     private variant?: { name: string; props: NodePatch },
   ) {}
@@ -36,6 +36,12 @@ export class ShapeTool implements Tool {
     this.doc.endGesture();
     const frame = hitTest(this.doc, this.ed.pageId, e.world, { framesOnly: true });
     this.parentId = frame?.id ?? this.ed.pageId;
+    // Sections go on the page or inside another section, never inside a frame.
+    if (this.type === 'SECTION') {
+      let p = this.doc.get(this.parentId);
+      while (p && !canHoldSection(p)) p = this.doc.get(p.parentId);
+      this.parentId = p?.id ?? this.ed.pageId;
+    }
     this.created = null;
     this.start = { ...e, px: this.snap(e) };
   }
@@ -64,6 +70,8 @@ export class ShapeTool implements Tool {
   private create(): NodeId {
     const names: Record<string, string> = {
       FRAME: 'Frame',
+      SECTION: 'Section',
+      SLICE: 'Slice',
       RECTANGLE: 'Rectangle',
       ELLIPSE: 'Ellipse',
       POLYGON: 'Polygon',
@@ -78,6 +86,11 @@ export class ShapeTool implements Tool {
       height: 0,
       ...this.variant?.props,
     });
+    // A section goes behind what's already there, so layers it only partly covers stay visible.
+    if (this.type === 'SECTION') {
+      const bottom = this.doc.childIds(this.parentId!)[0];
+      if (bottom && bottom !== id) this.doc.moveNodeBelow(id, this.parentId!, bottom);
+    }
     this.ed.select([id]);
     return id;
   }
@@ -123,7 +136,7 @@ export class ShapeTool implements Tool {
         this.doc.updateNode(id, placementIn(this.doc, this.parentId!, { x: a.x + 50, y: a.y + 50 }, rot, DEFAULT_SIZE, DEFAULT_SIZE));
       }
     }
-    if (this.type === 'FRAME') this.adoptContainedSiblings(id);
+    if (this.type === 'FRAME' || this.type === 'SECTION') this.adoptContainedSiblings(id);
     this.ed.setUI({ snapGuides: null });
     this.doc.endGesture();
     this.start = null;
@@ -132,12 +145,14 @@ export class ShapeTool implements Tool {
     this.ed.setTool('select');
   }
 
-  /** A new frame drawn around existing layers takes them in, like Figma. */
+  /** A new frame or section drawn around existing layers takes them in, like Figma. */
   private adoptContainedSiblings(frameId: NodeId): void {
     const frame = this.doc.get(frameId)!;
     const fb = worldBounds(this.doc, frameId);
     const siblings = this.doc.childIds(frame.parentId!).filter((id) => id !== frameId);
     for (const sid of siblings) {
+      // A frame can't take in a section.
+      if (frame.type !== 'SECTION' && this.doc.get(sid)?.type === 'SECTION') continue;
       if (rectContainsRect(fb, worldBounds(this.doc, sid))) reparentKeepingPosition(this.doc, sid, frameId);
     }
   }

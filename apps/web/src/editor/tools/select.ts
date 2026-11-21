@@ -1,4 +1,4 @@
-import { isLayoutChild, isInInstance, canReparent, childOfGroupContaining, hitTest, isAutoLayout, isGroupLike, worldTransform, nodesInRect, selectableAncestor, type NodeId, type NodePatch } from '@figma/document';
+import { isLayoutChild, isInInstance, canReparent, childOfGroupContaining, hitTest, isAutoLayout, isGroupLike, worldTransform, nodesInRect, selectableAncestor, type NodeId, type NodePatch, type SceneNode } from '@figma/document';
 import { applyToPoint, invert, rectContainsPoint, rectFromPoints, type Mat2D, type Rect, type Vec2 } from '@figma/geometry';
 import { getSelectionFrame, handleCursor, hitHandle, HANDLES, type HandleId, type SelectionFrame } from '../canvas/handles';
 import type { Editor } from '../editor';
@@ -14,6 +14,7 @@ import {
   worldCenter,
   worldRotation,
 } from '../transforms';
+import { scaledDescendant, scaledRuns, scaledStyle } from '../scaleContent';
 import { snapAngle, type Tool, type ToolEvent } from './types';
 
 /** Canvas placement of one geometry-carrying layer at gesture start. */
@@ -30,7 +31,15 @@ type Gesture =
   | { kind: 'none' }
   | { kind: 'pending'; start: ToolEvent; hitId: NodeId | null; wasSelected: boolean }
   | { kind: 'move'; start: Vec2; tops: NodeId[]; items: ItemSnapshot[]; bounds: Rect }
-  | { kind: 'resize'; handle: HandleId; frame: SelectionFrame; inv: Mat2D; items: ItemSnapshot[] }
+  | {
+      kind: 'resize';
+      handle: HandleId;
+      frame: SelectionFrame;
+      inv: Mat2D;
+      items: ItemSnapshot[];
+      /** Scale tool: the layers as they were, by id (each item and everything inside it). */
+      originals?: Map<NodeId, SceneNode>;
+    }
   | { kind: 'rotate'; center: Vec2; startAngle: number; items: ItemSnapshot[]; single: boolean }
   | { kind: 'endpoint'; id: NodeId; index: 0 | 1; other: Vec2 }
   | { kind: 'marquee'; start: Vec2; base: NodeId[] };
@@ -41,7 +50,11 @@ export class SelectTool implements Tool {
   cursor = 'default';
   private g: Gesture = { kind: 'none' };
 
-  constructor(private ed: Editor) {}
+  constructor(
+    private ed: Editor,
+    /** The scale tool (K): resizing scales strokes, text, effects and everything inside too. */
+    private opts: { scale?: boolean } = {},
+  ) {}
 
   private get doc() {
     return this.ed.doc;
@@ -82,7 +95,13 @@ export class SelectTool implements Tool {
     if (frame) {
       const h = hitHandle(this.ed, frame, e.screen);
       if (h?.kind === 'resize') {
-        this.g = { kind: 'resize', handle: h.handle, frame, inv: invert(frame.m), items: this.snapshot(frame.ids) };
+        const items = this.snapshot(frame.ids);
+        let originals: Map<NodeId, SceneNode> | undefined;
+        if (this.opts.scale) {
+          originals = new Map();
+          for (const it of items) for (const n of [this.doc.get(it.id)!, ...this.doc.descendants(it.id)]) originals.set(n.id, n);
+        }
+        this.g = { kind: 'resize', handle: h.handle, frame, inv: invert(frame.m), items, originals };
         return;
       }
       if (h?.kind === 'rotate') {
@@ -255,6 +274,8 @@ export class SelectTool implements Tool {
 
   private resize(g: Extract<Gesture, { kind: 'resize' }>, e: ToolEvent): void {
     const { frame } = g;
+    // The scale tool always keeps proportions.
+    if (g.originals) e = { ...e, shift: true };
     const w = frame.width || 1;
     const h = frame.height || 1;
     const u = HANDLES[g.handle];
@@ -316,6 +337,26 @@ export class SelectTool implements Tool {
       if (resizedH && n.layoutSizingVertical && n.layoutSizingVertical !== 'FIXED') patch.layoutSizingVertical = 'FIXED';
       return [it.id, patch];
     });
+    if (g.originals) {
+      // Scale tool: everything inside scales with the layer, from how it was when the drag started.
+      const s = Math.abs(sx);
+      const runs: Array<[NodeId, ReturnType<typeof scaledRuns>]> = [];
+      for (const [id, patch] of patches) {
+        const root = g.originals.get(id)!;
+        Object.assign(patch, scaledStyle(root, s));
+        runs.push([id, scaledRuns(root, s)]);
+        for (const d of this.doc.descendants(id)) {
+          const orig = g.originals.get(d.id);
+          if (!orig) continue;
+          patches.push([d.id, scaledDescendant(orig, s)]);
+          runs.push([d.id, scaledRuns(orig, s)]);
+        }
+      }
+      this.doc.updateNodes(patches, { constraints: false });
+      for (const [id, list] of runs) for (const r of list) this.doc.formatText(id, r.start, r.length, r.style);
+      for (const [id] of patches) fitText(this.doc, id);
+      return;
+    }
     // Ctrl resizes a frame without moving its children by their constraints.
     this.doc.updateNodes(patches, { constraints: !e.mod });
     for (const [id] of patches) fitText(this.doc, id);
