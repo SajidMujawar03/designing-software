@@ -5,6 +5,7 @@ import { useEffect, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
+import { AssetsPanel } from './AssetsPanel';
 import { IconButton } from './controls';
 
 const ICONS: Partial<Record<NodeType, typeof Square>> = {
@@ -23,13 +24,44 @@ const ICONS: Partial<Record<NodeType, typeof Square>> = {
   BOOLEAN: Combine,
 };
 
+const TAB_KEY = 'figma-clone:left-tab';
+
 export function LayersPanel() {
   useDocVersion();
+  const [tab, setTab] = useState<'layers' | 'assets'>(() => {
+    try {
+      return localStorage.getItem(TAB_KEY) === 'assets' ? 'assets' : 'layers';
+    } catch {
+      return 'layers';
+    }
+  });
+  const pick = (t: 'layers' | 'assets') => {
+    setTab(t);
+    try {
+      localStorage.setItem(TAB_KEY, t);
+    } catch {
+      // storage unavailable
+    }
+  };
   return (
     <div className="layers">
-      <PagesList />
-      <div className="panel-head">Layers</div>
-      <LayerTree />
+      <div className="side-tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'layers'} className={tab === 'layers' ? 'active' : ''} onClick={() => pick('layers')}>
+          Layers
+        </button>
+        <button role="tab" aria-selected={tab === 'assets'} className={tab === 'assets' ? 'active' : ''} onClick={() => pick('assets')}>
+          Assets
+        </button>
+      </div>
+      {tab === 'assets' ? (
+        <AssetsPanel />
+      ) : (
+        <>
+          <PagesList />
+          <div className="panel-head">Layers</div>
+          <LayerTree />
+        </>
+      )}
     </div>
   );
 }

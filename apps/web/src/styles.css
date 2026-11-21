@@ -1546,3 +1546,111 @@ button.swatch {
   box-sizing: border-box;
   margin-top: 4px;
 }
+
+/* Left sidebar tabs and assets */
+.side-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 4px;
+  border-bottom: 1px solid var(--border, #e6e6e6);
+}
+.side-tabs button {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  color: var(--text-dim, #8c8c8c);
+  cursor: pointer;
+}
+.side-tabs button.active {
+  color: inherit;
+  font-weight: 600;
+  background: var(--hover, #f0f0f0);
+}
+.assets {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+.asset-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px;
+  padding: 0 8px;
+  height: 28px;
+  border-radius: 4px;
+  background: var(--hover, #f5f5f5);
+  color: var(--text-dim, #8c8c8c);
+}
+.asset-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font: inherit;
+  color: var(--text, #1e1e1e);
+}
+.asset-group-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--text-dim, #8c8c8c);
+  cursor: pointer;
+  user-select: none;
+}
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  padding: 4px 12px 12px;
+}
+.asset-tile {
+  border-radius: 6px;
+  padding: 4px;
+  cursor: grab;
+  min-width: 0;
+}
+.asset-tile:hover {
+  background: var(--hover, #f0f0f0);
+}
+.asset-thumb {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: var(--canvas-bg, #f5f5f5);
+  color: var(--component, #9747ff);
+  overflow: hidden;
+}
+.asset-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.asset-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  min-width: 0;
+}
+.asset-name svg {
+  flex: none;
+  color: var(--component, #9747ff);
+}
+.asset-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.asset-meta {
+  font-size: 10px;
+  color: var(--text-dim, #8c8c8c);
+}

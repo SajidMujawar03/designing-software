@@ -1,5 +1,7 @@
 import {
   addVariantProperty,
+  canHoldInstance,
+  hitTest,
   createInstance,
   detachInstance,
   fitComponentSet,
@@ -17,6 +19,7 @@ import {
 } from '@figma/document';
 import type { Editor } from './editor';
 import { boundsOf, placementIn, reparentKeepingPosition, worldRotation } from './transforms';
+import type { Vec2 } from '@figma/geometry';
 
 /**
  * Ctrl+Alt+K: a selected plain frame becomes a main component; anything else
@@ -172,4 +175,33 @@ export function addVariant(ed: Editor, id: NodeId): void {
 /** Adds a variant property (every variant gets "Default"). */
 export function addVariantPropertyTo(ed: Editor, setId: NodeId): void {
   addVariantProperty(ed.doc, setId);
+}
+
+/** Drag-and-drop type for components dragged from the assets panel. */
+export const ASSET_MIME = 'application/x-figma-component';
+
+/**
+ * Places an instance of a component (or a set's first variant) centered on a
+ * canvas point, inside the frame under it when that frame can hold it.
+ */
+export function insertInstanceAt(ed: Editor, componentId: NodeId, at: Vec2): NodeId | null {
+  const doc = ed.doc;
+  const src = doc.get(componentId);
+  if (!src) return null;
+  const main = src.type === 'COMPONENT_SET' ? variantsOf(doc, src.id)[0] : src;
+  if (main?.type !== 'COMPONENT') return null;
+  let parent = hitTest(doc, ed.pageId, at, { framesOnly: true })?.id ?? ed.pageId;
+  // A set holds only its variants.
+  if (doc.get(parent)?.type === 'COMPONENT_SET') parent = doc.get(parent)!.parentId!;
+  if (!canHoldInstance(doc, main.id, parent)) parent = ed.pageId;
+  const id = doc.change(() => {
+    const inst = createInstance(doc, main.id, parent);
+    if (inst) doc.updateNode(inst, placementIn(doc, parent, at, worldRotation(doc, parent), main.width, main.height));
+    return inst;
+  });
+  if (id) {
+    ed.setTool('select');
+    ed.select([id]);
+  }
+  return id;
 }
