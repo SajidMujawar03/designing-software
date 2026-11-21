@@ -595,10 +595,30 @@ function isClosedShape(n: SceneNode): boolean {
 /** Figma blur radius → Skia Gaussian sigma. */
 const sigma = (radius: number) => Math.max(0, radius / 2);
 
-/** On-canvas bounds grown by the layer's (and its children's) effects, for exports. */
+/**
+ * How far a layer's stroke reaches past its box. Lines and open paths are
+ * stroked on their centre line (a horizontal line's box is 0 tall, so all of
+ * it is stroke); sharp corners with mitred joins can spike further.
+ */
+export function strokeOutset(n: SceneNode): number {
+  if (!n.strokeWeight || !n.strokes?.some((p) => p.visible !== false)) return 0;
+  const w = n.strokeWeight;
+  if (!isClosedShape(n)) return w / 2; // centred; round and square caps reach w/2 past the ends too
+  const align = n.strokeAlign ?? 'CENTER';
+  if (align === 'INSIDE') return 0;
+  const out = align === 'OUTSIDE' ? w : w / 2;
+  // Mitred corners sharper than a right angle (stars, polygons, paths) reach past the stroke (Skia's miter limit is 4).
+  const sharp = n.type === 'STAR' || n.type === 'POLYGON' || n.type === 'VECTOR';
+  return sharp && (n.strokeJoin ?? 'MITER') === 'MITER' ? out * 4 : out;
+}
+
+/** What a layer draws outside its box: its stroke and effects. */
+const outset = (n: SceneNode) => effectOutset(n) + strokeOutset(n);
+
+/** On-canvas bounds grown by the layer's (and its children's) strokes and effects, for exports and caches. */
 export function renderBounds(doc: DesignDocument, id: NodeId): Rect {
   const b = worldBounds(doc, id);
   const n = doc.get(id)!;
-  const pad = Math.max(effectOutset(n), ...doc.descendants(id).map(effectOutset), 0);
+  const pad = Math.ceil(Math.max(outset(n), ...doc.descendants(id).map(outset), 0));
   return { x: b.x - pad, y: b.y - pad, width: b.width + pad * 2, height: b.height + pad * 2 };
 }
