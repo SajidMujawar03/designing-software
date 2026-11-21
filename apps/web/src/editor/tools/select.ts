@@ -407,7 +407,8 @@ export class SelectTool implements Tool {
       return;
     }
     const sealed = sealedRoot(this.doc, hit.id);
-    if (sealed?.type === 'SPEC') this.ed.editSpec(sealed.id);
+    if (hit.type === 'CODE_LAYER') this.ed.openCodeEditor(hit.id);
+    else if (sealed?.type === 'SPEC') this.ed.editSpec(sealed.id);
     else if (sealed?.type === 'CODE_SNIPPET') {
       const text = snippetTextOf(this.doc, sealed.id);
       if (text) this.ed.startTextEdit(text, false, e.world);

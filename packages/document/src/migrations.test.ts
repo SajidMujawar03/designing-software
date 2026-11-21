@@ -35,7 +35,7 @@ describe('migrations', () => {
     const sizeBefore = ydoc.getMap<Y.Map<unknown>>('nodes').get('r1')!.size;
     const doc = new DesignDocument(ydoc);
     doc.ensureInitialized();
-    expect(doc.schema).toMatchObject({ from: 0, to: SCHEMA_VERSION, ran: [1, 2, 3, 4] });
+    expect(doc.schema).toMatchObject({ from: 0, to: SCHEMA_VERSION, ran: [1, 2, 3, 4, 5] });
     const y = ydoc.getMap<Y.Map<unknown>>('nodes').get('r1')!;
     expect(y.has('id')).toBe(false);
     expect([...y.keys()].sort()).toEqual(['index', 'name', 'parentId', 'type', 'width', 'x']);

@@ -10,6 +10,13 @@ export type AnnotationProperty = 'width' | 'height' | 'fills' | 'strokes' | 'cor
 
 export type SpecBlockType = 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet' | 'numbered' | 'todo' | 'quote' | 'divider' | 'code' | 'image' | 'embed';
 
+/** A code layer's source. */
+export interface CodeFiles {
+  html: string;
+  css: string;
+  js: string;
+}
+
 /** One block of a Spec document. */
 export interface SpecBlock {
   id: string;
@@ -48,6 +55,8 @@ export type NodeType =
   | 'CODE_SNIPPET'
   /** A document on the canvas: blocks of text, lists, code, images and frame embeds, drawn as generated child layers. */
   | 'SPEC'
+  /** Live code (HTML, CSS, JavaScript) that runs in a sandbox on the canvas; drawn as a snapshot when stopped. */
+  | 'CODE_LAYER'
   | 'COMPONENT'
   | 'COMPONENT_SET'
   | 'INSTANCE'
@@ -258,6 +267,10 @@ export interface SceneNode {
 
   // SPEC: its document, as blocks (its child layers are generated from them).
   specBlocks?: SpecBlock[];
+
+  // CODE_LAYER: its files, and which version of them its snapshot (image fill) shows.
+  codeFiles?: CodeFiles;
+  codeSnapshotKey?: string;
 
   /** Annotations pinned to this layer (notes and the measurements to show next to it). */
   annotations?: Annotation[];

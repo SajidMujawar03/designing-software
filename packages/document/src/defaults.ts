@@ -26,6 +26,7 @@ const NAMES: Record<NodeType, string> = {
   SLICE: 'Slice',
   CODE_SNIPPET: 'Code snippet',
   SPEC: 'Spec',
+  CODE_LAYER: 'Code layer',
   COMPONENT: 'Component',
   COMPONENT_SET: 'Component set',
   INSTANCE: 'Instance',
@@ -84,6 +85,15 @@ export function defaultProps(type: NodeType): NodeProps {
       p.layoutSizingHorizontal = 'FIXED';
       p.layoutSizingVertical = 'HUG';
       p.specBlocks = [];
+      break;
+    case 'CODE_LAYER':
+      p.width = 400;
+      p.height = 300;
+      p.fills = [solid('#FFFFFF')];
+      p.strokes = [solid('#E6E6E6')];
+      p.strokeAlign = 'INSIDE';
+      p.cornerRadius = 8;
+      p.codeFiles = { html: '', css: '', js: '' };
       break;
     case 'SLICE':
       p.exportSettings = [{ format: 'PNG', constraint: { type: 'SCALE', value: 1 }, suffix: '' }];

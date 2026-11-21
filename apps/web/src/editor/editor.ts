@@ -687,6 +687,26 @@ export class Editor {
     this.setUI({ textSelection: sel });
   }
 
+  /** Opens a code layer's code editor panel. */
+  openCodeEditor(id: NodeId): void {
+    if (this.doc.get(id)?.type !== 'CODE_LAYER') return;
+    this.commitTextEdit();
+    this.select([id]);
+    this.setUI({ codeEditorFor: id });
+  }
+
+  /** Runs a code layer on the canvas (or restarts it when running). */
+  playCode(id: NodeId): void {
+    if (this.doc.get(id)?.type !== 'CODE_LAYER') return;
+    const running = this.ui.runningCode;
+    this.setUI({ runningCode: { ...running, [id]: (running[id] ?? 0) + 1 } });
+  }
+
+  stopCode(id: NodeId): void {
+    const { [id]: _stopped, ...rest } = this.ui.runningCode;
+    this.setUI({ runningCode: rest });
+  }
+
   /** Opens a Spec document's editor (over the canvas, or full screen). */
   editSpec(id: NodeId, opts: { fullscreen?: boolean; focus?: SpecFocus } = {}): void {
     if (this.doc.get(id)?.type !== 'SPEC') return;

@@ -4550,3 +4550,175 @@ a.btn {
 .spec-full .icon-btn {
   color: #6f6f6f;
 }
+
+/* ---------- code layers ---------- */
+
+/* A running code layer: its sandboxed page over the layer, scaled with the zoom. */
+.code-run {
+  position: absolute;
+  z-index: 12;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(13, 153, 255, 0.6);
+}
+.code-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  transform-origin: 0 0;
+}
+.code-controls {
+  position: absolute;
+  z-index: 16;
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.code-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 21;
+  width: min(420px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  font-size: 12px;
+}
+.code-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.code-panel-head .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.code-panel-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-panel-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.code-tab {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.code-tab.active {
+  background: var(--hover);
+  color: var(--text);
+}
+.code-edit {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #1e1e1e;
+}
+.code-edit-pre,
+.code-edit-input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 12px 14px;
+  font-family: 'Source Code Pro', ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+  box-sizing: border-box;
+}
+.code-edit-pre {
+  color: #d4d4d4;
+  pointer-events: none;
+}
+.code-edit-input {
+  border: 0 !important;
+  outline: none;
+  resize: none;
+  background: transparent !important;
+  color: transparent !important;
+  caret-color: #fff;
+}
+.code-edit-input::selection {
+  background: rgba(38, 79, 120, 0.9);
+  color: transparent;
+}
+.tok-keyword { color: #c586c0; }
+.tok-string { color: #ce9178; }
+.tok-comment { color: #6a9955; }
+.tok-number { color: #b5cea8; }
+.tok-function { color: #dcdcaa; }
+.tok-tag { color: #569cd6; }
+.tok-attribute { color: #9cdcfe; }
+.tok-property { color: #9cdcfe; }
+.code-preview {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.code-preview-box {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+.code-preview-box .code-frame {
+  transform-origin: 0 0;
+}
+
+/* Above a running code layer: its name, and the place to drag it from. */
+.code-handle {
+  position: absolute;
+  z-index: 16;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgba(30, 30, 30, 0.75);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+.code-handle.selected {
+  background: var(--blue);
+}

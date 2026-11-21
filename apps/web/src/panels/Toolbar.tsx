@@ -1,4 +1,4 @@
-import { ArrowUpRight, Braces, FileText, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { ArrowUpRight, Braces, FileText, SquareCode, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -33,6 +33,7 @@ const T = {
   pen: { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
   pencil: { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   text: { id: 'text', label: 'Text', key: 'T', Icon: Type },
+  code: { id: 'code', label: 'Code', key: 'B', Icon: SquareCode },
   spec: { id: 'spec', label: 'Spec', key: 'D', Icon: FileText },
   snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
   annotate: { id: 'annotate', label: 'Annotate', key: '', Icon: NotebookPen },
@@ -53,7 +54,7 @@ const TOOLS: ToolDef[][] = [
   [T.pen],
   [T.pencil],
   [T.text],
-  [T.spec, T.snippet, T.annotate],
+  [T.code, T.spec, T.snippet, T.annotate],
   [T.hand],
   [T.comment],
 ];

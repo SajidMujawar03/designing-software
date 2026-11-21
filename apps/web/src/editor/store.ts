@@ -12,6 +12,7 @@ export type ToolId =
   | 'snippet'
   | 'annotate'
   | 'spec'
+  | 'code'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'
@@ -67,6 +68,10 @@ export interface UIState {
   findOpen: boolean;
   /** The Spec document being edited (over the canvas, or full screen), and a block to put the caret in. */
   editingSpec: { id: NodeId; fullscreen: boolean; focus?: SpecFocus } | null;
+  /** The code layer whose code editor panel is open. */
+  codeEditorFor: NodeId | null;
+  /** Code layers that are running, with a counter that restarts them when it changes. */
+  runningCode: Record<NodeId, number>;
   /** An annotation just added, whose note field should take focus. */
   editingAnnotation: { nodeId: NodeId; id: string } | null;
   /** The local variables window. */
@@ -144,6 +149,8 @@ export const useUI = create<UIState>()(() => ({
   findOpen: false,
   editingAnnotation: null,
   editingSpec: null,
+  codeEditorFor: null,
+  runningCode: {},
   variablesOpen: false,
   librariesOpen: false,
   historyOpen: false,
