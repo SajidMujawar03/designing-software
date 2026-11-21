@@ -16,6 +16,7 @@ import { ShareDialog } from './panels/ShareDialog';
 import { InspectPanel, RightTabs } from './panels/InspectPanel';
 import { PrototypePanel } from './panels/PrototypePanel';
 import { maybeStartTour, ShortcutsSheet, Tour } from './panels/Onboarding';
+import { PluginHost, PluginManager } from './panels/PluginPanels';
 import { Toolbar } from './panels/Toolbar';
 import { VariablesModal } from './panels/VariablesPanel';
 
@@ -84,6 +85,8 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
       <LibrariesModal />
       <ShareDialog />
       <Tour />
+      <PluginManager />
+      <PluginHost />
       <ShortcutsSheet />
     </div>
   );

@@ -1,4 +1,5 @@
 import { isAutoLayout, isFrameLike, isGroupLike } from '@figma/document';
+import { usePlugins } from '../plugins/host';
 import { startTour, useOnboarding } from '../panels/Onboarding';
 import { setTheme } from '../theme';
 import { createBenchmarkPage } from './perf';
@@ -141,6 +142,7 @@ export const COMMANDS: Command[] = [
   },
   { id: 'place-image', label: 'Place image…', shortcut: 'Ctrl+Shift+K', run: () => void placeImages() },
   { id: 'add-page', label: 'Add page', run: () => editor.addPage() },
+  { id: 'plugins', label: 'Plugins…', run: () => usePlugins.setState({ managerOpen: true }) },
   { id: 'shortcuts', label: 'Keyboard shortcuts', shortcut: '?', run: () => useOnboarding.setState({ shortcuts: true }) },
   { id: 'tour', label: 'Show the editor tour', run: () => startTour() },
   { id: 'theme-light', label: 'Theme: Light', run: () => setTheme('light') },
