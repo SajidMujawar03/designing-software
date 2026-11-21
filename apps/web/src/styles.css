@@ -2971,3 +2971,82 @@ button.swatch {
   max-height: 140px;
   object-fit: contain;
 }
+
+/* Inspect */
+.right-tabs {
+  border-bottom: 1px solid var(--border, #e6e6e6);
+}
+.inspect-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 8px;
+}
+.inspect-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  min-width: 0;
+}
+.inspect-label {
+  color: var(--text-dim, #8c8c8c);
+  font-size: 11px;
+  flex: none;
+  min-width: 18px;
+  text-transform: capitalize;
+}
+.inspect-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.inspect-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #7b3fe4;
+  background: #f1e9ff;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.inspect-copy {
+  opacity: 0.5;
+}
+.inspect-row:hover .inspect-copy,
+.inspect-copy:focus {
+  opacity: 1;
+}
+.code-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.code-tabs button {
+  flex: 1;
+  border: none;
+  background: var(--hover, #f0f0f0);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  color: inherit;
+}
+.code-tabs button.active {
+  background: #1e1e1e;
+  color: #fff;
+}
+.inspect-code {
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: #1e1e1e;
+  color: #e6e6e6;
+  font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 340px;
+  overflow: auto;
+}

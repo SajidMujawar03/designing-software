@@ -55,6 +55,10 @@ export interface UIState {
   historyOpen: boolean;
   /** The share dialog (cloud files). */
   shareOpen: boolean;
+  /** Right sidebar tab. */
+  rightTab: 'design' | 'inspect';
+  /** Alt held: measure distances to hovered layers. */
+  altHeld: boolean;
   /** Editing a vector's points and handles. */
   vectorEdit: { id: NodeId; selected: PointRef[] } | null;
   /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
@@ -116,6 +120,8 @@ export const useUI = create<UIState>()(() => ({
   librariesOpen: false,
   historyOpen: false,
   shareOpen: false,
+  rightTab: 'design',
+  altHeld: false,
   vectorEdit: null,
   penPreview: null,
   paintEdit: null,

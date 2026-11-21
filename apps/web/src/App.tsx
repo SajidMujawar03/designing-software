@@ -13,6 +13,7 @@ import { PropertiesPanel } from './panels/PropertiesPanel';
 import { CommentsPanel } from './panels/CommentsLayer';
 import { VersionHistoryPanel, VersionPreviewBar } from './panels/VersionHistory';
 import { ShareDialog } from './panels/ShareDialog';
+import { InspectPanel, RightTabs } from './panels/InspectPanel';
 import { Toolbar } from './panels/Toolbar';
 import { VariablesModal } from './panels/VariablesPanel';
 
@@ -22,6 +23,7 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
   const ready = useUI((s) => s.ready);
   const tool = useUI((s) => s.tool);
   const historyOpen = useUI((s) => s.historyOpen);
+  const rightTab = useUI((s) => s.rightTab);
   const previewing = route.kind === 'file' && new URLSearchParams(location.search).has('version');
   const error = useCloudFile((s) => s.error);
   const [failed, setFailed] = useState(false);
@@ -61,7 +63,10 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
           ) : tool === 'comment' && route.kind === 'file' && !previewing ? (
             <CommentsPanel />
           ) : (
-            <PropertiesPanel />
+            <>
+              <RightTabs />
+              {rightTab === 'inspect' ? <InspectPanel /> : <PropertiesPanel />}
+            </>
           )}
         </aside>
       </div>

@@ -165,8 +165,16 @@ export function installShortcuts(): () => void {
 
   const onKeyUp = (e: KeyboardEvent) => {
     if (e.key === ' ') editor.setUI({ spaceHeld: false });
+    if (e.key === 'Alt') editor.setUI({ altHeld: false });
   };
-  const onBlur = () => editor.setUI({ spaceHeld: false });
+  const onBlur = () => editor.setUI({ spaceHeld: false, altHeld: false });
+  // Holding Alt measures to the hovered layer (works even while typing elsewhere is not focused).
+  const onAltDown = (e: KeyboardEvent) => {
+    if (e.key === 'Alt' && !e.repeat && !isTyping(e.target)) {
+      e.preventDefault(); // keeps the browser menu bar from taking focus
+      editor.setUI({ altHeld: true });
+    }
+  };
 
   const onCopy = (e: ClipboardEvent) => {
     if (isTyping(e.target) || !e.clipboardData) return;
@@ -187,6 +195,7 @@ export function installShortcuts(): () => void {
   window.addEventListener('cut', onCopy);
   window.addEventListener('paste', onPaste);
   window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keydown', onAltDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', onBlur);
   return () => {
@@ -194,6 +203,7 @@ export function installShortcuts(): () => void {
     window.removeEventListener('cut', onCopy);
     window.removeEventListener('paste', onPaste);
     window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keydown', onAltDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('blur', onBlur);
   };
