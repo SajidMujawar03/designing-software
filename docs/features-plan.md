@@ -142,34 +142,51 @@ Figma's own versions of the recording's **Spec (D)** and **Code (B)** tools ([Sp
 ### Phase F6: Draw mode, part 1 (brushes)
 Branch `features-draw-mode` · about 5 days
 
-**1. Draw mode.** A toolbar mode (a toggle at the end of the toolbar) that swaps the tools for Pen, Marker and Pencil, as in the video. The properties panel title changes to "Draw".
+Matches Figma Draw ([Draw with illustration tools](https://help.figma.com/hc/en-us/articles/31440438150935-Draw-with-illustration-tools), [Explore Figma Draw](https://help.figma.com/hc/en-us/articles/31440394517143-Explore-Figma-Draw)).
 
-**2. Brush strokes**
-- An extension of the existing `PencilTool`. The stroke is smoothed (Catmull-Rom to Bézier, already used on release) and stored as a VECTOR with `strokeWeight`, round caps and joins.
-- A floating brush bar while drawing: colour, size slider and brush style (round, flat, tapered).
-- **Ctrl+click a stroke to copy its style:** it picks up the stroke's colour, width and style, and the hint banner "Ctrl+click a stroke to sample properties" is shown.
+**1. Draw mode.** A **Design / Draw** toggle in the toolbar (Figma has no shortcut for it; ours is also in quick actions). In draw mode:
+- The toolbar offers **Pen** (the vector pen), **Brush** and **Pencil**.
+- The layers panel shows bigger previews.
+- The right sidebar becomes a short set of sliders for the selected strokes.
 
-**3. Brush styles** are stored as a `brush` field on the vector and rendered as a variable-width outline in phase F7. Until then, they're plain strokes.
+**2. Brush and Pencil**
+- Freehand strokes, smoothed (the existing Catmull-Rom fitting) and stored as vectors that remember their brush (`brush: { tool, style }`). Holding Shift draws a straight line.
+- A secondary bar sets the current tool's **colour, weight and style**. Settings are kept per tool and per person. The pencil starts as Figma's round 3 px black line.
+- **Ctrl+click a stroke** samples its colour, weight and style. The bar shows the hint "Ctrl+click a stroke to sample properties".
+
+**3. Styles**
+- **Pencil:** solid, dashed, dotted.
+- **Brush:** Figma's two kinds. *Stretch* brushes (smooth, tapered, rough) run a shape along the stroke; *scatter* brushes (dots, dashes) repeat a mark along it.
+- Scatter and dashed/dotted styles draw now, as dash patterns. Stretch shapes draw as round strokes until F7 adds width profiles.
 
 ---
 
-### Phase F7: Draw mode, part 2 (width profiles and actions)
+### Phase F7: Draw mode, part 2 (width, vector edit actions)
 Branch `features-draw-actions` · about 1–2 weeks
 
-**1. Variable width profile**
-- Model: `widthProfile: Array<{ t: number; width: number }>` along the path (t from 0 to 1).
-- Renderer: the stroke is turned into a filled outline by offsetting the flattened path by the interpolated half-width on each side (in `pathops.ts`), rendered in all three outputs. Bounds use the widest point.
-- UI: a preset picker (uniform, taper start, taper end, taper both, bulge) in the stroke section. Dragging width points on the canvas comes later.
-- Tests: outline geometry, bounds, SVG.
+From Figma's [Edit vector layers](https://help.figma.com/hc/en-us/articles/360039957634) and [stroke properties](https://help.figma.com/hc/en-us/articles/360049283914) pages.
 
-**2. Draw-mode actions** (the bar shown in the video)
-- **Move:** drag selected strokes.
-- **Lasso:** select strokes by drawing a freehand loop; hit testing uses path–polygon intersection.
-- **Bend:** drag a point on a stroke to bend it smoothly; nearby points move with a falloff.
-- **Cut:** split a stroke where a drawn line crosses it, using the path intersection helpers from boolean ops.
-- **Erase:** remove the parts of strokes under the eraser; each stroke is split into the pieces that are left.
-- **Paint:** fill a closed area formed by strokes. It uses the PathKit union and boolean ops on the strokes' outlines and takes the region under the click.
-- Each action is one undo step and has tests on simple paths.
+**1. Width**
+- **Width profile:** presets that taper a uniform stroke.
+- **Variable width:** width points along a stroke. Drag to move, Shift-click to select several, Delete to remove. Not on dashed, dynamic or branching strokes.
+- **Model:** `widthProfile: Array<{ t: number; width: number }>`.
+- **Rendering:** the stroke is turned into a filled outline by offsetting the flattened path by the interpolated half-width (in `pathops.ts`), in all three outputs. Bounds use the widest point.
+- Stretch brush styles become width profiles.
+
+**2. Vector edit actions** (the secondary bar in vector edit mode), each one undo step with tests on simple paths:
+- **Move (V)**
+- **Lasso (Q):** selects points and paths inside a freehand loop.
+- **Bend:** adds curve handles to a segment, with the existing mirroring options.
+- **Cut (X):** click to split a path, or drag across paths to divide them into separate layers.
+- **Eraser (Shift+E):** removes what's under it, adding editable points where it cut.
+- **Paint (Shift+B):** fills closed regions formed by strokes, one at a time or by dragging across several (solid or gradient).
+- **Shape builder:** joins or subtracts regions of overlapping shapes.
+
+**3. Later or optional:**
+- **Dynamic stroke:** frequency, wiggle and smoothen sliders.
+- **Stroke caps:** reverse triangle.
+- **Custom brushes:** right-click a closed path, then **Create brush**.
+- **Radial and linear repeat transforms.**
 
 ---
 

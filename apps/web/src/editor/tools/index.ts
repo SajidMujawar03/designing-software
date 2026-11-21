@@ -5,7 +5,7 @@ import { HandTool, ShapeTool, TextTool } from './create';
 import { SelectTool } from './select';
 import { CommentTool } from './comment';
 import { AnnotateTool, CodeSnippetTool, SpecTool } from './handoff';
-import { PencilTool, PenTool, VectorEditTool } from './vector';
+import { BrushTool, PenTool, VectorEditTool } from './vector';
 import type { Tool } from './types';
 
 export function createTools(ed: Editor): Record<ToolId, Tool> {
@@ -26,7 +26,8 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     line: new ShapeTool(ed, 'LINE'),
     arrow: new ShapeTool(ed, 'LINE', { name: 'Arrow', props: { endMarker: 'ARROW_LINES' } }),
     pen: new PenTool(ed),
-    pencil: new PencilTool(ed),
+    pencil: new BrushTool(ed, 'pencil'),
+    brush: new BrushTool(ed, 'brush'),
     text: new TextTool(ed),
     hand: new HandTool(ed),
     comment: new CommentTool(),

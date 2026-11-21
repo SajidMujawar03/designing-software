@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenT
 import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
-import { subscribeThumb, thumbOf, THUMB_SIZE } from '../editor/layerThumbs';
+import { subscribeThumb, thumbOf } from '../editor/layerThumbs';
 import { setPrefs, usePrefs } from '../editor/prefs';
 import { useUI } from '../editor/store';
 import { AssetsPanel } from './AssetsPanel';
@@ -35,6 +35,7 @@ const TAB_KEY = 'figma-clone:left-tab';
 
 export function LayersPanel() {
   useDocVersion();
+  const drawMode = useUI((st) => st.drawMode);
   const [tab, setTab] = useState<'layers' | 'assets'>(() => {
     try {
       return localStorage.getItem(TAB_KEY) === 'assets' ? 'assets' : 'layers';
@@ -51,7 +52,7 @@ export function LayersPanel() {
     }
   };
   return (
-    <div className="layers">
+    <div className={`layers${drawMode ? ' draw' : ''}`}>
       <div className="side-tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'layers'} className={tab === 'layers' ? 'active' : ''} onClick={() => pick('layers')}>
           Layers
@@ -139,7 +140,9 @@ function PagesList() {
 
 type DropPos = 'above' | 'below' | 'inside';
 
-const ROW_H = 28;
+/** Row height; draw mode shows bigger previews in taller rows, as in Figma Draw. */
+const ROW_HEIGHT = 28;
+const DRAW_ROW_HEIGHT = 40;
 /** Above this many rows, only the rows in view are rendered. */
 const VIRTUAL_FROM = 150;
 const compType = (t: string) => t === 'COMPONENT' || t === 'INSTANCE' || t === 'COMPONENT_SET';
@@ -155,6 +158,7 @@ interface Row {
 }
 
 function LayerTree() {
+  const ROW_H = useUI((st) => st.drawMode) ? DRAW_ROW_HEIGHT : ROW_HEIGHT;
   const pageId = useUI((s) => s.pageId);
   const selection = useUI((s) => s.selection);
   const [expanded, setExpanded] = useState<Set<NodeId>>(new Set());
@@ -429,7 +433,7 @@ function LayerThumb({ id, Icon }: { id: NodeId; Icon: typeof Square }) {
   );
   return (
     <span className="layer-thumb" aria-hidden>
-      {url ? <img src={url} alt="" width={THUMB_SIZE} height={THUMB_SIZE} draggable={false} /> : <Icon size={12} className="layer-icon" />}
+      {url ? <img src={url} alt="" draggable={false} /> : <Icon size={12} className="layer-icon" />}
     </span>
   );
 }

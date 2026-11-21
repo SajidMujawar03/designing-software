@@ -1,6 +1,7 @@
-import { hitTest, segmentBetween, type NodeId, type VectorPath, type VectorVertex } from '@figma/document';
+import { BRUSH_SMOOTHING, brushStrokeProps, hitTest, sampleBrush, segmentBetween, styleFor, type DrawTool, type NodeId, type NodePatch, type VectorPath, type VectorVertex } from '@figma/document';
 import { closestOnCubic, rectContainsPoint, rectFromPoints, simplifyPolyline, splitCubic, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
+import { prefs, setBrush } from '../prefs';
 import type { PointRef } from '../store';
 import { placementIn, setVectorWorld, worldPathsOf, worldRotation } from '../transforms';
 import { snapAngle, type Tool, type ToolEvent } from './types';
@@ -13,12 +14,12 @@ const sub = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y });
 const len = (v: Vec2) => Math.hypot(v.x, v.y);
 
 /** Creates an empty vector in the frame under `at` (or the page). */
-function createVector(ed: Editor, at: Vec2, props: { strokeWeight?: number } = {}): NodeId {
+function createVector(ed: Editor, at: Vec2, props: NodePatch = {}, base = 'Vector'): NodeId {
   const doc = ed.doc;
   const parentId = hitTest(doc, ed.pageId, at, { framesOnly: true })?.id ?? ed.pageId;
   let count = 0;
-  for (const n of doc.allNodes()) if (n.type === 'VECTOR') count++;
-  const id = doc.createNode({ type: 'VECTOR', parentId, name: `Vector ${count + 1}`, width: 0, height: 0, ...props });
+  for (const n of doc.allNodes()) if (n.type === 'VECTOR' && n.name.startsWith(base)) count++;
+  const id = doc.createNode({ type: 'VECTOR', parentId, name: `${base} ${count + 1}`, width: 0, height: 0, ...props });
   doc.updateNode(id, placementIn(doc, parentId, at, worldRotation(doc, parentId), 0, 0));
   return id;
 }
@@ -146,27 +147,54 @@ export class PenTool implements Tool {
 
 // ---------------------------------------------------------------- pencil
 
-/** Pencil (Shift+P): freehand drawing, smoothed into curves on release. */
-export class PencilTool implements Tool {
+/**
+ * Brush and Pencil (Shift+P), as in Figma Draw: freehand strokes with the
+ * tool's color, weight and style (set in the brush bar), smoothed into
+ * curves on release. Shift draws a straight line; Ctrl+click a stroke picks
+ * up its color, weight and style instead of drawing.
+ */
+export class BrushTool implements Tool {
   cursor = 'crosshair';
   private id: NodeId | null = null;
   private points: Vec2[] = [];
   private startScreen: Vec2 = { x: 0, y: 0 };
 
-  constructor(private ed: Editor) {}
+  constructor(
+    private ed: Editor,
+    private tool: DrawTool,
+  ) {}
 
   down(e: ToolEvent): void {
+    this.ed.commitTextEdit();
     this.ed.doc.endGesture();
+    if (e.mod) {
+      this.sample(e);
+      return;
+    }
     this.points = [e.world];
     this.startScreen = e.screen;
-    this.id = createVector(this.ed, e.world, { strokeWeight: 2 });
+    const settings = prefs().brushes[this.tool];
+    this.id = createVector(this.ed, e.world, brushStrokeProps(this.tool, settings), this.tool === 'brush' ? 'Brush' : 'Pencil');
+  }
+
+  /** Ctrl+click: take the clicked stroke's color, weight and style for this tool. */
+  private sample(e: ToolEvent): void {
+    const hit = hitTest(this.ed.doc, this.ed.pageId, e.world, { tolerance: 4 / this.ed.ui.viewport.zoom });
+    const s = hit ? sampleBrush(hit) : null;
+    if (!s) return;
+    setBrush(this.tool, { color: s.color, weight: s.weight, style: styleFor(this.tool, s.style) });
   }
 
   move(e: ToolEvent): void {
     if (!this.id) return;
-    const last = this.points[this.points.length - 1];
-    if (len(sub(e.world, last)) * this.ed.ui.viewport.zoom < 1) return;
-    this.points.push(e.world);
+    if (e.shift) {
+      // Shift: a straight line from where the stroke started.
+      this.points = [this.points[0], e.world];
+    } else {
+      const last = this.points[this.points.length - 1];
+      if (len(sub(e.world, last)) * this.ed.ui.viewport.zoom < 1) return;
+      this.points.push(e.world);
+    }
     // Live preview as straight segments; smoothed on release.
     setVectorWorld(this.ed.doc, this.id, [{ closed: false, points: this.points.map((p) => ({ x: p.x, y: p.y })) }]);
   }
@@ -177,21 +205,23 @@ export class PencilTool implements Tool {
     if (!id) return;
     const doc = this.ed.doc;
     const zoom = this.ed.ui.viewport.zoom;
-    const simplified = simplifyPolyline(this.points, 1.5 / zoom);
-    if (simplified.length < 2) {
+    const straight = e.shift && this.points.length === 2;
+    const simplified = straight ? this.points : simplifyPolyline(this.points, BRUSH_SMOOTHING[this.tool] / zoom);
+    if (simplified.length < 2 || len(sub(simplified[0], simplified[simplified.length - 1])) * zoom < 1 && simplified.length < 3) {
       doc.deleteNodes([id]);
       doc.endGesture();
       return;
     }
-    // Ending near the start closes the shape.
-    const closed = simplified.length > 3 && len(sub(e.screen, this.startScreen)) <= NEAR * 1.5;
+    // The pencil closes a shape when it ends near where it started.
+    const closed = this.tool === 'pencil' && !straight && simplified.length > 3 && len(sub(e.screen, this.startScreen)) <= NEAR * 1.5;
     if (closed) simplified.pop();
-    setVectorWorld(doc, id, [smoothPath(simplified, closed)]);
+    setVectorWorld(doc, id, [straight ? { closed: false, points: simplified.map((p) => ({ x: p.x, y: p.y })) } : smoothPath(simplified, closed)]);
     doc.endGesture();
     this.ed.select([id]);
   }
 
   cancel(): void {
+    if (this.id) this.ed.doc.deleteNodes([this.id]);
     this.id = null;
   }
 }

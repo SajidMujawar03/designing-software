@@ -1,3 +1,4 @@
+import { DEFAULT_BRUSHES, parseBrushes, type BrushSettings, type DrawTool } from '@figma/document';
 import { create } from 'zustand';
 
 /**
@@ -16,12 +17,16 @@ export interface Prefs {
   layerThumbnails: boolean;
   /** Annotations drawn on the canvas. */
   showAnnotations: boolean;
+  /** Draw mode's Brush and Pencil settings (color, weight, style), per tool. */
+  brushes: Record<DrawTool, BrushSettings>;
+  /** The "Ctrl+click a stroke to sample" hint was closed. */
+  sampleHintClosed: boolean;
   /** Side panels shown, collapsed to narrow strips, or everything but the canvas hidden. */
   ui: 'full' | 'minimized' | 'hidden';
 }
 
 const KEY = 'figma-clone:prefs';
-export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, showAnnotations: true, ui: 'full' };
+export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, showAnnotations: true, brushes: DEFAULT_BRUSHES, sampleHintClosed: false, ui: 'full' };
 
 /** Stored prefs, with anything missing or out of range set back to its default. */
 export function parsePrefs(raw: string | null): Prefs {
@@ -39,6 +44,8 @@ export function parsePrefs(raw: string | null): Prefs {
     bigNudge: step(v.bigNudge, DEFAULT_PREFS.bigNudge),
     layerThumbnails: typeof v.layerThumbnails === 'boolean' ? v.layerThumbnails : DEFAULT_PREFS.layerThumbnails,
     showAnnotations: typeof v.showAnnotations === 'boolean' ? v.showAnnotations : DEFAULT_PREFS.showAnnotations,
+    brushes: parseBrushes(v.brushes),
+    sampleHintClosed: v.sampleHintClosed === true,
     // Hidden UI isn't restored: a reload shouldn't leave someone with no panels and no idea why.
     ui: v.ui === 'minimized' ? 'minimized' : 'full',
   };
@@ -64,6 +71,10 @@ usePrefs.subscribe((p) => {
 
 export const prefs = () => usePrefs.getState();
 export const setPrefs = (patch: Partial<Prefs>) => usePrefs.setState(patch);
+
+/** Changes one draw tool's settings. */
+export const setBrush = (tool: DrawTool, patch: Partial<BrushSettings>) =>
+  setPrefs({ brushes: { ...prefs().brushes, [tool]: { ...prefs().brushes[tool], ...patch } } });
 
 /** Ctrl+Shift+\: panels collapse to strips (or come back). */
 export const toggleMinimizedUI = () => setPrefs({ ui: prefs().ui === 'minimized' ? 'full' : 'minimized' });

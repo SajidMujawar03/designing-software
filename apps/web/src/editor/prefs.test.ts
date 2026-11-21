@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_BRUSHES } from '@figma/document';
 import { DEFAULT_PREFS, parsePrefs } from './prefs';
 
 describe('view settings', () => {
@@ -8,7 +9,7 @@ describe('view settings', () => {
   });
 
   it('keeps valid stored values', () => {
-    const stored = { snapToPixel: false, showCursors: false, nudge: 2, bigNudge: 8, layerThumbnails: false, showAnnotations: false, ui: 'minimized' };
+    const stored = { snapToPixel: false, showCursors: false, nudge: 2, bigNudge: 8, layerThumbnails: false, showAnnotations: false, brushes: DEFAULT_BRUSHES, sampleHintClosed: true, ui: 'minimized' };
     expect(parsePrefs(JSON.stringify(stored))).toEqual(stored);
   });
 

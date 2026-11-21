@@ -28,6 +28,7 @@ import { NudgeDialog, RestoreUIButton } from './panels/ViewSettings';
 import { FindReplacePanel } from './panels/FindReplace';
 import { SpecEditorLayer } from './panels/SpecEditor';
 import { CodeEditorPanel, CodeLayerOverlay } from './panels/CodeLayers';
+import { BrushBar, DrawPanel } from './panels/DrawMode';
 import { VariablesModal } from './panels/VariablesPanel';
 
 let started = false;
@@ -68,6 +69,7 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
   useEffect(() => startLayerThumbs(editor.doc), []);
   useEffect(() => startCodeLayers(editor.doc), []);
   const uiMode = usePrefs((s) => s.ui);
+  const drawMode = useUI((s) => s.drawMode);
 
   return (
     <div className={`app${uiMode === 'full' ? '' : ` ui-${uiMode}`}`}>
@@ -98,11 +100,14 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
           <SpecEditorLayer />
           <CodeLayerOverlay />
           <CodeEditorPanel />
+          <BrushBar />
         </main>
         <aside className="sidebar right">
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>
           {route.kind === 'file' && historyOpen && !previewing ? (
             <VersionHistoryPanel />
+          ) : drawMode ? (
+            <DrawPanel />
           ) : tool === 'comment' && route.kind === 'file' && !previewing ? (
             <CommentsPanel />
           ) : (
