@@ -197,7 +197,7 @@ export function createCodeSnippet(
       codeTheme: theme,
       fills: [solid(CODE_THEMES[theme].background)],
     });
-    doc.createNode({
+    const textId = doc.createNode({
       type: 'TEXT',
       parentId: id,
       name: 'Code',
@@ -207,6 +207,7 @@ export function createCodeSnippet(
       lineHeight: 1.5,
       fills: [solid(CODE_THEMES[theme].text)],
     });
+    doc.requestTextFit(textId);
     highlightCodeSnippet(doc, id);
     return id;
   });

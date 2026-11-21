@@ -6,7 +6,7 @@ import { importImages } from './images';
 import { indexAtWorld } from './textEditing';
 import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
-import { useUI, type ToolId, type UIState, type Viewport } from './store';
+import { useUI, type SpecFocus, type ToolId, type UIState, type Viewport } from './store';
 import { boundsOf, fitText, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
 import { nudgeInLayout } from './layoutCommands';
 import { fonts } from './fonts';
@@ -687,8 +687,25 @@ export class Editor {
     this.setUI({ textSelection: sel });
   }
 
+  /** Opens a Spec document's editor (over the canvas, or full screen). */
+  editSpec(id: NodeId, opts: { fullscreen?: boolean; focus?: SpecFocus } = {}): void {
+    if (this.doc.get(id)?.type !== 'SPEC') return;
+    this.commitTextEdit();
+    this.select([id]);
+    this.setUI({ editingSpec: { id, fullscreen: !!opts.fullscreen, focus: opts.focus } });
+  }
+
+  /** Closes the Spec editor. */
+  stopSpecEdit(): void {
+    if (!this.ui.editingSpec) return;
+    this.setUI({ editingSpec: null });
+    this.doc.endGesture();
+  }
+
   /** Ends text editing; deletes the node if it is empty (code stays, recolored). */
   commitTextEdit(): void {
+    // Clicking the canvas (every tool calls this first) also closes the Spec editor.
+    this.stopSpecEdit();
     const id = this.ui.editingTextId;
     if (!id) return;
     this.setUI({ editingTextId: null, textSelection: null, pendingStyle: null });

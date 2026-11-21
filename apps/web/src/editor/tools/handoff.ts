@@ -1,4 +1,4 @@
-import { addAnnotation, snippetTextOf, createCodeSnippet, hitTest, worldTransform } from '@figma/document';
+import { addAnnotation, createCodeSnippet, createSpec, hitTest, sealedRoot, snippetTextOf, worldTransform } from '@figma/document';
 import { applyToPoint, invert } from '@figma/geometry';
 import type { Editor } from '../editor';
 import type { Tool, ToolEvent } from './types';
@@ -45,13 +45,37 @@ export class AnnotateTool implements Tool {
     const doc = this.ed.doc;
     let hit = hitTest(doc, this.ed.pageId, e.world, { tolerance: 4 / this.ed.ui.viewport.zoom });
     if (!hit) return;
-    // A code snippet's text is part of the snippet: annotate the snippet.
-    const parent = doc.get(hit.parentId);
-    if (parent?.type === 'CODE_SNIPPET') hit = parent;
+    // Layers inside a code snippet or spec are part of it: annotate the whole thing.
+    hit = sealedRoot(doc, hit.id) ?? hit;
     const id = addAnnotation(doc, hit.id);
     doc.endGesture();
     this.ed.select([hit.id]);
     this.ed.setUI({ editingAnnotation: { nodeId: hit.id, id } });
     this.ed.setTool('select');
+  }
+}
+
+/** Spec (D): click to place a Spec document and start writing in it. */
+export class SpecTool implements Tool {
+  cursor = 'crosshair';
+  constructor(private ed: Editor) {}
+
+  down(_e: ToolEvent): void {
+    this.ed.commitTextEdit();
+  }
+
+  move(_e: ToolEvent): void {}
+
+  up(e: ToolEvent): void {
+    const doc = this.ed.doc;
+    const parentId = hitTest(doc, this.ed.pageId, e.world, { framesOnly: true })?.id ?? this.ed.pageId;
+    const parent = doc.get(parentId);
+    const origin = parent && parent.type !== 'PAGE' ? applyToPoint(invert(worldTransform(doc, parentId)), e.px) : e.px;
+    const count = [...doc.allNodes()].filter((n) => n.type === 'SPEC').length;
+    const id = createSpec(doc, { parentId, x: Math.round(origin.x), y: Math.round(origin.y), name: `Spec ${count + 1}` });
+    doc.endGesture();
+    this.ed.setTool('select');
+    // Start in the title, with it selected so typing replaces it.
+    this.ed.editSpec(id, { focus: { blockId: doc.get(id)!.specBlocks![0].id, select: true } });
   }
 }

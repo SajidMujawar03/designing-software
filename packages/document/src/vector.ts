@@ -180,6 +180,7 @@ export function shapePaths(n: SceneNode): VectorPath[] {
     case 'SECTION':
     case 'SLICE':
     case 'CODE_SNIPPET':
+    case 'SPEC':
     case 'COMPONENT':
     case 'COMPONENT_SET':
     case 'INSTANCE':

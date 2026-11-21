@@ -1,6 +1,6 @@
 import type { DesignDocument } from './document';
 import { boundProps } from './variables';
-import { canHoldSection, type NodeId, type NodePatch, type SceneNode, type TextRun } from './types';
+import { isSealed, canHoldSection, type NodeId, type NodePatch, type SceneNode, type TextRun } from './types';
 
 /**
  * Components and instances.
@@ -335,8 +335,8 @@ export function canReparent(doc: DesignDocument, ids: NodeId[], parentId: NodeId
     const n = doc.get(id);
     if (!n) continue;
     if (n.type === 'SECTION' && !canHoldSection(doc.get(parentId))) return false;
-    // A code snippet holds only its own text.
-    if (doc.get(parentId)?.type === 'CODE_SNIPPET' && n.parentId !== parentId) return false;
+    // Code snippets and specs hold only their own generated layers.
+    if ([doc.get(parentId), ...doc.ancestors(parentId)].some(isSealed) && n.parentId !== parentId) return false;
     const inner = [n, ...doc.descendants(id)];
     for (const x of inner) {
       if (x.type === 'INSTANCE' && x.componentId && !canHoldInstance(doc, x.componentId, parentId)) return false;

@@ -17,7 +17,7 @@ import {
   type Vec2,
 } from '@figma/geometry';
 import type { DesignDocument } from './document';
-import { hasOwnTransform, isFrameLike, isGroupLike, type NodeId, type SceneNode } from './types';
+import { isSealed, hasOwnTransform, isFrameLike, isGroupLike, type NodeId, type SceneNode } from './types';
 import { shapePaths, vectorContainsPoint } from './vector';
 
 const DEG = Math.PI / 180;
@@ -125,7 +125,7 @@ export function hitTest(doc: DesignDocument, pageId: NodeId, p: Vec2, opts: HitT
       const n = kids[i];
       if (!n.visible || n.locked || opts.exclude?.has(n.id)) continue;
       const inside = shapeContainsPoint(doc, n, p, isFrameLike(n) ? 0 : tol);
-      if (opts.framesOnly && (n.type === 'INSTANCE' || n.type === 'CODE_SNIPPET')) {
+      if (opts.framesOnly && (n.type === 'INSTANCE' || isSealed(n))) {
         if (inside) return BLOCKED;
         continue;
       }
@@ -210,4 +210,11 @@ export function childOfGroupContaining(doc: DesignDocument, groupId: NodeId, hit
   let cur = doc.get(hitId);
   while (cur && cur.parentId !== groupId) cur = doc.get(cur.parentId);
   return cur?.id ?? null;
+}
+
+/** The outermost code snippet or spec containing a layer (or the layer itself), if any. */
+export function sealedRoot(doc: DesignDocument, id: NodeId): SceneNode | undefined {
+  let found: SceneNode | undefined;
+  for (let n = doc.get(id); n; n = doc.get(n.parentId)) if (isSealed(n)) found = n;
+  return found;
 }

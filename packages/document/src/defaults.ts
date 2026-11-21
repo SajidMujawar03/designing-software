@@ -25,6 +25,7 @@ const NAMES: Record<NodeType, string> = {
   SECTION: 'Section',
   SLICE: 'Slice',
   CODE_SNIPPET: 'Code snippet',
+  SPEC: 'Spec',
   COMPONENT: 'Component',
   COMPONENT_SET: 'Component set',
   INSTANCE: 'Instance',
@@ -67,6 +68,22 @@ export function defaultProps(type: NodeType): NodeProps {
       p.layoutSizingVertical = 'HUG';
       p.codeLanguage = 'javascript';
       p.codeTheme = 'dark';
+      break;
+    case 'SPEC':
+      // A white page that grows with its content.
+      p.width = 560;
+      p.fills = [solid('#FFFFFF')];
+      p.strokes = [solid('#E6E6E6')];
+      p.strokeAlign = 'INSIDE';
+      p.cornerRadius = 12;
+      p.clipsContent = true;
+      p.layoutMode = 'VERTICAL';
+      p.paddingTop = p.paddingBottom = 32;
+      p.paddingLeft = p.paddingRight = 40;
+      p.itemSpacing = 10;
+      p.layoutSizingHorizontal = 'FIXED';
+      p.layoutSizingVertical = 'HUG';
+      p.specBlocks = [];
       break;
     case 'SLICE':
       p.exportSettings = [{ format: 'PNG', constraint: { type: 'SCALE', value: 1 }, suffix: '' }];

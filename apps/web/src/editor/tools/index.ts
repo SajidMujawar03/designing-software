@@ -3,7 +3,7 @@ import type { ToolId } from '../store';
 import { HandTool, ShapeTool, TextTool } from './create';
 import { SelectTool } from './select';
 import { CommentTool } from './comment';
-import { CodeSnippetTool, AnnotateTool } from './handoff';
+import { AnnotateTool, CodeSnippetTool, SpecTool } from './handoff';
 import { PencilTool, PenTool, VectorEditTool } from './vector';
 import type { Tool } from './types';
 
@@ -16,6 +16,7 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     scale: new SelectTool(ed, { scale: true }),
     snippet: new CodeSnippetTool(ed),
     annotate: new AnnotateTool(ed),
+    spec: new SpecTool(ed),
     rectangle: new ShapeTool(ed, 'RECTANGLE'),
     ellipse: new ShapeTool(ed, 'ELLIPSE'),
     polygon: new ShapeTool(ed, 'POLYGON'),
