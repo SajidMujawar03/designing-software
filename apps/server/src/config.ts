@@ -16,6 +16,10 @@ export const config = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
   },
   sessionDays: 30,
+  /** Sends server errors and the web app's error reports to Sentry when set. */
+  sentryDsn: process.env.SENTRY_DSN ?? '',
+  /** Shown in error reports (e.g. a git commit). */
+  release: process.env.RELEASE ?? 'dev',
   /** Secure cookies (set in production behind HTTPS). */
   secureCookies: process.env.NODE_ENV === 'production',
 };

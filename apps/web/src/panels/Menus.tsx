@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { breadcrumb } from '../errors';
 import { CANVAS_MENU, COMMANDS, command, EMPTY_CANVAS_MENU, isEnabled, type Command } from '../editor/commands';
 import { editor } from '../editor/editor';
 import { useUI } from '../editor/store';
@@ -73,6 +74,7 @@ function MenuItem({ cmd, onDone }: { cmd: Command; onDone: () => void }) {
       disabled={!enabled}
       onClick={() => {
         onDone();
+        breadcrumb(`menu: ${cmd.id}`);
         cmd.run();
       }}
     >
@@ -107,6 +109,7 @@ export function CommandPalette() {
   const run = (c: Command | undefined) => {
     if (!c) return;
     close();
+    breadcrumb(`palette: ${c.id}`);
     c.run();
   };
 

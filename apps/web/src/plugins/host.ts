@@ -5,6 +5,7 @@ import { renderExport } from '../editor/export';
 import { useUI } from '../editor/store';
 import { dispatch, PluginError, type PluginEditor, type PluginManifest } from './api';
 import { BUILTIN_PLUGINS } from './examples';
+import { breadcrumb } from '../errors';
 
 /**
  * Running plugins, the list of installed ones, and notifications. Each run
@@ -135,6 +136,7 @@ const pluginEditor: PluginEditor = {
 };
 
 export function runPlugin(plugin: PluginManifest): void {
+  breadcrumb(`plugin: ${plugin.builtin ? plugin.id : 'user plugin'}`);
   // One run of a plugin at a time: running it again restarts it.
   const others = usePlugins.getState().running.filter((r) => r.plugin.id !== plugin.id);
   usePlugins.setState({ running: [...others, { runId: ++runSeq, plugin, visible: false, width: 300, height: 240 }], managerOpen: false });

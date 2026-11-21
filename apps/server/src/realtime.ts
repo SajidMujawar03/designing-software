@@ -2,12 +2,13 @@ import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { Server, type Hocuspocus } from '@hocuspocus/server';
 import { and, asc, desc, eq, gt, lte, max } from 'drizzle-orm';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, type WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { tokenFromCookieHeader, userForToken } from './auth';
-import { db, schema } from './db';
+import { db, schema, vacuumLog } from './db';
 import { newId } from './ids';
 import { atLeast, fileRole } from './permissions';
+import { reportServerError } from './errors';
 
 /**
  * Live collaboration: each file is a Yjs document synced over WebSockets by
@@ -31,8 +32,13 @@ async function loadDoc(fileId: string, doc: Y.Doc): Promise<void> {
 
 /** Folds the update log into a fresh snapshot. */
 async function storeDoc(fileId: string, doc: Y.Doc): Promise<void> {
+  const t0 = performance.now();
+  const lap: Array<[string, number]> = [];
+  const mark = (what: string) => lap.push([what, Math.round(performance.now() - t0)]);
   const [row] = await db.select({ last: max(schema.docUpdates.id) }).from(schema.docUpdates).where(eq(schema.docUpdates.fileId, fileId));
+  mark('find');
   const state = Y.encodeStateAsUpdate(doc);
+  mark('encode');
   await db.transaction(async (tx) => {
     await tx
       .insert(schema.docSnapshots)
@@ -42,7 +48,12 @@ async function storeDoc(fileId: string, doc: Y.Doc): Promise<void> {
     if (row?.last != null) await tx.delete(schema.docUpdates).where(and(eq(schema.docUpdates.fileId, fileId), lte(schema.docUpdates.id, Number(row.last))));
     await tx.update(schema.files).set({ updatedAt: new Date() }).where(eq(schema.files.id, fileId));
   });
+  mark('write');
   await autosave(fileId, state);
+  mark('autosave');
+  void vacuumLog().catch((e) => reportServerError(e, 'db:vacuum'));
+  const total = performance.now() - t0;
+  if (total > 250) console.warn(`[realtime] saving ${fileId} took ${Math.round(total)} ms (${lap.map(([w, t]) => `${w} ${t}`).join(', ')}; ${state.length} bytes)`);
 }
 
 /** Minutes between automatic checkpoints of a file being edited. */
@@ -138,6 +149,29 @@ export async function restoreState(fileId: string, userId: string, state: Uint8A
   }
 }
 
+/**
+ * Every edit and cursor move is sent to everyone else on the file, as one
+ * socket write each: under load, those system calls were the server's
+ * biggest cost. Corking a socket when a turn of the event loop first sends to
+ * it, and uncorking once the turn's work is done, sends everything it got in
+ * that turn as one write (in load tests: much higher capacity, same latency).
+ */
+function coalesceWrites(ws: WebSocket, socket: Duplex): void {
+  const send = ws.send.bind(ws) as (...a: unknown[]) => void;
+  let corked = false;
+  (ws as unknown as { send: (...a: unknown[]) => void }).send = (...args: unknown[]) => {
+    if (!corked && !socket.destroyed) {
+      corked = true;
+      socket.cork();
+      setImmediate(() => {
+        corked = false;
+        socket.uncork();
+      });
+    }
+    send(...args);
+  };
+}
+
 export function startRealtime(httpServer: { on(event: 'upgrade', fn: (req: IncomingMessage, socket: Duplex, head: Buffer) => void): unknown }): void {
   hocuspocus = Server.configure({
     quiet: true,
@@ -160,24 +194,44 @@ export function startRealtime(httpServer: { on(event: 'upgrade', fn: (req: Incom
 
     async onLoadDocument({ documentName, document }) {
       if (process.env.DEBUG_REALTIME) console.log('[realtime] load', documentName);
-      await loadDoc(documentName, document);
+      try {
+        await loadDoc(documentName, document);
+      } catch (e) {
+        reportServerError(e, 'realtime:load', { fileId: documentName });
+        throw e;
+      }
       return document;
     },
 
     async onChange({ documentName, update, context }) {
       if (!context?.user) return; // changes made while loading
-      await db.insert(schema.docUpdates).values({ fileId: documentName, update });
+      // One row per update: measured faster under load than merging batches (Y.mergeUpdates
+      // of many clients' updates stalled the server for seconds), and nothing is ever held back.
+      try {
+        await db.insert(schema.docUpdates).values({ fileId: documentName, update });
+      } catch (e) {
+        reportServerError(e, 'realtime:append', { fileId: documentName });
+        throw e;
+      }
     },
 
     async onStoreDocument({ documentName, document }) {
-      await storeDoc(documentName, document);
+      try {
+        await storeDoc(documentName, document);
+      } catch (e) {
+        // The update log still has every change: the next save folds it in.
+        reportServerError(e, 'realtime:store', { fileId: documentName });
+      }
     },
   });
 
   const wss = new WebSocketServer({ noServer: true });
   httpServer.on('upgrade', (req, socket, head) => {
     if (!req.url?.startsWith('/collab')) return;
-    wss.handleUpgrade(req, socket, head, (ws) => hocuspocus!.handleConnection(ws, req));
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      coalesceWrites(ws, socket);
+      hocuspocus!.handleConnection(ws, req);
+    });
   });
 }
 
@@ -206,4 +260,10 @@ export function closeDocument(fileId: string): void {
 export async function flushAll(): Promise<void> {
   if (!hocuspocus) return;
   for (const [name, doc] of hocuspocus.documents) await storeDoc(name, doc);
+}
+
+/** Open files and connections (for the health check and load tests). */
+export function realtimeStats(): { documents: number; connections: number } {
+  if (!hocuspocus) return { documents: 0, connections: 0 };
+  return { documents: hocuspocus.getDocumentsCount(), connections: hocuspocus.getConnectionsCount() };
 }

@@ -26,6 +26,7 @@ import { applyChildConstraints, layoutFrame, layoutRoots } from './autolayout';
 import { propagate, structureSource, syncChildren } from './components';
 import { applyVariables, defaultValue, detachedFields } from './variables';
 import { scalePaths } from './vector';
+import { migrate, storedVersion, type MigrationResult } from './migrations';
 
 export const ROOT_ID = 'root';
 
@@ -116,7 +117,15 @@ export class DesignDocument {
    */
   textFitter: ((id: NodeId) => void) | null = null;
   /** Viewing only: local edits are ignored (remote ones still arrive). */
-  readOnly = false;
+  get readOnly(): boolean {
+    return this._readOnly || !!this.schema?.tooNew || !!this.schema?.failed;
+  }
+  set readOnly(v: boolean) {
+    this._readOnly = v;
+  }
+  private _readOnly = false;
+  /** What the last migration check found (set by ensureInitialized). */
+  schema: MigrationResult | null = null;
 
   constructor(ydoc: Y.Doc = new Y.Doc()) {
     this.ydoc = ydoc;
@@ -151,7 +160,17 @@ export class DesignDocument {
 
   /** Ensures the root and at least one page exist. Call after loading persisted state. */
   ensureInitialized(): void {
+    const fresh = this.yNodes.size === 0;
+    // Older files are upgraded first (see migrations.ts).
+    try {
+      this.schema = migrate(this.ydoc, (type, k, v) => isDefault(k, v, defaultsFor(type as NodeType)), { fresh });
+    } catch (e) {
+      // Open it view-only rather than not at all (the app reports the error).
+      const v = storedVersion(this.ydoc) ?? 0;
+      this.schema = { from: v, to: v, ran: [], tooNew: false, failed: e };
+    }
     if (this.nodes.get(ROOT_ID) && this.pages().length > 0) return;
+    if (this.schema.tooNew || this.schema.failed) return;
     this.ydoc.transact(() => {
       if (!this.yNodes.get(ROOT_ID)) {
         this.yNodes.set(ROOT_ID, toY({ ...defaultProps('DOCUMENT'), id: ROOT_ID, parentId: null, index: 'a0' }));

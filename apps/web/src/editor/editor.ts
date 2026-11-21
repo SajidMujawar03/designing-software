@@ -1,4 +1,5 @@
 import { canReparent, createInstance, DesignDocument, isInInstance, normalizeLinks, outerInstance, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
+import { breadcrumb, reportError } from '../errors';
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
 import { importImages } from './images';
@@ -53,6 +54,9 @@ export class Editor {
 
   onReady(): void {
     this.doc.ensureInitialized();
+    const schema = this.doc.schema;
+    if (schema?.failed) reportError(schema.failed, 'migration', { from: schema.from });
+    else if (schema?.ran.length) breadcrumb(`file upgraded from schema ${schema.from} to ${schema.to}`);
     // Reopen the page that was open last time, if it still exists.
     let last: string | null = null;
     try {
@@ -622,6 +626,7 @@ export class Editor {
   setTool(tool: ToolId): void {
     this.commitTextEdit();
     const prev = this.ui.tool;
+    if (prev !== tool) breadcrumb(`tool: ${tool}`);
     if (prev !== tool) this.toolDeactivated(prev);
     if (this.ui.vectorEdit && tool !== 'select') this.exitVectorEdit();
     this.setUI({ tool });

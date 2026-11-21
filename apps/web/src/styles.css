@@ -3669,3 +3669,56 @@ kbd {
 .plugin-editor input {
   font-family: inherit;
 }
+
+/* Crash recovery */
+.crash-page {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--text);
+  padding: 16px;
+}
+.crash-card {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.crash-card h1 {
+  font-size: 20px;
+  margin: 0;
+}
+.crash-card p {
+  margin: 0;
+  line-height: 1.5;
+}
+.crash-message {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--hover);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.crash-panel {
+  margin: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.crash-panel span {
+  color: var(--muted);
+}
+a.btn {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+}
