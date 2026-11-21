@@ -5,7 +5,7 @@ Features seen in the Figma screen recording (`docs/Screen Recording 2026-11-21 2
 ## 1. Scope
 
 **In scope**
-- Toolbar: arrow tool and arrowheads, section, slice, scale tool, text on path, code block, spec annotations.
+- Toolbar: arrow tool and arrowheads, section, slice, scale tool, text on path, code snippets, annotations, Spec documents and live code layers.
 - Quick actions: tabs, find and replace, view toggles (pixel grid, minimize/hide UI, multiplayer cursors, nudge amount).
 - Panels: layer thumbnails, the page's "Show in exports".
 - Draw mode: brush strokes, copying a stroke's style, variable width profiles, and the Lasso, Bend, Cut, Erase and Paint actions.
@@ -101,18 +101,41 @@ The migration from version 1 to 2 changes nothing in existing files. Its job is 
 
 ---
 
-### Phase F5: Code block and spec annotations
+### Phase F5: Code snippets and annotations
 Branch `features-code-specs` · about 4 days
 
-**1. Code block (B)**
-- A new `CODE_BLOCK` node type with `code`, `language` and theme fields.
-- Rendered as a rounded box with monospaced, syntax-highlighted text. A small tokenizer handles JS/TS, CSS, HTML, JSON and Python. The text goes through the existing text layout, using a bundled monospace font.
-- Double-click to edit it in place (a textarea over the canvas). A language picker sits in the properties panel.
+The recording's **Code (B)** and **Spec (D)** tools turned out to be different features in Figma: a live code layer and a document on the canvas (see phase F5b). F5 builds two handoff features that are useful on their own, without the B and D shortcuts:
 
-**2. Spec / annotation (D)**
-- An annotation pinned to a layer: a label, a note, and optional properties to show (width, height, fill, font and so on), read live from the layer.
-- Stored as `annotations` on the target node (not as layers), and drawn by the canvas overlay with a leader line. A toggle shows or hides them.
-- Visible in Inspect mode, and their notes are included in codegen comments.
+**1. Code snippet**
+- A `CODE_SNIPPET` node type: a frame-like box with auto layout that hugs one text layer in Source Code Pro, plus `codeLanguage` and `codeTheme` fields.
+- A small tokenizer colors JS/TS, CSS, HTML, JSON and Python as text ranges, in a dark or light theme. Colors are reapplied while typing and when editing ends.
+- A click picks the whole snippet; double-click or Enter edits the code. Language and theme sit in the properties panel. The tool is in the toolbar and quick actions.
+
+**2. Annotations** (like Figma's Dev Mode annotations)
+- A note pinned to a layer, with optional measurements to show (width, height, fill, font and so on), read live from the layer.
+- Stored as `annotations` on the target node (not as layers), and drawn by the canvas overlay with a leader line. Shift+Y shows or hides them.
+- Visible in Inspect, and their notes are included in codegen comments.
+
+---
+
+### Phase F5b: Spec documents and code layers
+Branch `features-spec-code-layers` · about 2 weeks · **bumps `SCHEMA_VERSION`**
+
+Figma's own versions of the recording's **Spec (D)** and **Code (B)** tools ([Specs](https://help.figma.com/hc/en-us/articles/44049066011671-Guide-to-Specs-in-Figma), [code layers](https://help.figma.com/hc/en-us/articles/44193259600535-Code-layers-in-Figma-Design)), without the AI parts.
+
+**1. Spec (D): a document on the canvas**
+- A `SPEC` node type: a page-like card holding a list of blocks, stored in the node as a Yjs array so people can edit it together.
+- **Blocks:** headings 1–3, paragraph, bullet and numbered lists, to-do, quote, divider, image, code (reusing the F5 tokenizer), and an embed of a frame from the file.
+- **Adding blocks:** a "/" menu and Markdown shortcuts (`#`, `-`, `1.`, `[]`, `>`, three backticks, `---`). Each block's handle offers **Turn into** and drag to reorder.
+- **Editing:** a DOM editor positioned over the card while it's being edited; the card is drawn on the canvas otherwise. Rendered by all three outputs, so exports and thumbnails work. **Open full-screen editor** shows the document as a page.
+- Comments work on it like on any layer.
+- **Out of scope:** the Figma agent, "Summarize AI", standalone Spec files and MCP editing.
+
+**2. Code (B): a live code layer**
+- A `CODE_LAYER` node type holding files (HTML, CSS, JS) and a size. B, then drag or pick a frame size.
+- **Running:** a sandboxed iframe (the plugin system's sandbox and CSP) positioned over the canvas, following pan and zoom. **Play** runs it; when stopped, the canvas shows the last captured snapshot, so exports and thumbnails have something to draw.
+- **Code editor panel:** file tabs with syntax highlighting (the F5 tokenizer), **Reload code layer**, and a Browser tab.
+- **Out of scope for now:** building from a prompt or a selection (needs an AI integration), GitHub or local-folder import, point and edit, and "Extract designs" (turning the running page into layers). Each could be its own phase.
 
 ---
 
@@ -180,19 +203,20 @@ Before starting, write `docs/motion-plan.md` with the data model, the playback l
 | F2 | Palette tabs, find and replace | ~3 days | None |
 | F3 | Layer thumbnails | ~2 days | None |
 | F4 | Section, slice, scale tool | 4–5 days | **v2** (new node types) |
-| F5 | Code block, spec annotations | ~4 days | **v3** (CODE_BLOCK) |
+| F5 | Code snippets, annotations | ~4 days | **v3** (CODE_SNIPPET) |
+| F5b | Spec documents, live code layers | ~2 weeks | **v4** (SPEC, CODE_LAYER) |
 | F6 | Draw mode and brushes | ~5 days | Optional fields |
 | F7 | Width profiles and draw actions | 1–2 weeks | Optional fields |
 | F8 | Text on path | ~1 week | Optional fields |
-| F9 | Motion timeline | 3–4 weeks | **v4** (separate plan) |
+| F9 | Motion timeline | 3–4 weeks | **v5** (separate plan) |
 
-F1–F3 can ship in any order. F7 needs F6. F9 is best done last.
+F1–F3 can ship in any order. F5b builds on F5's tokenizer. F7 needs F6. F9 is best done last.
 
 ## 5. Desktop app
 
 - Nothing extra is needed for menus or shortcuts, because they come from `COMMANDS`.
-- After F4 and F5, the `.design` format still works unchanged, since it saves the whole Yjs state. Older desktop versions open newer files read-only because of the schema check.
-- Release a new desktop version after F1–F3, after F4–F5, and after F6–F7, following the release steps in CONTRIBUTING.md.
+- After F4, F5 and F5b, the `.design` format still works unchanged, since it saves the whole Yjs state. Older desktop versions open newer files read-only because of the schema check.
+- Release a new desktop version after F1–F3, after F4–F5b, and after F6–F7, following the release steps in CONTRIBUTING.md.
 
 ## 6. Testing
 
@@ -200,4 +224,4 @@ F1–F3 can ship in any order. F7 needs F6. F9 is best done last.
 - **Renderer bounds tests** (`bounds.test.ts`) for arrowheads and width profiles.
 - **Migration tests** for each `SCHEMA_VERSION` bump: an older app sees the file as read-only.
 - **Manual check in the browser** for each phase, with a screenshot in the PR.
-- When the Playwright suite exists, add screenshot tests for arrowheads, sections, code blocks, brush strokes and text on path.
+- When the Playwright suite exists, add screenshot tests for arrowheads, sections, code snippets, specs, brush strokes and text on path.

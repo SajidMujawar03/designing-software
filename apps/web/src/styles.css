@@ -4175,3 +4175,61 @@ a.btn {
   padding: 4px 6px;
   color: var(--text-dim);
 }
+
+/* ---------- spec annotations ---------- */
+
+.annotation-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.annotation-editor:first-child {
+  border-top: 0;
+}
+.annotation-row {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+}
+.annotation-note {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+}
+.annotation-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.annotation-props .chip {
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.annotation-props .chip.on {
+  background: #7b61ff;
+  border-color: #7b61ff;
+  color: #fff;
+}
+
+.inspect-annotation {
+  padding: 6px 8px;
+  border-left: 3px solid #7b61ff;
+  border-radius: 2px;
+  background: rgba(123, 97, 255, 0.06);
+  margin-bottom: 6px;
+  font-size: 12px;
+}

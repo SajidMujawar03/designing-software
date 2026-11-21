@@ -1,3 +1,4 @@
+import { snippetTextOf } from '@figma/document';
 import type { BooleanOperation } from '@figma/document';
 import { useOnboarding } from '../panels/Onboarding';
 import { copyAsPng, exportLayers, saveFiles } from './export';
@@ -140,6 +141,7 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyG') return run(() => editor.setTool('polygon'));
       if (e.code === 'KeyS') return run(() => editor.setTool('section'));
       if (e.code === 'KeyL') return run(() => editor.setTool('arrow'));
+      if (e.code === 'KeyY') return run(() => setPrefs({ showAnnotations: !prefs().showAnnotations }));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());
@@ -159,6 +161,7 @@ export function installShortcuts(): () => void {
         return run(() => {
           const sel = editor.selectedNodes();
           if (sel.length === 1 && sel[0].type === 'TEXT') editor.startTextEdit(sel[0].id);
+          else if (sel.length === 1 && sel[0].type === 'CODE_SNIPPET' && snippetTextOf(editor.doc, sel[0].id)) editor.startTextEdit(snippetTextOf(editor.doc, sel[0].id)!);
           else if (sel.length === 1 && sel[0].type === 'VECTOR') editor.enterVectorEdit(sel[0].id);
           else editor.selectChildren();
         });

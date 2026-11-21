@@ -1,6 +1,6 @@
 import { DesignDocument, solid } from '@figma/document';
 import { describe, expect, it } from 'vitest';
-import { composeText, cssFor, cssText, cssVar, swiftUIText } from './codegen';
+import { codeFor, composeText, cssFor, cssText, cssVar, swiftUIText } from './codegen';
 
 function setup() {
   const doc = new DesignDocument();
@@ -78,5 +78,18 @@ describe('code for layers', () => {
     expect(cssText(doc, doc.get(t)!)).toContain('font-weight: 600;');
     expect(swiftUIText(doc, doc.get(t)!)).toContain('.font(.custom("Inter", size: 14).weight(.semibold))');
     expect(composeText(doc, doc.get(t)!)).toContain('fontWeight = FontWeight(600)');
+  });
+});
+
+describe('annotation notes in code', () => {
+  it('go above the code as a comment, and never end a CSS comment early', () => {
+    const { doc, page } = setup();
+    const id = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: page, name: 'Button', annotations: [{ id: 'a', note: 'Primary action\nSee */ tokens', properties: [] }] }));
+    const n = doc.get(id)!;
+    expect(codeFor(doc, n, 'css')).toMatch(/^\/\*\n \* Primary action\n \* See \* \/ tokens\n \*\/\n\/\* Button \*\//);
+    expect(codeFor(doc, n, 'swiftui')).toMatch(/^\/\/ Primary action\n\/\/ See \*\/ tokens\n/);
+    // No notes, no comment.
+    const plain = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: page, name: 'Plain' }));
+    expect(codeFor(doc, doc.get(plain)!, 'css').startsWith('/* Plain */')).toBe(true);
   });
 });

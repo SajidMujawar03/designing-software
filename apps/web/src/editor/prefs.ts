@@ -14,12 +14,14 @@ export interface Prefs {
   bigNudge: number;
   /** Small previews instead of type icons in the layers panel. */
   layerThumbnails: boolean;
+  /** Annotations drawn on the canvas. */
+  showAnnotations: boolean;
   /** Side panels shown, collapsed to narrow strips, or everything but the canvas hidden. */
   ui: 'full' | 'minimized' | 'hidden';
 }
 
 const KEY = 'figma-clone:prefs';
-export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, ui: 'full' };
+export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, showAnnotations: true, ui: 'full' };
 
 /** Stored prefs, with anything missing or out of range set back to its default. */
 export function parsePrefs(raw: string | null): Prefs {
@@ -36,6 +38,7 @@ export function parsePrefs(raw: string | null): Prefs {
     nudge: step(v.nudge, DEFAULT_PREFS.nudge),
     bigNudge: step(v.bigNudge, DEFAULT_PREFS.bigNudge),
     layerThumbnails: typeof v.layerThumbnails === 'boolean' ? v.layerThumbnails : DEFAULT_PREFS.layerThumbnails,
+    showAnnotations: typeof v.showAnnotations === 'boolean' ? v.showAnnotations : DEFAULT_PREFS.showAnnotations,
     // Hidden UI isn't restored: a reload shouldn't leave someone with no panels and no idea why.
     ui: v.ui === 'minimized' ? 'minimized' : 'full',
   };

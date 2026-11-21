@@ -12,4 +12,6 @@ export * from './variables';
 export * from './library';
 export * from './prototype';
 export * from './migrations';
+export * from './code';
+export * from './annotations';
 export { computeAutoLayout, defaultGrid, gridSpans, gridLines, gridSnapEdges, DEFAULT_CONSTRAINTS } from '@figma/layout';

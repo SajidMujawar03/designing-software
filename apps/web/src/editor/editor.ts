@@ -1,4 +1,4 @@
-import { canReparent, createInstance, DesignDocument, isInInstance, normalizeLinks, outerInstance, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
+import { highlightCodeSnippet, canReparent, createInstance, DesignDocument, isInInstance, normalizeLinks, outerInstance, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
 import { breadcrumb, reportError } from '../errors';
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
@@ -36,6 +36,22 @@ export class Editor {
   constructor() {
     // Keep UI state consistent with remote edits, undo/redo, deletions.
     this.doc.subscribe(() => this.pruneUI());
+    // Recolor code while it's typed, once typing pauses.
+    let codeTimer = 0;
+    let lastCode = '';
+    this.doc.subscribe(() => {
+      const id = this.ui.editingTextId;
+      const n = id ? this.doc.get(id) : undefined;
+      const snippet = n ? this.doc.get(n.parentId) : undefined;
+      if (snippet?.type !== 'CODE_SNIPPET' || (n!.characters ?? '') === lastCode) return;
+      clearTimeout(codeTimer);
+      codeTimer = window.setTimeout(() => {
+        const cur = this.doc.get(n!.id);
+        if (!cur || this.ui.editingTextId !== cur.id) return;
+        lastCode = cur.characters ?? '';
+        highlightCodeSnippet(this.doc, snippet.id);
+      }, 250);
+    });
     // Auto layout asks the app to re-measure text whose width it changed.
     this.doc.textFitter = (id) => fitText(this.doc, id);
   }
@@ -671,12 +687,18 @@ export class Editor {
     this.setUI({ textSelection: sel });
   }
 
-  /** Ends text editing; deletes the node if it is empty. */
+  /** Ends text editing; deletes the node if it is empty (code stays, recolored). */
   commitTextEdit(): void {
     const id = this.ui.editingTextId;
     if (!id) return;
     this.setUI({ editingTextId: null, textSelection: null, pendingStyle: null });
     const n = this.doc.get(id);
+    const snippet = n ? this.doc.get(n.parentId) : undefined;
+    if (snippet?.type === 'CODE_SNIPPET') {
+      highlightCodeSnippet(this.doc, snippet.id);
+      this.doc.endGesture();
+      return;
+    }
     if (n && !(n.characters ?? '').trim()) {
       this.doc.deleteNodes([id]);
       this.select(this.ui.selection.filter((s) => s !== id));

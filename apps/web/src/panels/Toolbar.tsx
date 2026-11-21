@@ -1,4 +1,4 @@
-import { ArrowUpRight, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { ArrowUpRight, Braces, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -33,6 +33,8 @@ const T = {
   pen: { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
   pencil: { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   text: { id: 'text', label: 'Text', key: 'T', Icon: Type },
+  snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
+  annotate: { id: 'annotate', label: 'Annotate', key: '', Icon: NotebookPen },
   hand: { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
   comment: { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
 } satisfies Record<string, ToolDef>;
@@ -50,6 +52,7 @@ const TOOLS: ToolDef[][] = [
   [T.pen],
   [T.pencil],
   [T.text],
+  [T.snippet, T.annotate],
   [T.hand],
   [T.comment],
 ];

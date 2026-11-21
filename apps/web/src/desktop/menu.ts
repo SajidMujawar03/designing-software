@@ -77,6 +77,7 @@ const MENUS = (): Array<{ label: string; items: Entry[] }> => [
       'snap-pixel',
       'multiplayer-cursors',
       'layer-thumbnails',
+      'show-annotations',
       'nudge-amount',
       '-',
       'minimize-ui',

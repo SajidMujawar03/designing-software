@@ -129,7 +129,10 @@ export const COMMANDS: Command[] = [
   { id: 'minimize-ui', label: 'Minimize UI', shortcut: 'Ctrl+Shift+\\', run: toggleMinimizedUI, checked: () => prefs().ui === 'minimized', setting: true },
   { id: 'hide-ui', label: 'Show UI', shortcut: 'Ctrl+\\', run: toggleHiddenUI, checked: () => prefs().ui !== 'hidden', setting: true },
   { id: 'multiplayer-cursors', label: 'Multiplayer cursors', shortcut: 'Ctrl+Alt+\\', run: () => setPrefs({ showCursors: !prefs().showCursors }), checked: () => prefs().showCursors, setting: true },
+  { id: 'show-annotations', label: 'Show annotations', shortcut: 'Shift+Y', run: () => setPrefs({ showAnnotations: !prefs().showAnnotations }), checked: () => prefs().showAnnotations, setting: true },
   { id: 'layer-thumbnails', label: 'Layer thumbnails', run: () => setPrefs({ layerThumbnails: !prefs().layerThumbnails }), checked: () => prefs().layerThumbnails, setting: true },
+  { id: 'code-snippet', label: 'Insert code snippet', run: () => editor.setTool('snippet') },
+  { id: 'annotate', label: 'Annotate a layer', run: () => editor.setTool('annotate') },
   { id: 'find-replace', label: 'Find and replace…', shortcut: 'Ctrl+F', run: () => editor.setUI({ findOpen: true }) },
   { id: 'nudge-amount', label: 'Nudge amount…', run: () => editor.setUI({ nudgeOpen: true }), setting: true },
   {

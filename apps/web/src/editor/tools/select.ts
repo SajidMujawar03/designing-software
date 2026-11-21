@@ -1,4 +1,4 @@
-import { isLayoutChild, isInInstance, canReparent, childOfGroupContaining, hitTest, isAutoLayout, isGroupLike, worldTransform, nodesInRect, selectableAncestor, type NodeId, type NodePatch, type SceneNode } from '@figma/document';
+import { isLayoutChild, isInInstance, canReparent, childOfGroupContaining, hitTest, isAutoLayout, isGroupLike, worldTransform, nodesInRect, selectableAncestor, type NodeId, type NodePatch, type SceneNode, snippetTextOf } from '@figma/document';
 import { applyToPoint, invert, rectContainsPoint, rectFromPoints, type Mat2D, type Rect, type Vec2 } from '@figma/geometry';
 import { getSelectionFrame, handleCursor, hitHandle, HANDLES, type HandleId, type SelectionFrame } from '../canvas/handles';
 import type { Editor } from '../editor';
@@ -84,7 +84,11 @@ export class SelectTool implements Tool {
   private pick(e: ToolEvent): NodeId | null {
     const hit = this.hit(e);
     if (!hit) return null;
-    return e.mod ? hit.id : selectableAncestor(this.doc, hit.id, this.ed.ui.selection);
+    if (e.mod) return hit.id;
+    // A code snippet is picked as a whole (double-click edits its code).
+    const parent = this.doc.get(hit.parentId);
+    if (parent?.type === 'CODE_SNIPPET') return selectableAncestor(this.doc, parent.id, this.ed.ui.selection);
+    return selectableAncestor(this.doc, hit.id, this.ed.ui.selection);
   }
 
   down(e: ToolEvent): void {
@@ -403,7 +407,10 @@ export class SelectTool implements Tool {
       if (child) this.ed.select([child]);
       return;
     }
-    if (hit.type === 'TEXT') this.ed.startTextEdit(hit.id, false, e.world);
+    if (hit.type === 'CODE_SNIPPET') {
+      const text = snippetTextOf(this.doc, hit.id);
+      if (text) this.ed.startTextEdit(text, false, e.world);
+    } else if (hit.type === 'TEXT') this.ed.startTextEdit(hit.id, false, e.world);
     else if (hit.type === 'VECTOR') this.ed.enterVectorEdit(hit.id);
   }
 }

@@ -1,4 +1,4 @@
-import { isAutoLayout, libraryOf, mainComponentOf, type Paint, type SceneNode } from '@figma/document';
+import { annotationLines, isAutoLayout, libraryOf, mainComponentOf, type Paint, type SceneNode } from '@figma/document';
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 import { codeFor, cssColor, type CodeLanguage } from '../inspect/codegen';
@@ -96,6 +96,25 @@ export function InspectPanel() {
         {n.name}
         <span className="props-type">{n.type.toLowerCase().replace('_', ' ')}</span>
       </div>
+      {!!n.annotations?.length && (
+        <Section title="Annotations">
+          {n.annotations.map((a) => {
+            const { note, values } = annotationLines(n, a);
+            return (
+              <div key={a.id} className="inspect-annotation">
+                {note.map((l, i) => (
+                  <div key={i}>{l}</div>
+                ))}
+                {values.map((v) => (
+                  <div key={v} className="hint">
+                    {v}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </Section>
+      )}
       {main && (
         <Section title="Component">
           <Row label="Instance of" value={main.name} />

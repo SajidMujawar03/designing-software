@@ -9,6 +9,8 @@ export type ToolId =
   | 'section'
   | 'slice'
   | 'scale'
+  | 'snippet'
+  | 'annotate'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'
@@ -55,6 +57,8 @@ export interface UIState {
   nudgeOpen: boolean;
   /** The find and replace panel (Ctrl+F). */
   findOpen: boolean;
+  /** An annotation just added, whose note field should take focus. */
+  editingAnnotation: { nodeId: NodeId; id: string } | null;
   /** The local variables window. */
   variablesOpen: boolean;
   /** The libraries window. */
@@ -128,6 +132,7 @@ export const useUI = create<UIState>()(() => ({
   paletteOpen: false,
   nudgeOpen: false,
   findOpen: false,
+  editingAnnotation: null,
   variablesOpen: false,
   librariesOpen: false,
   historyOpen: false,
