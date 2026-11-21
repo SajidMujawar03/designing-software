@@ -1,4 +1,4 @@
-import { isGroupLike, worldBounds, worldTransform, type NodeId } from '@figma/document';
+import { gridLines, gridSpans, isGroupLike, worldBounds, worldTransform, type NodeId } from '@figma/document';
 import { applyToPoint, multiply, type Mat2D } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { CORNERS, getSelectionFrame, handleWorldPoint } from './handles';
@@ -26,6 +26,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
 
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  if (ed.ui.showLayoutGrids) drawLayoutGrids(ctx, ed, multiply(screen, view));
 
   // Frame name labels for top-level frames.
   ctx.font = '11px Inter, system-ui, sans-serif';
@@ -173,6 +175,18 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.stroke();
   }
 
+  const drop = ed.ui.dropLine;
+  if (drop) {
+    const a = ed.worldToScreen(drop[0]);
+    const b = ed.worldToScreen(drop[1]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = BLUE;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
   if (marquee) {
     const a = ed.worldToScreen({ x: marquee.x, y: marquee.y });
     const w = marquee.width * viewport.zoom;
@@ -305,4 +319,53 @@ function drawTextEditing(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number)
     }
   }
   ctx.restore();
+}
+
+/** Columns, rows and square grids of the frames on the page, clipped to each frame. */
+function drawLayoutGrids(ctx: CanvasRenderingContext2D, ed: Editor, toScreen: Mat2D): void {
+  const doc = ed.doc;
+  const zoom = ed.ui.viewport.zoom;
+  const visit = (parentId: NodeId) => {
+    for (const n of doc.children(parentId)) {
+      if (!n.visible) continue;
+      if (n.type === 'FRAME' && n.layoutGrids?.some((g) => g.visible)) {
+        const m = multiply(toScreen, worldTransform(doc, n.id));
+        ctx.save();
+        ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+        ctx.beginPath();
+        ctx.rect(0, 0, n.width, n.height);
+        ctx.clip();
+        for (const g of n.layoutGrids) {
+          if (!g.visible) continue;
+          const color = `rgba(${Math.round(g.color.r * 255)}, ${Math.round(g.color.g * 255)}, ${Math.round(g.color.b * 255)}, ${g.opacity})`;
+          if (g.pattern === 'GRID') {
+            // Hide dense grids when zoomed out, as cells would blur together.
+            if (g.sectionSize * zoom < 4) continue;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1 / zoom;
+            ctx.beginPath();
+            for (const x of gridLines(g, n.width)) {
+              ctx.moveTo(x, 0);
+              ctx.lineTo(x, n.height);
+            }
+            for (const y of gridLines(g, n.height)) {
+              ctx.moveTo(0, y);
+              ctx.lineTo(n.width, y);
+            }
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = color;
+            const cols = g.pattern === 'COLUMNS';
+            for (const sp of gridSpans(g, cols ? n.width : n.height)) {
+              if (cols) ctx.fillRect(sp.start, 0, sp.size, n.height);
+              else ctx.fillRect(0, sp.start, n.width, sp.size);
+            }
+          }
+        }
+        ctx.restore();
+      }
+      if (n.type === 'FRAME' || isGroupLike(n)) visit(n.id);
+    }
+  };
+  visit(ed.pageId);
 }

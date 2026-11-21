@@ -1,3 +1,9 @@
+import type { Constraints, CounterAlign, LayoutGrid, PrimaryAlign, Sizing } from '@figma/layout';
+
+export type { ConstraintType, Constraints, CounterAlign, GridAlignment, GridPattern, LayoutGrid, PrimaryAlign, Sizing } from '@figma/layout';
+
+export type LayoutMode = 'NONE' | 'HORIZONTAL' | 'VERTICAL';
+
 export type NodeId = string;
 
 export type NodeType =
@@ -199,6 +205,35 @@ export interface SceneNode {
 
   // FRAME
   clipsContent?: boolean;
+  layoutGrids?: LayoutGrid[];
+
+  // FRAME: auto layout
+  layoutMode?: LayoutMode;
+  layoutWrap?: 'NO_WRAP' | 'WRAP';
+  /** Gap between items. */
+  itemSpacing?: number;
+  /** Gap between wrapped lines. */
+  counterAxisSpacing?: number;
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  /** SPACE_BETWEEN is the "Auto" gap. */
+  primaryAxisAlignItems?: PrimaryAlign;
+  counterAxisAlignItems?: CounterAlign;
+
+  // Any layer: sizing and placement inside layouts
+  /** FIXED by default; HUG for auto layout frames and text; FILL inside auto layout. */
+  layoutSizingHorizontal?: Sizing;
+  layoutSizingVertical?: Sizing;
+  /** ABSOLUTE children of an auto layout frame keep their position (and use constraints). */
+  layoutPositioning?: 'AUTO' | 'ABSOLUTE';
+  minWidth?: number | null;
+  maxWidth?: number | null;
+  minHeight?: number | null;
+  maxHeight?: number | null;
+  /** How the layer follows its parent frame's resizing (left/top by default). */
+  constraints?: Constraints;
 
   // PAGE
   guides?: Guide[];
@@ -285,3 +320,11 @@ export const isGroupLike = (n: SceneNode | undefined | null): boolean => n?.type
  */
 export const hasOwnTransform = (n: SceneNode): boolean =>
   !isGroupLike(n) && n.type !== 'PAGE' && n.type !== 'DOCUMENT';
+
+/** A frame that lays out its children (auto layout). */
+export const isAutoLayout = (n: SceneNode | undefined | null): boolean =>
+  n?.type === 'FRAME' && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
+
+/** A child placed by its auto layout parent (rather than positioned freely). */
+export const isLayoutChild = (n: SceneNode, parent: SceneNode | undefined | null): boolean =>
+  isAutoLayout(parent) && n.layoutPositioning !== 'ABSOLUTE';

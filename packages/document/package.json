@@ -5,9 +5,12 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "scripts": { "typecheck": "tsc -p ." },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
   "dependencies": {
     "@figma/geometry": "workspace:*",
+    "@figma/layout": "workspace:*",
     "fractional-indexing": "^3.2.0",
     "nanoid": "^5.0.9",
     "yjs": "^13.6.20"

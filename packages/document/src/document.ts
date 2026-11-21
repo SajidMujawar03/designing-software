@@ -15,6 +15,7 @@ import {
   type TextStyle,
   type TextStyleProps,
 } from './types';
+import { applyChildConstraints, layoutFrame, layoutRoots } from './autolayout';
 import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
@@ -40,6 +41,19 @@ export interface ChangeOptions {
    * updates of one drag gesture; call `endGesture()` when the gesture ends.
    */
   merge?: boolean;
+  /**
+   * Keep this change out of undo history: fixes the app makes on its own,
+   * such as re-measuring text once its font has loaded.
+   */
+  untracked?: boolean;
+}
+
+/** Origin of local changes that are not undoable. */
+export const AUTO_ORIGIN = Symbol('auto');
+
+export interface UpdateOptions {
+  /** Resizing a frame moves its children by their constraints (default true). */
+  constraints?: boolean;
 }
 
 /**
@@ -62,6 +76,18 @@ export class DesignDocument {
   private childrenDirty = true;
   private listeners = new Set<() => void>();
   private _version = 0;
+
+  /** Nesting depth of `change()`; layout runs when the outermost one ends. */
+  private depth = 0;
+  /** Layers changed in this change (their auto layouts must be redone). */
+  private layoutDirty = new Set<NodeId>();
+  /** Text layers whose width changed and must be measured again. */
+  private fitDirty = new Set<NodeId>();
+  /**
+   * Re-measures a text layer (set by the app, which owns text shaping).
+   * Without it, text keeps its size when layouts change its width.
+   */
+  textFitter: ((id: NodeId) => void) | null = null;
 
   constructor(ydoc: Y.Doc = new Y.Doc()) {
     this.ydoc = ydoc;
@@ -191,11 +217,43 @@ export class DesignDocument {
   change<T>(fn: () => T, opts: ChangeOptions = {}): T {
     if (!opts.merge) this.undoManager.stopCapturing();
     let result!: T;
-    this.ydoc.transact(() => {
-      result = fn();
-    }, LOCAL_ORIGIN);
+    this.depth++;
+    try {
+      this.ydoc.transact(() => {
+        result = fn();
+        if (this.depth === 1) this.runLayout();
+      }, opts.untracked ? AUTO_ORIGIN : LOCAL_ORIGIN);
+    } finally {
+      this.depth--;
+    }
     if (!opts.merge) this.undoManager.stopCapturing();
     return result;
+  }
+
+  /** Asks for a text layer to be measured again at the end of the change. */
+  requestTextFit(id: NodeId): void {
+    this.fitDirty.add(id);
+  }
+
+  /** Lays out every auto layout frame touched by this change, until nothing moves. */
+  private runLayout(): void {
+    for (let pass = 0; pass < 10 && (this.layoutDirty.size || this.fitDirty.size); pass++) {
+      const fit = [...this.fitDirty];
+      this.fitDirty.clear();
+      if (this.textFitter) for (const id of fit) if (this.nodes.has(id)) this.textFitter(id);
+      const dirty = [...this.layoutDirty];
+      this.layoutDirty.clear();
+      for (const root of layoutRoots(this, dirty)) layoutFrame(this, root);
+    }
+    this.layoutDirty.clear();
+    this.fitDirty.clear();
+  }
+
+  /** Lays out an auto layout frame now (e.g. after turning auto layout on). */
+  relayout(id: NodeId): void {
+    this.change(() => {
+      this.layoutDirty.add(id);
+    }, { merge: true });
   }
 
   /** Close the current merged undo step (end of a drag gesture). */
@@ -214,26 +272,40 @@ export class DesignDocument {
     }, { merge: true });
   }
 
-  updateNode(id: NodeId, patch: NodePatch): void {
+  updateNode(id: NodeId, patch: NodePatch, opts: UpdateOptions = {}): void {
     const y = this.yNodes.get(id);
     if (!y) return;
+    const before = this.nodes.get(id);
     patch = this.withDetachedStyles(id, this.withScaledPaths(id, patch));
     this.change(() => {
+      let changed = false;
       for (const [k, v] of Object.entries(patch)) {
         if (v === undefined || k === 'textRuns') continue;
         if (k === 'characters') {
-          this.replaceText(y, v as string);
+          changed = this.replaceText(y, v as string) || changed;
           continue;
         }
-        if (!shallowEqual(y.get(k), v)) y.set(k, v);
+        if (!shallowEqual(y.get(k), v)) {
+          y.set(k, v);
+          changed = true;
+        }
       }
+      if (!changed) return;
       this.refresh(id, 'parentId' in patch || 'index' in patch);
+      const after = this.nodes.get(id)!;
+      if (
+        before?.type === 'FRAME' &&
+        opts.constraints !== false &&
+        (after.width !== before.width || after.height !== before.height)
+      ) {
+        applyChildConstraints(this, id, before, after);
+      }
     }, { merge: true });
   }
 
-  updateNodes(patches: Array<[NodeId, NodePatch]>): void {
+  updateNodes(patches: Array<[NodeId, NodePatch]>, opts: UpdateOptions = {}): void {
     this.change(() => {
-      for (const [id, p] of patches) this.updateNode(id, p);
+      for (const [id, p] of patches) this.updateNode(id, p, opts);
     }, { merge: true });
   }
 
@@ -342,16 +414,17 @@ export class DesignDocument {
     return t;
   }
 
-  private replaceText(y: YNode, text: string): void {
+  /** Returns whether the text changed. */
+  private replaceText(y: YNode, text: string): boolean {
     const t = y.get('characters');
     if (!(t instanceof Y.Text)) {
       const fresh = new Y.Text();
       fresh.insert(0, text);
       y.set('characters', fresh);
-      return;
+      return true;
     }
     const old = t.toString();
-    if (old === text) return;
+    if (old === text) return false;
     // Keep formatting where possible: replace only the part that changed.
     let a = 0;
     while (a < old.length && a < text.length && old[a] === text[a]) a++;
@@ -359,6 +432,7 @@ export class DesignDocument {
     while (b < old.length - a && b < text.length - a && old[old.length - 1 - b] === text[text.length - 1 - b]) b++;
     if (old.length - a - b > 0) t.delete(a, old.length - a - b);
     if (text.length - a - b > 0) t.insert(a, text.slice(a, text.length - b));
+    return true;
   }
 
   /**
@@ -571,6 +645,11 @@ export class DesignDocument {
    * see the change (Yjs only emits events when the transaction ends).
    */
   private refresh(id: NodeId, structural: boolean): void {
+    const old = this.nodes.get(id);
+    if (this.depth > 0) {
+      this.layoutDirty.add(id);
+      if (old?.parentId) this.layoutDirty.add(old.parentId);
+    }
     const y = this.yNodes.get(id);
     if (y) this.nodes.set(id, snapshot(id, y));
     else this.nodes.delete(id);
@@ -592,13 +671,30 @@ export class DesignDocument {
         }
       }
     }
+    // Undo/redo restore what was tracked; untracked fixes (text re-measured after
+    // a font loaded) may no longer match it, so their layouts are redone.
+    const fromUndo = events[0]?.transaction.origin === this.undoManager;
+    const relayout = new Set<NodeId>();
     for (const id of changed) {
+      const old = this.nodes.get(id);
+      if (fromUndo) {
+        relayout.add(id);
+        if (old?.parentId) relayout.add(old.parentId);
+      }
       const y = this.yNodes.get(id);
       if (y) this.nodes.set(id, snapshot(id, y));
       else this.nodes.delete(id);
     }
     this._version++;
     for (const l of this.listeners) l();
+    if (relayout.size) {
+      this.change(() => {
+        for (const id of relayout) {
+          this.layoutDirty.add(id);
+          if (this.nodes.get(id)?.type === 'TEXT') this.fitDirty.add(id);
+        }
+      }, { merge: true, untracked: true });
+    }
   }
 
   private rebuildChildren(): void {

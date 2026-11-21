@@ -6,8 +6,10 @@ import { indexAtWorld } from './textEditing';
 import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
 import { useUI, type ToolId, type UIState, type Viewport } from './store';
-import { boundsOf, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
-import { isGroupLike, worldBounds } from '@figma/document';
+import { boundsOf, fitText, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
+import { nudgeInLayout } from './layoutCommands';
+import { fonts } from './fonts';
+import { gridSnapEdges, isGroupLike, worldBounds, worldTransform } from '@figma/document';
 
 const LAST_PAGE_KEY = 'figma-clone:last-page';
 export const MIN_ZOOM = 0.02;
@@ -33,6 +35,8 @@ export class Editor {
   constructor() {
     // Keep UI state consistent with remote edits, undo/redo, deletions.
     this.doc.subscribe(() => this.pruneUI());
+    // Auto layout asks the app to re-measure text whose width it changed.
+    this.doc.textFitter = (id) => fitText(this.doc, id);
   }
 
   get ui(): UIState {
@@ -58,6 +62,19 @@ export class Editor {
     }
     const page = this.doc.pages().find((p) => p.id === last) ?? this.doc.pages()[0];
     this.setUI({ ready: true, pageId: page.id });
+    // Text measured before its font arrived has the wrong size (and so do the
+    // auto layouts hugging it): measure auto-sizing text again once fonts load.
+    let pending = 0;
+    fonts.onLoad(() => {
+      clearTimeout(pending);
+      pending = window.setTimeout(() => this.refitText(), 50);
+    });
+  }
+
+  /** Re-measures every auto-sizing text layer (only changed sizes are written). */
+  refitText(): void {
+    const ids = [...this.doc.allNodes()].filter((n) => n.type === 'TEXT' && n.textAutoResize !== 'NONE').map((n) => n.id);
+    if (ids.length) this.doc.change(() => ids.forEach((id) => fitText(this.doc, id)), { merge: true, untracked: true });
   }
 
   // ------------------------------------------------------------ selection
@@ -217,6 +234,8 @@ export class Editor {
   nudge(dx: number, dy: number): void {
     const ids = this.topLevelSelection();
     if (!ids.length) return;
+    // Inside auto layout, arrows reorder instead.
+    if (nudgeInLayout(this, ids, dx, dy)) return;
     this.doc.change(() => moveByWorld(this.doc, ids, dx, dy));
   }
 
@@ -483,10 +502,21 @@ export class Editor {
       rects.push(worldBounds(this.doc, c.id));
     }
     const guides = this.doc.get(this.pageId)?.guides ?? [];
+    const guideX = guides.filter((g) => g.axis === 'x').map((g) => g.offset);
+    const guideY = guides.filter((g) => g.axis === 'y').map((g) => g.offset);
+    // The containing frame's layout grid (when shown and the frame is not rotated).
+    if (container?.type === 'FRAME' && container.layoutGrids?.length && this.ui.showLayoutGrids) {
+      const m = worldTransform(this.doc, ctxId);
+      if (Math.abs(m[1]) < 1e-9 && Math.abs(m[2]) < 1e-9) {
+        const e = gridSnapEdges(container.layoutGrids, container.width, container.height);
+        guideX.push(...e.x.map((x) => m[4] + x * m[0]));
+        guideY.push(...e.y.map((y) => m[5] + y * m[3]));
+      }
+    }
     return {
       rects,
-      guideX: guides.filter((g) => g.axis === 'x').map((g) => g.offset),
-      guideY: guides.filter((g) => g.axis === 'y').map((g) => g.offset),
+      guideX,
+      guideY,
       threshold: 5 / this.ui.viewport.zoom,
     };
   }
