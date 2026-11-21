@@ -3722,3 +3722,100 @@ a.btn {
   display: inline-flex;
   align-items: center;
 }
+
+/* Desktop app start screen */
+.desktop-home {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+.desktop-home header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.desktop-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.desktop-brand span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-home main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.desktop-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.desktop-section-head h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.desktop-home .hint {
+  margin: 4px 0 12px;
+}
+.desktop-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.desktop-files li + li {
+  border-top: 1px solid var(--border);
+}
+.desktop-files button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.desktop-files button:hover {
+  background: var(--hover);
+}
+.desktop-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-file-time {
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-server {
+  display: flex;
+  gap: 8px;
+}
+.desktop-server input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}

@@ -3,7 +3,7 @@ import Fastify from 'fastify';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { authRoutes } from './auth';
 import { config } from './config';
-import { initDb } from './db';
+import { closeDb, initDb } from './db';
 import { flushAll, startRealtime } from './realtime';
 import { workspaceRoutes } from './routes/workspace';
 import { commentRoutes } from './routes/comments';
@@ -54,9 +54,14 @@ async function main(): Promise<void> {
       : `[server] API and realtime on http://localhost:${config.port} (web app proxies /api and /collab)`,
   );
 
+  let stopping = false;
   const stop = async () => {
+    if (stopping) return;
+    stopping = true;
     await flushAll().catch((e) => console.error('[server] saving on shutdown failed', e));
-    await app.close();
+    await app.close().catch(() => {});
+    // Last: the database closes cleanly, so it opens cleanly next time.
+    await closeDb().catch((e) => console.error('[server] closing the database failed', e));
     process.exit(0);
   };
   process.on('SIGINT', stop);

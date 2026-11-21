@@ -1,0 +1,20 @@
+{
+  "name": "@figma/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design Clone for the desktop",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs && electron . --dev",
+    "start": "electron .",
+    "smoke": "node build.mjs && electron . --smoke",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "electron": "^45.4.1",
+    "esbuild": "0.21.5",
+    "typescript": "^5.9.3"
+  }
+}

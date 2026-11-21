@@ -1,4 +1,5 @@
-import { mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { config } from '../config';
@@ -150,23 +151,105 @@ async function migrate(): Promise<void> {
   }
 }
 
+/** Closes the connection (the embedded database writes a clean checkpoint, so it starts cleanly next time). */
+let closeClient: (() => Promise<void>) | null = null;
+/** Runs a statement on the embedded database outside Drizzle (CHECKPOINT). */
+let rawExec: ((sql: string) => Promise<unknown>) | null = null;
+
 /** Connects (to Postgres, or the embedded PGlite) and brings the schema up to date. */
 export async function initDb(): Promise<void> {
   if (config.databaseUrl) {
     const { Pool } = await import('pg');
     const { drizzle } = await import('drizzle-orm/node-postgres');
-    db = drizzle(new Pool({ connectionString: config.databaseUrl }), { schema });
+    const pool = new Pool({ connectionString: config.databaseUrl });
+    db = drizzle(pool, { schema });
+    closeClient = () => pool.end();
     console.log('[db] using Postgres at DATABASE_URL');
-  } else {
-    mkdirSync(config.dataDir, { recursive: true });
-    const { PGlite } = await import('@electric-sql/pglite');
-    const { drizzle } = await import('drizzle-orm/pglite');
-    db = drizzle(new PGlite(config.dataDir), { schema }) as unknown as DB;
+    await migrate();
+    return;
+  }
+  mkdirSync(config.dataDir, { recursive: true });
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { drizzle } = await import('drizzle-orm/pglite');
+  console.log(`[db] using embedded Postgres (PGlite) in ${config.dataDir}`);
+  try {
+    const client = new PGlite(config.dataDir);
+    await client.query('SELECT 1');
+    db = drizzle(client, { schema }) as unknown as DB;
+    closeClient = () => client.close();
+    rawExec = (q) => client.exec(q);
     embedded = true;
-    console.log(`[db] using embedded Postgres (PGlite) in ${config.dataDir}`);
+  } catch (e) {
+    throw new Error(damagedMessage(e));
   }
   await migrate();
   await vacuumLog(true);
+  await backupEmbedded();
+}
+
+/** Closes the database. Call once, on shutdown, after the last query. */
+export async function closeDb(): Promise<void> {
+  const close = closeClient;
+  closeClient = null;
+  await close?.();
+}
+
+// ------------------------------------------------------------ backups of the embedded database
+
+/**
+ * A process that is killed (rather than shut down) can't close the embedded
+ * database, and if that happens mid-write PGlite may not open again; `tsx
+ * watch` restarts on Windows are such kills. So a copy is kept: at startup,
+ * at most every BACKUP_HOURS, the newest BACKUPS_KEPT. A Postgres server
+ * (DATABASE_URL) is crash-safe and backed up with its own tools instead.
+ */
+const BACKUP_HOURS = 6;
+const BACKUPS_KEPT = 3;
+export const backupsDir = () => join(dirname(config.dataDir), `${basename(config.dataDir)}-backups`);
+
+/** Backups, newest first (folder names are timestamps). */
+export function listBackups(): string[] {
+  const dir = backupsDir();
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((n) => /^\d{8}-\d{6}$/.test(n))
+    .sort()
+    .reverse()
+    .map((n) => join(dir, n));
+}
+
+const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+const stampTime = (name: string) => Date.parse(`${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}T${name.slice(9, 11)}:${name.slice(11, 13)}:${name.slice(13, 15)}Z`);
+
+async function backupEmbedded(): Promise<void> {
+  if (!embedded || process.env.DB_BACKUPS === 'off') return;
+  const newest = listBackups()[0];
+  if (newest && Date.now() - stampTime(basename(newest)) < BACKUP_HOURS * 3600_000) return;
+  const t0 = performance.now();
+  try {
+    // Everything on disk first; then a synchronous copy, during which nothing else can run (so nothing writes).
+    await rawExec!('CHECKPOINT');
+    const target = join(backupsDir(), stamp(new Date()));
+    mkdirSync(backupsDir(), { recursive: true });
+    cpSync(config.dataDir, target, { recursive: true, filter: (src) => basename(src) !== 'postmaster.pid' });
+    for (const old of listBackups().slice(BACKUPS_KEPT)) rmSync(old, { recursive: true, force: true });
+    console.log(`[db] backed up the database to ${target} (${Math.round(performance.now() - t0)} ms)`);
+  } catch (e) {
+    console.error('[db] backing up the database failed', e);
+  }
+}
+
+/** What to do when the embedded database won't open. */
+function damagedMessage(e: unknown): string {
+  const backups = listBackups();
+  return [
+    `The embedded database in ${config.dataDir} could not be opened (${e instanceof Error ? e.message : String(e)}).`,
+    'It was probably damaged by the server being killed while writing.',
+    backups.length
+      ? `Restore the newest backup (from ${basename(backups[0]!)}) with: pnpm --filter @figma/server db:restore`
+      : 'There are no backups to restore.',
+    'Or repair it with a Postgres 18 install: pg_resetwal -f on a copy of the folder (see docs/operations.md).',
+  ].join('\n');
 }
 
 let lastVacuum = 0;

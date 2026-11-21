@@ -36,6 +36,59 @@ restart it; every change is already in the update log. `/api/errors` accepts
 connections, error counts, and the event-loop delay since the previous check.
 The event-loop delay is the best single measure of how busy the server is.
 
+## The embedded database
+
+Without `DATABASE_URL`, the server stores everything in an embedded Postgres
+(PGlite) in `DATA_DIR` (default `apps/server/.data/pg`). It runs inside the
+server process, so tools like pgAdmin don't see it. To use a Postgres server
+instead, see "Using your own Postgres" below.
+
+If the server is **killed** while the database is writing, PGlite may refuse
+to open afterwards. A normal stop (Ctrl+C, or SIGTERM in production) closes it
+cleanly, but a kill can't run any shutdown code. On Windows, every `tsx watch`
+restart in development is a kill. Two safety nets cover this:
+
+- **Automatic backups.** At startup, at most every 6 hours, the server takes a
+  consistent copy into `<DATA_DIR>-backups/<time>` and keeps the newest 3. Set
+  `DB_BACKUPS=off` to turn this off.
+- **A clear message instead of a crash.** If the database won't open, the
+  server says so, names the newest backup, and exits.
+
+To restore, stop the server, then run:
+
+```powershell
+pnpm --filter @figma/server db:restore
+```
+
+The current folder is moved aside (to `<DATA_DIR>-replaced-<time>`), never
+deleted. Add `-- --list` to see the backups, or `-- --from <time>` to pick one.
+
+Changes made after the backup are lost. Files that were open in a browser
+sync their newer edits back the next time they're opened there, because
+browsers keep a copy.
+
+**Repairing without a backup.** With a Postgres 18 install (the same major
+version as PGlite), run the repair on a **copy** of the folder:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\pg_resetwal.exe" -f <copy of the folder>
+```
+
+Then put the copy in place. This resets the write-ahead log: the last moments
+before the crash may be lost, but the rest comes back.
+
+## Using your own Postgres
+
+1. In pgAdmin (or `psql`), create a user and a database, for example user
+   `figma` and database `figma`.
+2. In `apps/server/.env`, set
+   `DATABASE_URL=postgres://figma:<password>@localhost:5432/figma`.
+3. Start the server. It creates its tables on first start.
+
+The data then lives in that database, visible in pgAdmin and backed up with
+`pg_dump`. Data already in the embedded database isn't moved over
+automatically.
+
 ## Document migrations
 
 Files record the schema version they were last upgraded to, in
