@@ -2934,3 +2934,342 @@ button.swatch {
   flex: 1;
   min-width: 0;
 }
+
+/* Export settings */
+.export-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 62px 20px;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.export-row input,
+.export-row select {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  height: 26px;
+  font: inherit;
+  font-size: 11px;
+}
+.export-row input {
+  border: 1px solid var(--border, #e6e6e6);
+  border-radius: 4px;
+  padding: 0 6px;
+  background: transparent;
+}
+.export-preview {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 12px 12px;
+  display: flex;
+  justify-content: center;
+}
+.export-preview img {
+  max-width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+}
+
+/* Inspect */
+.right-tabs {
+  border-bottom: 1px solid var(--border, #e6e6e6);
+}
+.inspect-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 8px;
+}
+.inspect-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  min-width: 0;
+}
+.inspect-label {
+  color: var(--text-dim, #8c8c8c);
+  font-size: 11px;
+  flex: none;
+  min-width: 18px;
+  text-transform: capitalize;
+}
+.inspect-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.inspect-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #7b3fe4;
+  background: #f1e9ff;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.inspect-copy {
+  opacity: 0.5;
+}
+.inspect-row:hover .inspect-copy,
+.inspect-copy:focus {
+  opacity: 1;
+}
+.code-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.code-tabs button {
+  flex: 1;
+  border: none;
+  background: var(--hover, #f0f0f0);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  color: inherit;
+}
+.code-tabs button.active {
+  background: #1e1e1e;
+  color: #fff;
+}
+.inspect-code {
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: #1e1e1e;
+  color: #e6e6e6;
+  font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 340px;
+  overflow: auto;
+}
+
+/* Prototype */
+.proto-item {
+  border: 1px solid var(--border, #e6e6e6);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+.proto-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px 6px 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+.proto-trigger {
+  font-size: 11px;
+  color: var(--text-dim, #8c8c8c);
+  white-space: nowrap;
+}
+.proto-action {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proto-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 8px 10px;
+}
+.proto-field {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.proto-field.two {
+  grid-template-columns: minmax(0, 1fr) 90px;
+}
+.proto-field > span {
+  font-size: 11px;
+  color: var(--text-dim, #8c8c8c);
+}
+.proto-field select,
+.proto-field input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  height: 26px;
+  font: inherit;
+}
+.proto-num {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.proto-num input {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  font: inherit;
+  box-sizing: border-box;
+}
+.proto-num span {
+  font-size: 11px;
+  color: var(--text-dim, #8c8c8c);
+}
+.proto-dirs {
+  display: flex;
+  gap: 4px;
+  margin-left: 80px;
+}
+.proto-dirs button {
+  width: 28px;
+  height: 24px;
+  border: 1px solid var(--border, #e6e6e6);
+  background: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+.proto-dirs button.active {
+  background: #0d99ff;
+  color: #fff;
+  border-color: #0d99ff;
+}
+.proto-flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #0d99ff;
+  min-width: 0;
+}
+.proto-flow input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--text, #1e1e1e);
+}
+.proto-flow input:hover,
+.proto-flow input:focus {
+  border-color: var(--border, #ddd);
+}
+
+/* Present mode */
+.present {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  color: #fff;
+  user-select: none;
+}
+.present-loading {
+  background: #1e1e1e;
+  color: #ccc;
+}
+.pv-bar {
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: #2c2c2c;
+  border-bottom: 1px solid #383838;
+  min-width: 0;
+}
+.pv-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+.pv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: #3a3a3a;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pv-btn:hover {
+  background: #4a4a4a;
+}
+.pv-flow {
+  height: 28px;
+  background: #3a3a3a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+}
+.pv-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.pv-device.framed {
+  background: #0b0b0b;
+  box-shadow: 0 0 0 2px #3a3a3a, 0 20px 60px rgba(0, 0, 0, 0.5);
+  transform-origin: center;
+  flex: none;
+}
+.pv-stage {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  touch-action: none;
+  cursor: default;
+}
+.pv-screen-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+}
+.pv-overlay-wrap {
+  position: absolute;
+  inset: 0;
+}
+.pv-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+.pv-hint {
+  position: absolute;
+  background: rgba(13, 153, 255, 0.25);
+  border: 1px solid rgba(13, 153, 255, 0.8);
+  border-radius: 2px;
+  pointer-events: none;
+  animation: pv-hint 0.7s ease-out forwards;
+}
+@keyframes pv-hint {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

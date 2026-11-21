@@ -1,4 +1,6 @@
 import { gridLines, gridSpans, isFrameLike, isGroupLike, worldBounds, worldTransform, type NodeId, type SceneNode } from '@figma/document';
+import { drawMeasurements } from './measure';
+import { drawPrototype } from './prototypeOverlay';
 import { applyToPoint, multiply, type Mat2D } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { CORNERS, getSelectionFrame, handleWorldPoint } from './handles';
@@ -78,6 +80,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   };
 
   if (hoverId && !selected.has(hoverId)) outline(hoverId, 1.5);
+  drawMeasurements(ctx, ed);
+  drawPrototype(ctx, ed);
   for (const id of selection) if (id !== editingTextId) outline(id, 1);
 
   const frame = getSelectionFrame(ed);

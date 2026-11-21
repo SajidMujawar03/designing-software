@@ -1,4 +1,5 @@
 import type { BooleanOperation } from '@figma/document';
+import { copyAsPng, exportLayers, saveFiles } from './export';
 import { follow, usePresence } from '../cloud/presence';
 import { createComponent, detachSelection } from './componentCommands';
 import { addAutoLayout, removeAutoLayout } from './layoutCommands';
@@ -69,6 +70,7 @@ export function installShortcuts(): () => void {
       const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
       if (e.code === 'KeyG') return run(() => editor.frameSelection());
       if (e.code === 'KeyK') return run(() => createComponent(editor));
+      if (e.key === 'Enter') return run(() => (document.querySelector('.present-btn') as HTMLButtonElement | null)?.click());
       if (e.code === 'KeyV') return run(() => editor.setUI({ variablesOpen: true }));
       if (e.code === 'KeyB') return run(() => detachSelection(editor));
       if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));
@@ -76,6 +78,8 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyM') return run(() => editor.useAsMask());
     }
     if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') return run(() => void flattenSelection(editor));
+    if (mod && e.shiftKey && !e.altKey && (e.code === 'KeyC' || key === 'c')) return run(() => void copyAsPng());
+    if (mod && e.shiftKey && !e.altKey && (e.code === 'KeyE' || key === 'e')) return run(() => void exportLayers(editor.topLevelSelection()).then((f) => saveFiles(f)));
 
     // Alignment: Alt+A/D/H (left/right/center), Alt+W/S/V (top/bottom/middle); with Shift, H/V distribute.
     if (e.altKey && !mod) {
@@ -162,8 +166,16 @@ export function installShortcuts(): () => void {
 
   const onKeyUp = (e: KeyboardEvent) => {
     if (e.key === ' ') editor.setUI({ spaceHeld: false });
+    if (e.key === 'Alt') editor.setUI({ altHeld: false });
   };
-  const onBlur = () => editor.setUI({ spaceHeld: false });
+  const onBlur = () => editor.setUI({ spaceHeld: false, altHeld: false });
+  // Holding Alt measures to the hovered layer (works even while typing elsewhere is not focused).
+  const onAltDown = (e: KeyboardEvent) => {
+    if (e.key === 'Alt' && !e.repeat && !isTyping(e.target)) {
+      e.preventDefault(); // keeps the browser menu bar from taking focus
+      editor.setUI({ altHeld: true });
+    }
+  };
 
   const onCopy = (e: ClipboardEvent) => {
     if (isTyping(e.target) || !e.clipboardData) return;
@@ -184,6 +196,7 @@ export function installShortcuts(): () => void {
   window.addEventListener('cut', onCopy);
   window.addEventListener('paste', onPaste);
   window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keydown', onAltDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', onBlur);
   return () => {
@@ -191,6 +204,7 @@ export function installShortcuts(): () => void {
     window.removeEventListener('cut', onCopy);
     window.removeEventListener('paste', onPaste);
     window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keydown', onAltDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('blur', onBlur);
   };

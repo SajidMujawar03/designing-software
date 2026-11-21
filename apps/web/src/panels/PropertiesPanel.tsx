@@ -32,7 +32,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { editor } from '../editor/editor';
-import { exportJson, exportPng, exportSvgFile } from '../editor/export';
+import { exportJson } from '../editor/export';
+import { BatchExportSection, ExportSection } from './ExportPanel';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from '../editor/pathCommands';
 import { rememberFont, weightsOf } from '../editor/fonts';
 import { FontPicker } from './FontPicker';
@@ -212,7 +213,7 @@ export function PropertiesPanel() {
       <EffectsSection ids={ids} nodes={nodes} />
       <LayoutGridSection ids={ids} nodes={nodes} />
 
-      <ExportSection ids={ids} />
+      <ExportSection ids={ids} nodes={nodes} />
     </div>
   );
 }
@@ -550,37 +551,6 @@ function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]
   );
 }
 
-function ExportSection({ ids }: { ids: NodeId[] }) {
-  const [scale, setScale] = useState(1);
-  const [format, setFormat] = useState<'PNG' | 'SVG'>('PNG');
-  const run = async () => {
-    for (const id of ids) {
-      if (format === 'PNG') await exportPng(id, scale);
-      else await exportSvgFile(id);
-    }
-  };
-  return (
-    <Section title="Export">
-      <div className="grid2">
-        <select className="select" value={scale} onChange={(e) => setScale(Number(e.target.value))} disabled={format === 'SVG'} aria-label="Scale">
-          {[0.5, 1, 2, 3, 4].map((s) => (
-            <option key={s} value={s}>
-              {s}x
-            </option>
-          ))}
-        </select>
-        <select className="select" value={format} onChange={(e) => setFormat(e.target.value as 'PNG' | 'SVG')} aria-label="Format">
-          <option>PNG</option>
-          <option>SVG</option>
-        </select>
-      </div>
-      <button type="button" className="btn" onClick={() => void run()}>
-        Export {ids.length > 1 ? `${ids.length} layers` : 'layer'}
-      </button>
-    </Section>
-  );
-}
-
 function PageProperties() {
   const pageId = useUI((s) => s.pageId);
   const page = editor.doc.get(pageId);
@@ -616,6 +586,7 @@ function PageProperties() {
           Open variables
         </button>
       </Section>
+      <BatchExportSection />
       <Section title="File">
         <button type="button" className="btn" onClick={exportJson}>
           Export file as JSON

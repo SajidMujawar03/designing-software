@@ -55,6 +55,12 @@ export interface UIState {
   historyOpen: boolean;
   /** The share dialog (cloud files). */
   shareOpen: boolean;
+  /** Right sidebar tab. */
+  rightTab: 'design' | 'prototype' | 'inspect';
+  /** Dragging a prototype connection from a layer (world point, and the frame under it). */
+  protoDrag: { from: NodeId; to: Vec2; target: NodeId | null } | null;
+  /** Alt held: measure distances to hovered layers. */
+  altHeld: boolean;
   /** Editing a vector's points and handles. */
   vectorEdit: { id: NodeId; selected: PointRef[] } | null;
   /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
@@ -116,6 +122,9 @@ export const useUI = create<UIState>()(() => ({
   librariesOpen: false,
   historyOpen: false,
   shareOpen: false,
+  rightTab: 'design',
+  protoDrag: null,
+  altHeld: false,
   vectorEdit: null,
   penPreview: null,
   paintEdit: null,
