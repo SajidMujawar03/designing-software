@@ -73,6 +73,7 @@ export function defaultProps(type: NodeType): NodeProps {
       p.lineHeight = 1.2;
       p.letterSpacing = 0;
       p.textAlign = 'LEFT';
+      p.textAlignVertical = 'TOP';
       p.textAutoResize = 'WIDTH_AND_HEIGHT';
       break;
     default:

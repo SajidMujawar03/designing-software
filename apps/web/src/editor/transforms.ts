@@ -11,6 +11,7 @@ import {
 } from '@figma/document';
 import { applyToPoint, invert, rectUnion, type Rect, type Vec2 } from '@figma/geometry';
 import { layoutText } from '@figma/renderer';
+import { textEngine } from './textEngine';
 
 /** Normalizes degrees to (-180, 180]. */
 export function normDeg(d: number): number {
@@ -108,6 +109,15 @@ export function lineEndpoints(doc: DesignDocument, id: NodeId): [Vec2, Vec2] {
 export function fitText(doc: DesignDocument, id: NodeId): void {
   const n = doc.get(id);
   if (!n || n.type !== 'TEXT' || n.textAutoResize === 'NONE') return;
+  // Measure with Skia (what draws the text) when it has loaded, else with the browser.
+  const eng = textEngine();
+  if (eng) {
+    const l = eng.layout(n, doc);
+    const patch: NodePatch = { height: Math.max(1, l.height) };
+    if (n.textAutoResize === 'WIDTH_AND_HEIGHT') patch.width = Math.max(1, l.width);
+    doc.updateNode(id, patch);
+    return;
+  }
   const layout = layoutText(n);
   const patch: NodePatch = { height: Math.max(layout.height, Math.ceil(layout.lineHeightPx)) };
   if (n.textAutoResize === 'WIDTH_AND_HEIGHT') patch.width = Math.max(1, layout.width);

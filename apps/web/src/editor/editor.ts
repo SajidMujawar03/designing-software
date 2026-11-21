@@ -2,6 +2,7 @@ import { DesignDocument, ROOT_ID, type NodeId, type SceneNode } from '@figma/doc
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
 import { importImages } from './images';
+import { indexAtWorld } from './textEditing';
 import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
 import { useUI, type ToolId, type UIState, type Viewport } from './store';
@@ -579,16 +580,35 @@ export class Editor {
   }
 
   /** `isNew`: the node was just created, so creation and typing undo together. */
-  startTextEdit(id: NodeId, isNew = false): void {
+  /**
+   * Edits a text layer on the canvas. The caret goes where `at` (canvas point)
+   * is; a new layer starts empty; otherwise all text is selected.
+   */
+  startTextEdit(id: NodeId, isNew = false, at?: Vec2): void {
     if (!isNew) this.doc.endGesture();
-    this.setUI({ editingTextId: id, selection: [id], tool: 'select' });
+    const len = this.doc.get(id)?.characters?.length ?? 0;
+    this.setUI({
+      editingTextId: id,
+      selection: [id],
+      tool: 'select',
+      textSelection: { anchor: 0, focus: 0 },
+      pendingStyle: null,
+      caretTick: Date.now(),
+    });
+    let sel = { anchor: 0, focus: len };
+    if (isNew) sel = { anchor: 0, focus: 0 };
+    else if (at) {
+      const i = indexAtWorld(at, id);
+      sel = { anchor: i, focus: i };
+    }
+    this.setUI({ textSelection: sel });
   }
 
   /** Ends text editing; deletes the node if it is empty. */
   commitTextEdit(): void {
     const id = this.ui.editingTextId;
     if (!id) return;
-    this.setUI({ editingTextId: null });
+    this.setUI({ editingTextId: null, textSelection: null, pendingStyle: null });
     const n = this.doc.get(id);
     if (n && !(n.characters ?? '').trim()) {
       this.doc.deleteNodes([id]);

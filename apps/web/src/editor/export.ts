@@ -3,6 +3,7 @@ import { exportSvg, renderNodeToCanvas } from '@figma/renderer';
 import { getCanvasKit } from './canvaskit';
 import { editor } from './editor';
 import { booleanSvgPathData } from './pathCommands';
+import { textEngine } from './textEngine';
 
 function download(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -30,8 +31,10 @@ export async function exportSvgFile(id: NodeId): Promise<void> {
   if (!n) return;
   // Boolean layers need Skia's path operations to export their combined outline.
   const ck = await getCanvasKit().catch(() => null);
+  const eng = textEngine();
   const svg = exportSvg(editor.doc, id, {
     booleanPathData: ck ? (bid) => booleanSvgPathData(ck, editor.doc, bid) : undefined,
+    textSpans: eng ? (n) => eng.spans(n, editor.doc) : undefined,
   });
   download(new Blob([svg], { type: 'image/svg+xml' }), `${safeName(n.name)}.svg`);
 }

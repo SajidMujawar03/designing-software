@@ -133,7 +133,34 @@ export type Effect = ShadowEffect | BlurEffect;
 export type StrokeCap = 'NONE' | 'ROUND' | 'SQUARE';
 export type StrokeJoin = 'MITER' | 'BEVEL' | 'ROUND';
 
-export type TextAlign = 'LEFT' | 'CENTER' | 'RIGHT';
+export type TextAlign = 'LEFT' | 'CENTER' | 'RIGHT' | 'JUSTIFIED';
+export type TextAlignVertical = 'TOP' | 'CENTER' | 'BOTTOM';
+export type TextDecoration = 'NONE' | 'UNDERLINE' | 'STRIKETHROUGH';
+export type TextCase = 'ORIGINAL' | 'UPPER' | 'LOWER' | 'TITLE';
+
+/** Character styles: set on the whole text layer, or on ranges (runs) inside it. */
+export interface TextStyleProps {
+  fontFamily?: string;
+  fontWeight?: number;
+  fontSize?: number;
+  italic?: boolean;
+  /** Multiplier of the font size. */
+  lineHeight?: number;
+  /** px */
+  letterSpacing?: number;
+  textDecoration?: TextDecoration;
+  textCase?: TextCase;
+  /** Range color as 8-digit hex (RRGGBBAA); the layer's fills otherwise. */
+  color?: string;
+  /** Shared text style this range uses (null once detached). */
+  textStyleId?: string | null;
+}
+
+/** A range of characters [start, end) with style overrides. */
+export interface TextRun extends TextStyleProps {
+  start: number;
+  end: number;
+}
 export type TextAutoResize = 'WIDTH_AND_HEIGHT' | 'HEIGHT' | 'NONE';
 
 export interface SceneNode {
@@ -193,11 +220,51 @@ export interface SceneNode {
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: number;
+  italic?: boolean;
   lineHeight?: number; // multiplier of fontSize
   letterSpacing?: number; // px
+  textDecoration?: TextDecoration;
+  textCase?: TextCase;
   textAlign?: TextAlign;
+  textAlignVertical?: TextAlignVertical;
   textAutoResize?: TextAutoResize;
+  /** Ranges whose style differs from the layer's (derived from the text; read-only). */
+  textRuns?: TextRun[];
+
+  // Shared styles in use (null once detached).
+  fillStyleId?: string | null;
+  strokeStyleId?: string | null;
+  effectStyleId?: string | null;
+  textStyleId?: string | null;
 }
+
+/** Text properties a text style controls (color comes from fills, as in Figma). */
+export type TextStyleValues = Required<Omit<TextStyleProps, 'color' | 'textStyleId'>>;
+
+interface StyleBase {
+  id: string;
+  /** Slashes group styles into folders, e.g. "Brand/Primary". */
+  name: string;
+  description?: string;
+}
+
+export interface FillStyle extends StyleBase {
+  type: 'FILL';
+  paints: Paint[];
+}
+
+export interface TextStyle extends StyleBase {
+  type: 'TEXT';
+  text: TextStyleValues;
+}
+
+export interface EffectStyle extends StyleBase {
+  type: 'EFFECT';
+  effects: Effect[];
+}
+
+export type SharedStyle = FillStyle | TextStyle | EffectStyle;
+export type StyleType = SharedStyle['type'];
 
 export type NodeProps = Omit<SceneNode, 'id' | 'parentId' | 'index'>;
 export type NodePatch = Partial<NodeProps>;

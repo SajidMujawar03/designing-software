@@ -1,5 +1,13 @@
-import { defaultEffect, isGroupLike, rgbaCss, solid, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
+import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
+  AlignJustify,
+  ArrowDownToLine,
+  ArrowUpToLine,
+  Bold,
+  FoldVertical,
+  Italic,
+  Strikethrough,
+  Underline,
   Eye,
   EyeOff,
   Minus,
@@ -26,11 +34,14 @@ import { useState } from 'react';
 import { editor } from '../editor/editor';
 import { exportJson, exportPng, exportSvgFile } from '../editor/export';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from '../editor/pathCommands';
-import { FONT_FAMILIES, weightsOf } from '../editor/fonts';
+import { rememberFont, weightsOf } from '../editor/fonts';
+import { FontPicker } from './FontPicker';
 import { useDocVersion } from '../editor/hooks';
+import * as TextEdit from '../editor/textEditing';
 import { useUI } from '../editor/store';
 import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
 import { ColorPicker } from './ColorPicker';
+import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -177,44 +188,123 @@ export function PropertiesPanel() {
 }
 
 function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
-  const val = <K extends keyof SceneNode>(k: K) => common(nodes.map((n) => n[k])) as SceneNode[K] | Mixed;
+  const editingId = useUI((s) => s.editingTextId);
+  useUI((s) => s.textSelection);
+  useUI((s) => s.pendingStyle);
+  const editing = editingId && ids.length === 1 && ids[0] === editingId;
+
+  // Values: the selection (or caret) while editing; every character of every layer otherwise.
+  const styles = editing
+    ? (() => {
+        const r = TextEdit.range();
+        const n = nodes[0];
+        if (r.start === r.end) return [TextEdit.currentStyle()!];
+        return styledSegments(n)
+          .filter((s) => s.end > r.start && s.start < r.end)
+          .map((s) => s.style);
+      })()
+    : nodes.flatMap((n) => (n.characters ? styledSegments(n).map((s) => s.style) : [baseTextStyle(n)]));
+  const val = <K extends keyof ReturnType<typeof baseTextStyle>>(k: K) => common(styles.map((s) => s[k]));
+  const nodeVal = <K extends keyof SceneNode>(k: K) => common(nodes.map((n) => n[k])) as SceneNode[K] | Mixed;
+
+  /** While editing: style the selection. Otherwise: the whole layer (clearing range overrides). */
+  const setStyle = (style: TextStyleProps, live = false) => {
+    if (editing) return TextEdit.applyStyle(style);
+    const run = () => {
+      for (const n of nodes) {
+        editor.doc.updateNode(n.id, style);
+        const len = n.characters?.length ?? 0;
+        const clear = Object.fromEntries(Object.keys(style).map((k) => [k, null]));
+        if (len) editor.doc.formatText(n.id, 0, len, clear);
+        fitText(editor.doc, n.id);
+      }
+    };
+    if (live) run();
+    else editor.doc.change(run);
+  };
+
   const family = val('fontFamily');
   const weight = val('fontWeight');
-  const align = val('textAlign');
-  const resize = val('textAutoResize');
+  const italic = val('italic');
+  const decoration = val('textDecoration');
+  const textCase = val('textCase');
+  const align = nodeVal('textAlign');
+  const valign = nodeVal('textAlignVertical');
+  const resize = nodeVal('textAutoResize');
+  const weightList = weightOptions(family === MIXED ? MIXED : family);
+
+  // The text style in use: the selected range's while editing, the layer's otherwise.
+  const textStyleId = editing
+    ? (() => {
+        const n = nodes[0];
+        const r = TextEdit.range();
+        const at = r.start === r.end ? Math.max(0, r.start - 1) : r.start;
+        const run = (n.textRuns ?? []).find((x) => at >= x.start && at < x.end);
+        return run?.textStyleId ?? n.textStyleId ?? null;
+      })()
+    : common(nodes.map((n) => n.textStyleId ?? null));
+  const textStyle = textStyleId && textStyleId !== MIXED ? editor.doc.getStyle(textStyleId) : undefined;
+  const applyTextStyleHere = (sid: string) => {
+    editor.doc.change(() => {
+      const r = TextEdit.range();
+      for (const n of nodes) {
+        editor.doc.applyTextStyle(n.id, sid, editing && r.end > r.start ? r : undefined);
+        fitText(editor.doc, n.id);
+      }
+    });
+  };
+
   return (
-    <Section title="Text">
-      <select
-        className="select"
-        value={family === MIXED ? '' : family}
-        onChange={(e) => apply(ids, { fontFamily: e.target.value })}
-        aria-label="Font family"
-      >
-        {family === MIXED && <option value="">Mixed</option>}
-        {FONT_FAMILIES.map((f) => (
-          <option key={f}>{f}</option>
-        ))}
-      </select>
+    <Section
+      title={editing && TextEdit.range().end > TextEdit.range().start ? 'Text · selection' : 'Text'}
+      actions={
+        <StyleMenu
+          type="TEXT"
+          title="Text styles"
+          onPick={(sid) => applyTextStyleHere(sid)}
+          onCreate={(name) =>
+            editor.doc.change(() => {
+              const values = textStyleValues(editing ? TextEdit.currentStyle()! : baseTextStyle(nodes[0]));
+              const sid = editor.doc.createStyle({ type: 'TEXT', name, text: values });
+              applyTextStyleHere(sid);
+            })
+          }
+        />
+      }
+    >
+      {textStyle && (
+        <StyleRow
+          style={textStyle}
+          onDetach={() => {
+            if (editing) {
+              const r = TextEdit.range();
+              if (r.end > r.start) editor.doc.change(() => editor.doc.formatText(nodes[0].id, r.start, r.end - r.start, { textStyleId: null }));
+            } else apply(ids, { textStyleId: null });
+          }}
+        />
+      )}
+      <FontPicker
+        value={family === MIXED ? null : family}
+        onPick={(f) => {
+          rememberFont(f);
+          setStyle({ fontFamily: f });
+        }}
+      />
       <div className="grid2">
         <select
           className="select"
           value={weight === MIXED ? '' : String(weight)}
-          onChange={(e) => apply(ids, { fontWeight: Number(e.target.value) })}
+          onChange={(e) => setStyle({ fontWeight: Number(e.target.value) })}
           aria-label="Font weight"
         >
           {weight === MIXED && <option value="">Mixed</option>}
-          {weightOptions(family ?? 'Inter').map(([w, label]) => (
+          {weightList.map(([w, label]) => (
             <option key={w} value={w}>
               {label}
             </option>
           ))}
         </select>
-        <NumberField
-          label="Size"
-          value={val('fontSize') as number | Mixed}
-          min={1}
-          onChange={(v, live) => apply(ids, { fontSize: v }, live)}
-        />
+        <NumberField label="Size" value={val('fontSize')} min={1} onChange={(v, live) => setStyle({ fontSize: v }, live)} />
         <NumberField
           label="Line"
           title="Line height"
@@ -222,15 +312,51 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           suffix="%"
           min={10}
           precision={0}
-          onChange={(v, live) => apply(ids, { lineHeight: v / 100 }, live)}
+          onChange={(v, live) => setStyle({ lineHeight: v / 100 }, live)}
         />
         <NumberField
           label="Letter"
           title="Letter spacing"
-          value={val('letterSpacing') as number | Mixed}
+          value={val('letterSpacing')}
           step={0.1}
-          onChange={(v, live) => apply(ids, { letterSpacing: v }, live)}
+          onChange={(v, live) => setStyle({ letterSpacing: v }, live)}
         />
+      </div>
+      <div className="button-row">
+        <IconButton title="Bold (Ctrl+B)" active={weight !== MIXED && weight >= 600} onClick={() => setStyle({ fontWeight: weight !== MIXED && weight >= 600 ? 400 : 700 })}>
+          <Bold size={14} />
+        </IconButton>
+        <IconButton title="Italic (Ctrl+I)" active={italic === true} onClick={() => setStyle({ italic: italic !== true })}>
+          <Italic size={14} />
+        </IconButton>
+        <IconButton
+          title="Underline (Ctrl+U)"
+          active={decoration === 'UNDERLINE'}
+          onClick={() => setStyle({ textDecoration: decoration === 'UNDERLINE' ? 'NONE' : 'UNDERLINE' })}
+        >
+          <Underline size={14} />
+        </IconButton>
+        <IconButton
+          title="Strikethrough (Ctrl+Shift+X)"
+          active={decoration === 'STRIKETHROUGH'}
+          onClick={() => setStyle({ textDecoration: decoration === 'STRIKETHROUGH' ? 'NONE' : 'STRIKETHROUGH' })}
+        >
+          <Strikethrough size={14} />
+        </IconButton>
+        <span className="spacer" />
+        <select
+          className="select case-select"
+          value={textCase === MIXED ? '' : textCase}
+          onChange={(e) => setStyle({ textCase: e.target.value as TextCase })}
+          aria-label="Letter case"
+          title="Letter case"
+        >
+          {textCase === MIXED && <option value="">Mixed</option>}
+          <option value="ORIGINAL">As typed</option>
+          <option value="UPPER">UPPERCASE</option>
+          <option value="LOWER">lowercase</option>
+          <option value="TITLE">Title Case</option>
+        </select>
       </div>
       <div className="button-row">
         {(
@@ -238,6 +364,7 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
             ['LEFT', AlignLeft],
             ['CENTER', AlignCenter],
             ['RIGHT', AlignRight],
+            ['JUSTIFIED', AlignJustify],
           ] as Array<[TextAlign, typeof AlignLeft]>
         ).map(([a, Icon]) => (
           <IconButton key={a} title={`Align ${a.toLowerCase()}`} active={align === a} onClick={() => apply(ids, { textAlign: a })}>
@@ -245,6 +372,24 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           </IconButton>
         ))}
         <span className="spacer" />
+        {(
+          [
+            ['TOP', ArrowUpToLine, 'Align top'],
+            ['CENTER', FoldVertical, 'Align middle'],
+            ['BOTTOM', ArrowDownToLine, 'Align bottom'],
+          ] as Array<[TextAlignVertical, typeof AlignLeft, string]>
+        ).map(([a, Icon, label]) => (
+          <IconButton
+            key={a}
+            title={`${label} (fixed-size boxes)`}
+            active={(valign ?? 'TOP') === a}
+            onClick={() => apply(ids, { textAlignVertical: a })}
+          >
+            <Icon size={14} />
+          </IconButton>
+        ))}
+      </div>
+      <div className="button-row">
         {(
           [
             ['WIDTH_AND_HEIGHT', ArrowLeftRight, 'Auto width'],
@@ -257,7 +402,38 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           </IconButton>
         ))}
       </div>
+      {editing && <SelectionColor />}
     </Section>
+  );
+}
+
+/** While editing, the color of the selected characters (or of the next typed ones). */
+function SelectionColor() {
+  const [open, setOpen] = useState(false);
+  const id = useUI((s) => s.editingTextId);
+  const n = editor.doc.get(id);
+  const s = TextEdit.currentStyle();
+  if (!n || !s) return null;
+  const top = [...n.fills].reverse().find((f) => f.visible);
+  const layer = top ? paintColor(top) : { color: { r: 0, g: 0, b: 0 }, opacity: 1 };
+  const color = s.color ? hexToRgb(s.color.slice(0, 6)) : layer.color;
+  const opacity = s.color && s.color.length >= 8 ? parseInt(s.color.slice(6, 8), 16) / 255 : layer.opacity;
+  const toHex = (c: typeof color, o: number) => rgbToHex(c) + Math.round(o * 255).toString(16).padStart(2, '0').toUpperCase();
+  return (
+    <>
+      <div className="paint-row">
+        <button type="button" className="swatch" title="Selection color" onClick={() => setOpen(!open)}>
+          <span className="swatch-color" style={{ background: rgbaCss(color, opacity) }} />
+        </button>
+        <span className="hint grow">Selection color</span>
+        {s.color && (
+          <button type="button" className="btn small" onClick={() => TextEdit.applyStyle({ color: null })} title="Use the layer's fill">
+            Reset
+          </button>
+        )}
+      </div>
+      {open && <ColorPicker color={color} opacity={opacity} onChange={(c, o) => TextEdit.applyStyle({ color: toHex(c, o) })} />}
+    </>
   );
 }
 
@@ -271,17 +447,56 @@ function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]
     });
   const set = (next: Paint[], live: boolean) => apply(ids, { [prop]: next } as NodePatch, live);
   const paintEdit = useUI((s) => s.paintEdit);
+  const styleKey = prop === 'fills' ? 'fillStyleId' : 'strokeStyleId';
+  const styleId = common(nodes.map((n) => n[styleKey] ?? null));
+  const style = styleId !== MIXED ? editor.doc.getStyle(styleId) : undefined;
 
   return (
     <Section
       title={title}
       actions={
-        <IconButton title={`Add ${title.toLowerCase()}`} onClick={add}>
-          <Plus size={14} />
-        </IconButton>
+        <>
+          <StyleMenu
+            type="FILL"
+            title={`${title} styles`}
+            onPick={(sid) => editor.doc.change(() => ids.forEach((id) => editor.doc.applyStyle(id, sid, prop)))}
+            onCreate={
+              paints !== MIXED && paints.length
+                ? (name) =>
+                    editor.doc.change(() => {
+                      const sid = editor.doc.createStyle({ type: 'FILL', name, paints });
+                      ids.forEach((id) => editor.doc.applyStyle(id, sid, prop));
+                    })
+                : undefined
+            }
+          />
+          {!style && (
+            <IconButton title={`Add ${title.toLowerCase()}`} onClick={add}>
+              <Plus size={14} />
+            </IconButton>
+          )}
+        </>
       }
     >
-      {paints === MIXED ? (
+      {style ? (
+        <StyleRow
+          style={style}
+          onDetach={() => apply(ids, { [styleKey]: null } as NodePatch)}
+          onEdit={() => {
+            const row = document.activeElement?.closest('.paint-row')?.getBoundingClientRect();
+            editor.setUI({
+              paintEdit: {
+                ids: [],
+                prop,
+                index: Math.max(0, (style.type === 'FILL' ? style.paints.length : 1) - 1),
+                stop: 0,
+                anchor: { x: row?.left ?? 800, y: row?.top ?? 200 },
+                styleId: style.id,
+              },
+            });
+          }}
+        />
+      ) : paints === MIXED ? (
         <div className="hint">Mixed — click + to replace</div>
       ) : (
         [...paints]
@@ -360,6 +575,7 @@ function PageProperties() {
           onRemove={() => apply([page.id], { fills: [] })}
         />
       </Section>
+      <LocalStyles />
       <Section title="File">
         <button type="button" className="btn" onClick={exportJson}>
           Export file as JSON
@@ -727,23 +943,45 @@ function EffectsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const list = effects === MIXED ? [] : effects;
   const update = (i: number, patch: Partial<Effect>, live = false) =>
     set(list.map((e, j) => (j === i ? ({ ...e, ...patch } as Effect) : e)), live);
+  const effectStyleId = common(nodes.map((n) => n.effectStyleId ?? null));
+  const effectStyle = effectStyleId !== MIXED ? editor.doc.getStyle(effectStyleId) : undefined;
 
   return (
     <Section
       title="Effects"
       actions={
-        <IconButton
-          title="Add effect"
-          onClick={() => {
-            set([...(effects === MIXED ? [] : effects), defaultEffect('DROP_SHADOW')]);
-            setOpen(list.length);
-          }}
-        >
-          <Plus size={14} />
-        </IconButton>
+        <>
+          <StyleMenu
+            type="EFFECT"
+            title="Effect styles"
+            onPick={(sid) => editor.doc.change(() => ids.forEach((id) => editor.doc.applyStyle(id, sid, 'effects')))}
+            onCreate={
+              list.length
+                ? (name) =>
+                    editor.doc.change(() => {
+                      const sid = editor.doc.createStyle({ type: 'EFFECT', name, effects: list });
+                      ids.forEach((id) => editor.doc.applyStyle(id, sid, 'effects'));
+                    })
+                : undefined
+            }
+          />
+          {!effectStyle && (
+            <IconButton
+              title="Add effect"
+              onClick={() => {
+                set([...(effects === MIXED ? [] : effects), defaultEffect('DROP_SHADOW')]);
+                setOpen(list.length);
+              }}
+            >
+              <Plus size={14} />
+            </IconButton>
+          )}
+        </>
       }
     >
-      {effects === MIXED ? (
+      {effectStyle ? (
+        <StyleRow style={effectStyle} onDetach={() => apply(ids, { effectStyleId: null })} />
+      ) : effects === MIXED ? (
         <div className="hint">Mixed — click + to replace</div>
       ) : (
         list.map((e, i) => (

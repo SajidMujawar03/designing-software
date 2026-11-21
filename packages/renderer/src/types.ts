@@ -17,7 +17,7 @@ export interface FontRegistry {
    * Font bytes for a family/weight, or null while loading (loading starts on
    * the first request). `resolvedWeight` is the closest weight available.
    */
-  get(family: string, weight: number): { data: ArrayBuffer; resolvedWeight: number } | null;
+  get(family: string, weight: number, italic?: boolean): { data: ArrayBuffer; resolvedWeight: number; italic: boolean } | null;
   /** Called when any font finishes loading. Returns an unsubscribe function. */
   onLoad(cb: () => void): () => void;
 }

@@ -12,7 +12,9 @@ import { snapPx } from '../tools/types';
 import { drawOverlay } from './overlay';
 import { hitGradientHandle, moveGradientHandle } from './gradientHandles';
 import { hitGuide, RULER } from './rulers';
-import { TextEditor } from './TextEditor';
+import { TextInput } from './TextInput';
+import { textEngine } from '../textEngine';
+import * as TextEdit from '../textEditing';
 
 const CANVAS_BG = { r: 245 / 255, g: 245 / 255, b: 245 / 255 };
 const pageBackground = () => {
@@ -74,13 +76,15 @@ export function CanvasView() {
       if (!frame) frame = requestAnimationFrame(draw);
     };
     const renderer: SceneRenderer =
-      backend === 'canvaskit' && ck ? new CanvasKitRenderer(ck, scene, fonts, schedule) : new Canvas2DRenderer(scene, schedule);
+      backend === 'canvaskit' && ck
+        ? new CanvasKitRenderer(ck, scene, fonts, schedule, textEngine() ?? undefined)
+        : new Canvas2DRenderer(scene, schedule);
     editor.renderer = renderer;
     editor.setUI({ activeRenderer: renderer.kind });
 
     function draw() {
       frame = 0;
-      const { viewport, editingTextId } = editor.ui;
+      const { viewport } = editor.ui;
       const { width, height } = editor.canvasSize;
       fonts.requestUsed(editor.doc);
       renderer.render(editor.doc, editor.pageId, {
@@ -92,7 +96,6 @@ export function CanvasView() {
           height: height / viewport.zoom,
         },
         background: pageBackground(),
-        hidden: editingTextId ? new Set([editingTextId]) : undefined,
       });
       octx.setTransform(1, 0, 0, 1, 0, 0);
       octx.clearRect(0, 0, overlay.width, overlay.height);
@@ -140,6 +143,16 @@ export function CanvasView() {
     let guide: { index: number; axis: 'x' | 'y' } | null = null;
     /** Gradient handle being dragged (paint editor open). */
     let gradientHandle: number | null = null;
+    /** Selecting text with the pointer (anchor index). */
+    let textDrag: number | null = null;
+    /** Click counting (pointer events report no click count): time and place of the last press. */
+    let lastDown = { t: 0, x: 0, y: 0, count: 0 };
+    const clickCount = (e: PointerEvent) => {
+      const near = Math.hypot(e.clientX - lastDown.x, e.clientY - lastDown.y) < 5;
+      const count = near && e.timeStamp - lastDown.t < 450 ? lastDown.count + 1 : 1;
+      lastDown = { t: e.timeStamp, x: e.clientX, y: e.clientY, count };
+      return count;
+    };
 
     const toEvent = (e: PointerEvent | MouseEvent): ToolEvent => {
       const r = canvas.getBoundingClientRect();
@@ -161,6 +174,25 @@ export function CanvasView() {
       canvas.setPointerCapture(e.pointerId);
       const ui = editor.ui;
       const ev = toEvent(e);
+      const clicks = clickCount(e);
+      // Editing text: clicks inside it place the caret, select words (double) or lines (triple).
+      if (ui.editingTextId && e.button === 0 && !ui.spaceHeld) {
+        const tid = ui.editingTextId;
+        const inside = hitTest(editor.doc, editor.pageId, ev.world, { tolerance: 4 / ui.viewport.zoom })?.id === tid;
+        if (inside) {
+          const i = TextEdit.indexAtWorld(ev.world);
+          if (clicks === 2) TextEdit.selectWordAt(i);
+          else if (clicks >= 3) TextEdit.selectLineAt(i);
+          else {
+            const anchor = e.shiftKey ? (ui.textSelection?.anchor ?? i) : i;
+            TextEdit.setSelection(anchor, i);
+            textDrag = anchor;
+          }
+          (document.querySelector('.text-input') as HTMLTextAreaElement | null)?.focus({ preventScroll: true });
+          return;
+        }
+        editor.commitTextEdit();
+      }
       const gradHit = e.button === 0 && !ui.spaceHeld ? hitGradientHandle(editor, ev.screen) : null;
       if (gradHit !== null) {
         editor.doc.endGesture();
@@ -179,6 +211,10 @@ export function CanvasView() {
     };
     const onMove = (e: PointerEvent) => {
       const ev = toEvent(e);
+      if (textDrag !== null) {
+        TextEdit.setSelection(textDrag, TextEdit.indexAtWorld(ev.world));
+        return;
+      }
       if (gradientHandle !== null) {
         moveGradientHandle(editor, gradientHandle, ev.world);
         return;
@@ -190,11 +226,20 @@ export function CanvasView() {
       if (active) return active.move(ev);
       currentTool().hover?.(ev);
       if (hitGradientHandle(editor, ev.screen) !== null) return editor.setUI({ cursor: 'move', hoverId: null });
+      if (editor.ui.editingTextId) {
+        const over = hitTest(editor.doc, editor.pageId, ev.world, { tolerance: 4 / editor.ui.viewport.zoom })?.id;
+        if (over === editor.ui.editingTextId) return editor.setUI({ cursor: 'text' });
+      }
       const gh = hitGuide(editor, ev.screen);
       if (gh?.kind === 'guide') editor.setUI({ cursor: gh.axis === 'x' ? 'ew-resize' : 'ns-resize', hoverId: null });
       else if (gh?.kind === 'ruler') editor.setUI({ cursor: 'default', hoverId: null });
     };
     const onUp = (e: PointerEvent) => {
+      if (textDrag !== null) {
+        textDrag = null;
+        if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        return;
+      }
       if (gradientHandle !== null) {
         gradientHandle = null;
         editor.doc.endGesture();
@@ -217,7 +262,11 @@ export function CanvasView() {
       t.up(toEvent(e));
       if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
     };
-    const onDbl = (e: MouseEvent) => currentTool().doubleClick?.(toEvent(e));
+    const onDbl = (e: MouseEvent) => {
+      // Inside text being edited, double/triple clicks select words and lines (handled on pointerdown).
+      if (editor.ui.editingTextId) return;
+      currentTool().doubleClick?.(toEvent(e));
+    };
     const onLeave = () => {
       if (!active) editor.setUI({ hoverId: null });
     };
@@ -240,6 +289,11 @@ export function CanvasView() {
     };
     editor.cancelGesture = onCancel;
 
+    // While editing text, keep keyboard focus in the text input (a click would otherwise blur it).
+    const onMouseDown = (e: MouseEvent) => {
+      if (editor.ui.editingTextId) e.preventDefault();
+    };
+    canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerup', onUp);
@@ -258,6 +312,7 @@ export function CanvasView() {
     };
     canvas.addEventListener('contextmenu', onContext);
     return () => {
+      canvas.removeEventListener('mousedown', onMouseDown);
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
@@ -289,7 +344,7 @@ export function CanvasView() {
       {/* A fresh element per backend: a canvas cannot switch between WebGL and 2D contexts. */}
       <canvas key={backend} ref={sceneRef} className="scene-canvas" data-renderer={backend} />
       <canvas ref={canvasRef} className="overlay-canvas" style={{ cursor: css }} data-testid="canvas" />
-      <TextEditor />
+      <TextInput />
     </div>
   );
 }

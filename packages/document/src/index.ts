@@ -4,3 +4,4 @@ export * from './defaults';
 export * from './document';
 export * from './scene';
 export * from './vector';
+export * from './text';

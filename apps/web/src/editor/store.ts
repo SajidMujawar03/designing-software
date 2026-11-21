@@ -1,4 +1,4 @@
-import type { NodeId } from '@figma/document';
+import type { NodeId, TextStyleProps } from '@figma/document';
 import type { Rect, Vec2 } from '@figma/geometry';
 import { create } from 'zustand';
 import type { SnapGuides } from './snapping';
@@ -59,7 +59,16 @@ export interface UIState {
     stop: number;
     /** Where the popover opens (window coords of the paint row). */
     anchor: { x: number; y: number };
+    /** Editing a color style's paint instead of layers' paints. */
+    styleId?: string;
   } | null;
+  /** Caret (anchor = focus) or selection while editing text. */
+  textSelection: { anchor: number; focus: number } | null;
+  /** Style picked with a collapsed caret, applied to the next typed text. */
+  pendingStyle: TextStyleProps | null;
+  /** Caret blink phase and last caret move (the caret stays solid right after moving). */
+  caretBlink: boolean;
+  caretTick: number;
   /** Renderer the user prefers; CanvasKit falls back to Canvas 2D if it cannot start. */
   rendererPref: 'canvaskit' | 'canvas2d';
   /** Renderer actually drawing the canvas. */
@@ -93,6 +102,10 @@ export const useUI = create<UIState>()(() => ({
   vectorEdit: null,
   penPreview: null,
   paintEdit: null,
+  textSelection: null,
+  pendingStyle: null,
+  caretBlink: true,
+  caretTick: 0,
   rendererPref: storedRenderer(),
   activeRenderer: null,
 }));
