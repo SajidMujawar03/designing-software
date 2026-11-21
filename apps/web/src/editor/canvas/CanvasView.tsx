@@ -1,4 +1,5 @@
 import { hitTest, paintColor, selectableAncestor } from '@figma/document';
+import { recordFrame } from '../perf';
 import { ASSET_MIME, insertInstanceAt } from '../componentCommands';
 import { Canvas2DRenderer, CanvasKitRenderer, type SceneRenderer } from '@figma/renderer';
 import type { CanvasKit } from 'canvaskit-wasm';
@@ -90,6 +91,7 @@ export function CanvasView() {
 
     function draw() {
       frame = 0;
+      const t0 = performance.now();
       const { viewport } = editor.ui;
       const { width, height } = editor.canvasSize;
       fonts.requestUsed(editor.doc);
@@ -103,11 +105,13 @@ export function CanvasView() {
         },
         background: pageBackground(),
       });
+      const t1 = performance.now();
       octx.setTransform(1, 0, 0, 1, 0, 0);
       octx.clearRect(0, 0, overlay.width, overlay.height);
       drawOverlay(octx, editor, dpr);
       octx.setTransform(dpr, 0, 0, dpr, 0, 0);
       drawPresence(octx, editor);
+      recordFrame(t1 - t0, performance.now() - t1);
     }
 
     const unsubDoc = editor.doc.subscribe(schedule);

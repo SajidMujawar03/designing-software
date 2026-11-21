@@ -994,9 +994,32 @@ export class DesignDocument {
     }
   }
 
+  /** Bumped on every node change; renderers cache by it. */
+  private changeCounter = 0;
+  private subtreeVersions = new Map<NodeId, number>();
+
+  /**
+   * Changes whenever the layer or anything inside it changes (or a child is
+   * added, removed or reordered). Renderers use it to reuse cached drawings.
+   */
+  subtreeVersion(id: NodeId): number {
+    return this.subtreeVersions.get(id) ?? 0;
+  }
+
+  /** Marks a layer and its ancestors as changed. */
+  private touchSubtree(id: NodeId | null | undefined): void {
+    const v = ++this.changeCounter;
+    for (let cur = id, guard = 0; cur && guard < 256; guard++) {
+      this.subtreeVersions.set(cur, v);
+      cur = this.nodes.get(cur)?.parentId ?? null;
+    }
+  }
+
   /** Stores a node's snapshot (or removes it) and keeps the component indexes current. */
   private setSnapshot(id: NodeId, n: SceneNode | undefined): void {
     const old = this.nodes.get(id);
+    // The old parent chain (if moved or deleted) and the new one have changed.
+    if (old?.parentId && old.parentId !== n?.parentId) this.touchSubtree(old.parentId);
     const link = (m: Map<NodeId, Set<NodeId>>, from: NodeId | null | undefined, to: NodeId | null | undefined) => {
       if (from === to) return;
       if (from) {
@@ -1015,7 +1038,11 @@ export class DesignDocument {
     link(this.bySource, old?.sourceId, n?.sourceId);
     link(this.byComponent, old?.componentId, n?.componentId);
     if (n) this.nodes.set(id, n);
-    else this.nodes.delete(id);
+    else {
+      this.nodes.delete(id);
+      this.subtreeVersions.delete(id);
+    }
+    if (n) this.touchSubtree(id);
   }
 
   private onYEvents(events: Array<Y.YEvent<Y.AbstractType<unknown>>>): void {

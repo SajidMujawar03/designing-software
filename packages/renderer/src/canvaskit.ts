@@ -22,12 +22,24 @@ import type {
   Paint,
   Path,
   Surface,
+  Image,
+  SkPicture,
 } from 'canvaskit-wasm';
 import { CkPaints, toCk } from './ckpaint';
 import { booleanKey, booleanPath } from './pathops';
 import { SkText } from './textlayout';
 import type { FontRegistry, SceneOptions, SceneRenderer } from './types';
 
+
+interface LayerCacheEntry {
+  /** The layer's subtree version the drawings were made from. */
+  version: number;
+  bounds: Rect;
+  picture?: SkPicture;
+  raster?: { image: Image; level: number };
+}
+
+const toRect = (r: Rect) => [r.x, r.y, r.x + r.width, r.y + r.height];
 
 interface DrawContext {
   /** Visible area in canvas space, for culling. */
@@ -52,6 +64,15 @@ export class CanvasKitRenderer implements SceneRenderer {
   /** Text layout, shared with the editor (caret and selection) when it passes one in. */
   private text: SkText;
   private ownsText: boolean;
+  /**
+   * Cached drawings of top-level layers, reused until something inside them
+   * changes: a recorded picture (vector) when zoomed in, and a small raster
+   * image per zoom level when zoomed out, where thousands of layers would
+   * otherwise be drawn every frame.
+   */
+  private layerCache = new Map<NodeId, LayerCacheEntry>();
+  /** Turn caching off (e.g. to compare in benchmarks). */
+  cacheEnabled = true;
 
   constructor(
     private ck: CanvasKit,
@@ -65,8 +86,12 @@ export class CanvasKitRenderer implements SceneRenderer {
     this.paints = new CkPaints(ck);
     this.text = text ?? new SkText(ck, fonts);
     this.ownsText = !text;
-    // Layouts made with a fallback font are rebuilt once the real font arrives.
-    this.unsubscribeFonts = fonts.onLoad(onFontsChanged);
+    // Layouts made with a fallback font are rebuilt once the real font arrives
+    // (and cached drawings with them).
+    this.unsubscribeFonts = fonts.onLoad(() => {
+      this.clearLayerCache();
+      onFontsChanged();
+    });
   }
 
   resize(width: number, height: number, dpr: number): void {
@@ -87,10 +112,101 @@ export class CanvasKitRenderer implements SceneRenderer {
     c.save();
     c.concat(toCk(multiply([this.dpr, 0, 0, this.dpr, 0, 0], opts.view)));
     const ctx: DrawContext = { visible: opts.visible, hidden: opts.hidden };
-    this.drawChildren(c, doc, doc.children(pageId), IDENTITY, ctx);
+    const kids = doc.children(pageId);
+    // Masks at page level combine top-level layers: draw those pages directly.
+    if (!this.cacheEnabled || kids.some((k) => k.isMask && k.visible)) this.drawChildren(c, doc, kids, IDENTITY, ctx);
+    else this.drawCached(c, doc, kids, ctx, opts.view[0] * this.dpr);
     c.restore();
     surface.flush();
     this.prune(doc);
+  }
+
+  /** Zoom (device pixels per canvas unit) below which top-level layers are drawn from raster caches. */
+  static RASTER_BELOW = 0.35;
+
+  private drawCached(c: Canvas, doc: DesignDocument, kids: SceneNode[], ctx: DrawContext, zoom: number): void {
+    const hidden = ctx.hidden?.size ? [...ctx.hidden] : [];
+    const seen = new Set<NodeId>();
+    for (const k of kids) {
+      if (!k.visible || k.opacity <= 0) continue;
+      seen.add(k.id);
+      const version = doc.subtreeVersion(k.id);
+      let e = this.layerCache.get(k.id);
+      if (!e || e.version !== version) {
+        if (e) this.disposeEntry(e);
+        e = { version, bounds: renderBounds(doc, k.id) };
+        this.layerCache.set(k.id, e);
+      }
+      if (!rectIntersects(e.bounds, ctx.visible)) continue;
+      // Something inside is hidden (text being edited): draw it live.
+      if (hidden.length && hidden.some((h) => h === k.id || doc.isAncestor(k.id, h))) {
+        this.drawNode(c, doc, k, IDENTITY, ctx);
+        continue;
+      }
+      if (zoom < CanvasKitRenderer.RASTER_BELOW) {
+        const img = this.rasterOf(doc, k, e, zoom);
+        if (img) {
+          c.drawImageRectOptions(img.image, [0, 0, img.image.width(), img.image.height()], toRect(e.bounds), this.ck.FilterMode.Linear, this.ck.MipmapMode.None, null);
+          continue;
+        }
+      }
+      if (!e.picture) {
+        const rec = new this.ck.PictureRecorder();
+        const rc = rec.beginRecording(toRect(e.bounds));
+        this.drawNode(rc, doc, k, IDENTITY, { visible: e.bounds });
+        e.picture = rec.finishRecordingAsPicture();
+        rec.delete();
+      }
+      c.drawPicture(e.picture);
+    }
+    // Forget layers that are gone (or moved to another page).
+    for (const [id, e] of this.layerCache) {
+      if (!seen.has(id) && !doc.has(id)) {
+        this.disposeEntry(e);
+        this.layerCache.delete(id);
+      }
+    }
+  }
+
+  /** A raster image of a top-level layer at the zoom level (power of two) at or above `zoom`. */
+  private rasterOf(doc: DesignDocument, n: SceneNode, e: LayerCacheEntry, zoom: number): { image: Image; level: number } | null {
+    const level = Math.max(1 / 128, 2 ** Math.ceil(Math.log2(Math.max(zoom, 1e-4))));
+    if (e.raster?.level === level) return e.raster;
+    const w = Math.ceil(e.bounds.width * level);
+    const h = Math.ceil(e.bounds.height * level);
+    if (w < 1 || h < 1 || w > 4096 || h > 4096) return null;
+    const surface = this.surface?.makeSurface({
+      width: w,
+      height: h,
+      alphaType: this.ck.AlphaType.Premul,
+      colorType: this.ck.ColorType.RGBA_8888,
+      colorSpace: this.ck.ColorSpace.SRGB,
+    }) ?? this.ck.MakeSurface(w, h);
+    if (!surface) return null;
+    const rc = surface.getCanvas();
+    rc.clear(this.ck.TRANSPARENT);
+    rc.scale(level, level);
+    rc.translate(-e.bounds.x, -e.bounds.y);
+    this.drawNode(rc, doc, n, IDENTITY, { visible: e.bounds });
+    surface.flush();
+    const image = surface.makeImageSnapshot();
+    surface.delete();
+    e.raster?.image.delete();
+    e.raster = { image, level };
+    return e.raster;
+  }
+
+  private disposeEntry(e: LayerCacheEntry): void {
+    e.picture?.delete();
+    e.raster?.image.delete();
+    e.picture = undefined;
+    e.raster = undefined;
+  }
+
+  /** Drops every cached drawing (fonts changed, renderer disposed). */
+  clearLayerCache(): void {
+    for (const e of this.layerCache.values()) this.disposeEntry(e);
+    this.layerCache.clear();
   }
 
   async exportPng(doc: DesignDocument, id: NodeId, scale: number): Promise<Blob | null> {
@@ -117,6 +233,7 @@ export class CanvasKitRenderer implements SceneRenderer {
 
   dispose(): void {
     this.unsubscribeFonts();
+    this.clearLayerCache();
     if (this.ownsText) this.text.dispose();
     for (const { path } of this.paths.values()) path.delete();
     this.paths.clear();
