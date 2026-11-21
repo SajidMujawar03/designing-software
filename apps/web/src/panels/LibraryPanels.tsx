@@ -22,6 +22,7 @@ import { useUI } from '../editor/store';
 import { api } from '../cloud/api';
 import { renameCloudFile, useCloudFile } from '../cloud/cloudFile';
 import { IconButton } from './controls';
+import { ThemeSwitch } from './ThemeSwitch';
 
 const ago = (t: number) => {
   const s = Math.round((Date.now() - t) / 1000);
@@ -127,6 +128,7 @@ function CloudFileMenu() {
           <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ historyOpen: true }))}>
             <History size={12} /> Version history
           </button>
+          <ThemeSwitch role="menuitem" />
         </div>
       )}
     </div>
@@ -188,6 +190,7 @@ function LocalFileMenu() {
           <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ librariesOpen: true }))}>
             <BookOpen size={12} /> Libraries…
           </button>
+          <ThemeSwitch role="menuitem" />
           <div className="menu-sep" />
           <div className="menu-label">Files in this browser</div>
           {files.map((f) => (
@@ -238,7 +241,7 @@ export function LibrariesModal() {
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="libraries-modal" role="dialog" aria-label="Libraries" onKeyDown={(e) => e.key === 'Escape' && close()}>
+      <div className="libraries-modal" role="dialog" aria-modal="true" aria-label="Libraries" onKeyDown={(e) => e.key === 'Escape' && close()}>
         <div className="vm-head">
           <b>Libraries</b>
           <IconButton title="Close" onClick={close}>

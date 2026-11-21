@@ -15,6 +15,7 @@ import { VersionHistoryPanel, VersionPreviewBar } from './panels/VersionHistory'
 import { ShareDialog } from './panels/ShareDialog';
 import { InspectPanel, RightTabs } from './panels/InspectPanel';
 import { PrototypePanel } from './panels/PrototypePanel';
+import { maybeStartTour, ShortcutsSheet, Tour } from './panels/Onboarding';
 import { Toolbar } from './panels/Toolbar';
 import { VariablesModal } from './panels/VariablesPanel';
 
@@ -22,10 +23,6 @@ let started = false;
 
 export function App({ route, offlineNotice = false }: { route: Route; offlineNotice?: boolean }) {
   const ready = useUI((s) => s.ready);
-  const tool = useUI((s) => s.tool);
-  const historyOpen = useUI((s) => s.historyOpen);
-  const rightTab = useUI((s) => s.rightTab);
-  const previewing = route.kind === 'file' && new URLSearchParams(location.search).has('version');
   const error = useCloudFile((s) => s.error);
   const [failed, setFailed] = useState(false);
 
@@ -45,6 +42,15 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
       </div>
     );
   if (!ready) return <div className="loading">Loading…</div>;
+  return <Editor route={route} offlineNotice={offlineNotice} />;
+}
+
+function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean }) {
+  const tool = useUI((s) => s.tool);
+  const historyOpen = useUI((s) => s.historyOpen);
+  const rightTab = useUI((s) => s.rightTab);
+  const previewing = route.kind === 'file' && new URLSearchParams(location.search).has('version');
+  useEffect(() => maybeStartTour(), []);
 
   return (
     <div className="app">
@@ -77,6 +83,8 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
       <VariablesModal />
       <LibrariesModal />
       <ShareDialog />
+      <Tour />
+      <ShortcutsSheet />
     </div>
   );
 }

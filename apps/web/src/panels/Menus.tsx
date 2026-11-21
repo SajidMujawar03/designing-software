@@ -112,7 +112,7 @@ export function CommandPalette() {
 
   return (
     <div className="palette-backdrop" onPointerDown={close}>
-      <div className="palette" role="dialog" aria-label="Command palette" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label="Command palette" onPointerDown={(e) => e.stopPropagation()}>
         <input
           autoFocus
           className="palette-input"

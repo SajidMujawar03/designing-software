@@ -6,6 +6,7 @@ import { api, type CloudFile, type Project, type Team } from '../cloud/api';
 import { openCloudFile } from '../cloud/route';
 import { signOut, useSession } from '../cloud/session';
 import { fileStoreName, listFiles } from '../editor/files';
+import { ThemeSwitch } from '../panels/ThemeSwitch';
 
 type View = { kind: 'recent' } | { kind: 'drafts' } | { kind: 'trash' } | { kind: 'project'; id: string };
 
@@ -114,6 +115,7 @@ export function Dashboard() {
           </div>
         ))}
         <div className="dash-side-foot">
+          <ThemeSwitch className="dash-theme" />
           <a href="/local">Files in this browser</a>
         </div>
       </aside>
@@ -288,7 +290,7 @@ function ImportDialog({ teamId, onClose, onDone }: { teamId?: string; onClose: (
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="libraries-modal" role="dialog" aria-label="Import files">
+      <div className="libraries-modal" role="dialog" aria-modal="true" aria-label="Import files">
         <div className="vm-head">
           <b>Import from this browser</b>
         </div>

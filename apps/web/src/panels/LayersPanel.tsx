@@ -1,7 +1,7 @@
 import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
 import { Boxes, Combine, Component, Contrast, Diamond, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
-import { memo, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
@@ -239,13 +239,57 @@ function LayerTree() {
   };
   walk(pageId, 0, false, false);
 
+  /** Arrow keys move through the layers; Left/Right collapse and expand. */
+  const onTreeKey = (e: React.KeyboardEvent, list: Row[]) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    const current = list.findIndex((r) => r.node.id === selection[selection.length - 1]);
+    const go = (i: number) => {
+      const r = list[Math.max(0, Math.min(list.length - 1, i))];
+      if (!r) return;
+      editor.select([r.node.id]);
+      const scroller = treeRef.current?.closest('.sidebar') as HTMLElement | null;
+      const idx = list.indexOf(r);
+      if (scroller && treeRef.current) {
+        const top = treeRef.current.offsetTop + idx * ROW_H;
+        if (top < scroller.scrollTop) scroller.scrollTop = top;
+        else if (top + ROW_H > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = top + ROW_H - scroller.clientHeight;
+      }
+      requestAnimationFrame(() => (treeRef.current?.querySelector(`[data-id="${r.node.id}"]`) as HTMLElement | null)?.focus());
+    };
+    const row = list[current];
+    if (e.key === 'ArrowDown') go(current + 1);
+    else if (e.key === 'ArrowUp') go(current < 0 ? 0 : current - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(list.length - 1);
+    else if (e.key === 'ArrowRight' && row?.hasKids) {
+      if (!expanded.has(row.node.id)) handlers.toggle(row.node.id);
+      else go(current + 1);
+    } else if (e.key === 'ArrowLeft' && row) {
+      if (expanded.has(row.node.id)) handlers.toggle(row.node.id);
+      else {
+        const parent = list.findIndex((r) => r.node.id === row.node.parentId);
+        if (parent >= 0) go(parent);
+      }
+    } else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   const virtual = rows.length > VIRTUAL_FROM;
   const first = virtual ? Math.max(0, Math.floor(view.top / ROW_H) - 10) : 0;
   const last = virtual ? Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_H) + 10) : rows.length;
   const sel = new Set(selection);
 
   return (
-    <div className="tree" ref={treeRef} onDragLeave={(e) => e.currentTarget === e.target && setDrop(null)}>
+    <div
+      className="tree"
+      ref={treeRef}
+      role="tree"
+      aria-label="Layers"
+      aria-multiselectable="true"
+      onKeyDown={(e) => onTreeKey(e, rows)}
+      onDragLeave={(e) => e.currentTarget === e.target && setDrop(null)}
+    >
       {rows.length === 0 && <div className="hint pad">Draw something with the toolbar above.</div>}
       {virtual && <div style={{ height: first * ROW_H }} />}
       {rows.slice(first, last).map((r) => (
@@ -297,6 +341,13 @@ function LayerRowView(p: LayerRowProps) {
 
   return (
     <div
+      role="treeitem"
+      aria-level={p.depth + 1}
+      aria-selected={p.selected}
+      aria-expanded={hasKids ? p.expanded : undefined}
+      aria-label={`${node.name}, ${node.type.toLowerCase().replace('_', ' ')}${!node.visible ? ', hidden' : ''}${node.locked ? ', locked' : ''}`}
+      tabIndex={p.selected ? 0 : -1}
+      data-id={node.id}
       className={[
         'layer-row',
         p.selected && 'selected',

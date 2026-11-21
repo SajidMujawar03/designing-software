@@ -1,4 +1,6 @@
 import { isAutoLayout, isFrameLike, isGroupLike } from '@figma/document';
+import { startTour, useOnboarding } from '../panels/Onboarding';
+import { setTheme } from '../theme';
 import { createBenchmarkPage } from './perf';
 import { addAutoLayout, removeAutoLayout } from './layoutCommands';
 import { combineAsVariants, createComponent, detachSelection, goToMainComponent, resetSelection } from './componentCommands';
@@ -139,6 +141,11 @@ export const COMMANDS: Command[] = [
   },
   { id: 'place-image', label: 'Place image…', shortcut: 'Ctrl+Shift+K', run: () => void placeImages() },
   { id: 'add-page', label: 'Add page', run: () => editor.addPage() },
+  { id: 'shortcuts', label: 'Keyboard shortcuts', shortcut: '?', run: () => useOnboarding.setState({ shortcuts: true }) },
+  { id: 'tour', label: 'Show the editor tour', run: () => startTour() },
+  { id: 'theme-light', label: 'Theme: Light', run: () => setTheme('light') },
+  { id: 'theme-dark', label: 'Theme: Dark', run: () => setTheme('dark') },
+  { id: 'theme-system', label: 'Theme: Match system', run: () => setTheme('system') },
   { id: 'benchmark-page', label: 'Create a 10,000-layer test page', run: () => void createBenchmarkPage() },
   { id: 'export-json', label: 'Export file as JSON', run: () => exportJson() },
 ];

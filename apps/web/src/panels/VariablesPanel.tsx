@@ -81,7 +81,7 @@ export function VariablesModal() {
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="variables-modal" role="dialog" aria-label="Local variables" onKeyDown={(e) => e.key === 'Escape' && close()}>
+      <div className="variables-modal" role="dialog" aria-modal="true" aria-label="Local variables" onKeyDown={(e) => e.key === 'Escape' && close()}>
         <div className="vm-head">
           <b>Local variables</b>
           <IconButton title="Close" onClick={close}>

@@ -387,7 +387,16 @@ export function CanvasView() {
     >
       {/* A fresh element per backend: a canvas cannot switch between WebGL and 2D contexts. */}
       <canvas key={backend} ref={sceneRef} className="scene-canvas" data-renderer={backend} />
-      <canvas ref={canvasRef} className="overlay-canvas" style={{ cursor: css }} data-testid="canvas" />
+      <canvas
+        ref={canvasRef}
+        className="overlay-canvas"
+        style={{ cursor: css }}
+        data-testid="canvas"
+        role="application"
+        aria-label="Design canvas. Use the tools above to draw; arrow keys move the selection."
+        aria-describedby="canvas-status"
+      />
+      <SelectionAnnouncer />
       <TextInput />
       <FollowFrame />
       <CommentsLayer />
@@ -405,6 +414,18 @@ function FollowFrame() {
       <button className="follow-label" style={{ background: p.user.color }} onClick={() => follow(null)}>
         Following {p.user.name} · Stop
       </button>
+    </div>
+  );
+}
+
+/** Tells screen readers what is selected (polite live region). */
+function SelectionAnnouncer() {
+  const selection = useUI((s) => s.selection);
+  const names = selection.map((id) => editor.doc.get(id)?.name).filter(Boolean);
+  const text = !names.length ? 'Nothing selected' : names.length === 1 ? `${names[0]} selected` : `${names.length} layers selected`;
+  return (
+    <div id="canvas-status" className="sr-only" role="status" aria-live="polite">
+      {text}
     </div>
   );
 }

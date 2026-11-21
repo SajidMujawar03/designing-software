@@ -91,7 +91,7 @@ export function ShareDialog() {
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="share-modal" role="dialog" aria-label="Share" onKeyDown={(e) => (e.stopPropagation(), e.key === 'Escape' && close())}>
+      <div className="share-modal" role="dialog" aria-modal="true" aria-label="Share" onKeyDown={(e) => (e.stopPropagation(), e.key === 'Escape' && close())}>
         <div className="vm-head">
           <b>Share “{file.name}”</b>
           <button className="icon-btn" title="Close" onClick={close}>

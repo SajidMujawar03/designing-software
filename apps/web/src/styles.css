@@ -1,17 +1,88 @@
 :root {
   --bg: #ffffff;
   --panel: #ffffff;
+  --panel-2: #f5f5f5;
   --border: #e6e6e6;
+  --border-strong: #d0d0d0;
   --text: #1e1e1e;
-  --muted: #8c8c8c;
-  --hover: #f5f5f5;
+  /* Secondary text, dark enough for 4.5:1 contrast on panels. */
+  --muted: #6f6f6f;
+  --text-dim: #6f6f6f;
+  --hover: #f2f2f2;
+  --selected: #e5f4ff;
   --blue: #0d99ff;
+  --blue-text: #0a6dc2;
   --blue-soft: #e5f4ff;
+  --component: #9747ff;
+  --component-soft: #f1e9ff;
+  --canvas-bg: #f5f5f5;
+  --input-bg: #ffffff;
+  --danger: #c4320a;
+  --danger-soft: #fdecea;
+  --success-soft: #e8f7ee;
+  --warning-soft: #fff4e5;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   --toolbar: #2c2c2c;
   --toolbar-hover: #3d3d3d;
+  color-scheme: light;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 11px;
   color: var(--text);
+}
+
+/* Dark theme: chosen, or following the system setting. */
+:root[data-theme='dark'] {
+  --bg: #1e1e1e;
+  --panel: #2c2c2c;
+  --panel-2: #383838;
+  --border: #444444;
+  --border-strong: #5a5a5a;
+  --text: #ededed;
+  --muted: #a8a8a8;
+  --text-dim: #a8a8a8;
+  --hover: #383838;
+  --selected: rgba(13, 153, 255, 0.24);
+  --blue-text: #5cb8ff;
+  --blue-soft: rgba(13, 153, 255, 0.18);
+  --component: #b18cff;
+  --component-soft: rgba(151, 71, 255, 0.22);
+  --canvas-bg: #1e1e1e;
+  --input-bg: #383838;
+  --danger: #ff8a73;
+  --danger-soft: rgba(242, 72, 34, 0.18);
+  --success-soft: rgba(20, 174, 92, 0.18);
+  --warning-soft: rgba(255, 166, 41, 0.18);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --toolbar: #2c2c2c;
+  --toolbar-hover: #444444;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] {
+    --bg: #1e1e1e;
+    --panel: #2c2c2c;
+    --panel-2: #383838;
+    --border: #444444;
+    --border-strong: #5a5a5a;
+    --text: #ededed;
+    --muted: #a8a8a8;
+    --text-dim: #a8a8a8;
+    --hover: #383838;
+    --selected: rgba(13, 153, 255, 0.24);
+    --blue-text: #5cb8ff;
+    --blue-soft: rgba(13, 153, 255, 0.18);
+    --component: #b18cff;
+    --component-soft: rgba(151, 71, 255, 0.22);
+    --canvas-bg: #1e1e1e;
+    --input-bg: #383838;
+    --danger: #ff8a73;
+    --danger-soft: rgba(242, 72, 34, 0.18);
+    --success-soft: rgba(20, 174, 92, 0.18);
+    --warning-soft: rgba(255, 166, 41, 0.18);
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --toolbar-hover: #444444;
+    color-scheme: dark;
+  }
 }
 
 * {
@@ -82,7 +153,7 @@ button {
 }
 
 .toolbar-center .sep {
-  color: #8c8c8c;
+  color: var(--muted);
 }
 
 .logo {
@@ -173,7 +244,7 @@ button {
 
 .menu-item kbd {
   font-family: inherit;
-  color: #aaa;
+  color: var(--muted);
 }
 
 /* ---------- layout ---------- */
@@ -429,7 +500,7 @@ button {
 
 .num-field:focus-within {
   border-color: var(--blue);
-  background: #fff;
+  background: var(--panel);
 }
 
 .num-label {
@@ -509,7 +580,7 @@ button {
   height: 28px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: #fff;
+  background: var(--panel);
   cursor: pointer;
 }
 
@@ -567,7 +638,7 @@ button {
 
 .hex-input:focus {
   border-color: var(--blue);
-  background: #fff;
+  background: var(--panel);
 }
 
 .paint-opacity {
@@ -603,7 +674,7 @@ button {
 }
 
 .menu-item:disabled kbd {
-  color: #555;
+  color: var(--muted);
 }
 
 .palette-backdrop {
@@ -663,7 +734,7 @@ button {
 
 .palette-item kbd {
   font-family: inherit;
-  color: #aaa;
+  color: var(--muted);
 }
 
 .palette-item.active kbd {
@@ -672,7 +743,7 @@ button {
 
 .palette-empty {
   padding: 12px 16px;
-  color: #8c8c8c;
+  color: var(--muted);
 }
 
 .align-bar {
@@ -764,7 +835,7 @@ button.swatch {
   z-index: 40;
   width: 248px;
   padding: 8px 12px 12px;
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
@@ -1049,7 +1120,7 @@ button.swatch {
   width: 260px;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
@@ -1084,7 +1155,7 @@ button.swatch {
 .chip {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--panel);
   padding: 2px 8px;
   cursor: pointer;
   font-size: 10px;
@@ -1160,7 +1231,7 @@ button.swatch {
   max-height: 340px;
   overflow-y: auto;
   padding: 4px 0;
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
@@ -1213,7 +1284,7 @@ button.swatch {
 }
 
 .style-preview.effect {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
 }
 
@@ -1360,7 +1431,7 @@ button.swatch {
   inset: 20px;
   border: 1px solid #c4c4c4;
   border-radius: 2px;
-  background: #fff;
+  background: var(--panel);
 }
 
 .cbar {
@@ -1473,13 +1544,13 @@ button.swatch {
 /* Components */
 .layer-row.component-layer .layer-icon,
 .layer-row.component-layer .name {
-  color: var(--component, #9747ff);
+  color: var(--component);
 }
 .component-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--component, #9747ff);
+  color: var(--component);
   font-weight: 600;
   min-width: 0;
 }
@@ -1507,7 +1578,7 @@ button.swatch {
   font: inherit;
 }
 .override-dot {
-  color: var(--component, #9747ff);
+  color: var(--component);
   font-size: 11px;
 }
 .prop-row {
@@ -1529,14 +1600,14 @@ button.swatch {
 .prop-label,
 .prop-type,
 .prop-values {
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
 }
 .prop-def {
-  border-top: 1px solid var(--border, #e6e6e6);
+  border-top: 1px solid var(--border);
   padding-top: 4px;
   margin-top: 6px;
 }
@@ -1552,7 +1623,7 @@ button.swatch {
   display: flex;
   gap: 4px;
   padding: 8px 8px 4px;
-  border-bottom: 1px solid var(--border, #e6e6e6);
+  border-bottom: 1px solid var(--border);
 }
 .side-tabs button {
   border: none;
@@ -1560,13 +1631,13 @@ button.swatch {
   padding: 4px 8px;
   border-radius: 4px;
   font-weight: 500;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
   cursor: pointer;
 }
 .side-tabs button.active {
   color: inherit;
   font-weight: 600;
-  background: var(--hover, #f0f0f0);
+  background: var(--hover);
 }
 .assets {
   overflow-y: auto;
@@ -1581,8 +1652,8 @@ button.swatch {
   padding: 0 8px;
   height: 28px;
   border-radius: 4px;
-  background: var(--hover, #f5f5f5);
-  color: var(--text-dim, #8c8c8c);
+  background: var(--hover);
+  color: var(--text-dim);
 }
 .asset-search input {
   flex: 1;
@@ -1591,7 +1662,7 @@ button.swatch {
   background: none;
   outline: none;
   font: inherit;
-  color: var(--text, #1e1e1e);
+  color: var(--text);
 }
 .asset-group-head {
   display: flex;
@@ -1599,7 +1670,7 @@ button.swatch {
   gap: 4px;
   padding: 4px 12px;
   font-size: 11px;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
   cursor: pointer;
   user-select: none;
 }
@@ -1616,7 +1687,7 @@ button.swatch {
   min-width: 0;
 }
 .asset-tile:hover {
-  background: var(--hover, #f0f0f0);
+  background: var(--hover);
 }
 .asset-thumb {
   height: 64px;
@@ -1624,8 +1695,8 @@ button.swatch {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  background: var(--canvas-bg, #f5f5f5);
-  color: var(--component, #9747ff);
+  background: var(--canvas-bg);
+  color: var(--component);
   overflow: hidden;
 }
 .asset-thumb img {
@@ -1643,7 +1714,7 @@ button.swatch {
 }
 .asset-name svg {
   flex: none;
-  color: var(--component, #9747ff);
+  color: var(--component);
 }
 .asset-name span {
   overflow: hidden;
@@ -1652,7 +1723,7 @@ button.swatch {
 }
 .asset-meta {
   font-size: 10px;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
 }
 
 /* Variables */
@@ -1671,8 +1742,8 @@ button.swatch {
   height: min(560px, 100%);
   display: flex;
   flex-direction: column;
-  background: var(--panel, #fff);
-  color: var(--text, #1e1e1e);
+  background: var(--panel);
+  color: var(--text);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   overflow: hidden;
@@ -1682,7 +1753,7 @@ button.swatch {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px 10px 16px;
-  border-bottom: 1px solid var(--border, #e6e6e6);
+  border-bottom: 1px solid var(--border);
 }
 .vm-body {
   flex: 1;
@@ -1692,7 +1763,7 @@ button.swatch {
 .vm-collections {
   width: 180px;
   flex: none;
-  border-right: 1px solid var(--border, #e6e6e6);
+  border-right: 1px solid var(--border);
   overflow-y: auto;
 }
 .vm-subhead {
@@ -1701,7 +1772,7 @@ button.swatch {
   justify-content: space-between;
   padding: 8px 8px 4px 16px;
   font-size: 11px;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
 }
 .vm-col {
   padding: 4px 16px;
@@ -1711,7 +1782,7 @@ button.swatch {
   align-items: center;
 }
 .vm-col.active {
-  background: var(--selected, #e5f4ff);
+  background: var(--selected);
 }
 .vm-col input {
   width: 100%;
@@ -1735,7 +1806,7 @@ button.swatch {
 }
 .vm-table th,
 .vm-table td {
-  border-bottom: 1px solid var(--border, #eee);
+  border-bottom: 1px solid var(--border);
   padding: 4px 8px;
   text-align: left;
   font-weight: normal;
@@ -1744,8 +1815,8 @@ button.swatch {
 .vm-table th {
   position: sticky;
   top: 0;
-  background: var(--panel, #fff);
-  color: var(--text-dim, #8c8c8c);
+  background: var(--panel);
+  color: var(--text-dim);
   font-size: 11px;
   z-index: 1;
 }
@@ -1772,7 +1843,7 @@ button.swatch {
 .vm-mode input:focus,
 .vm-name input:focus,
 .vm-cell input:focus {
-  border-color: var(--border, #ddd);
+  border-color: var(--border);
 }
 .vm-name input {
   width: 160px;
@@ -1807,7 +1878,7 @@ button.swatch {
   gap: 4px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: var(--hover, #f0f0f0);
+  background: var(--hover);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -1831,7 +1902,7 @@ button.swatch {
 .vm-empty {
   padding: 32px;
   max-width: 420px;
-  color: var(--text-dim, #666);
+  color: var(--text-dim);
 }
 .var-swatch {
   display: inline-block;
@@ -1913,7 +1984,7 @@ button.swatch {
 }
 .menu-label {
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--muted);
   padding: 4px 8px;
 }
 .file-row {
@@ -1938,8 +2009,8 @@ button.swatch {
   max-height: min(600px, 100%);
   display: flex;
   flex-direction: column;
-  background: var(--panel, #fff);
-  color: var(--text, #1e1e1e);
+  background: var(--panel);
+  color: var(--text);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   overflow: hidden;
@@ -1950,11 +2021,11 @@ button.swatch {
 }
 .lib-subhead {
   font-size: 11px;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
   margin: 12px 0 6px;
 }
 .lib-card {
-  border: 1px solid var(--border, #e6e6e6);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 8px;
@@ -1974,7 +2045,7 @@ button.swatch {
   gap: 4px;
   border: none;
   background: none;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
   font: inherit;
   font-weight: normal;
   font-size: 11px;
@@ -1983,7 +2054,7 @@ button.swatch {
   border-radius: 4px;
 }
 .lib-btn:hover {
-  background: var(--hover, #f0f0f0);
+  background: var(--hover);
   color: inherit;
 }
 .lib-updates {
@@ -1998,7 +2069,7 @@ button.swatch {
   gap: 6px;
   padding: 6px 8px;
   border-radius: 6px;
-  background: #f1e9ff;
+  background: var(--component-soft);
   color: #5b21b6;
   font-size: 11px;
 }
@@ -2015,7 +2086,7 @@ button.swatch {
 
 /* Cloud: status, sign-in, dashboard */
 .file-crumb {
-  color: #8c8c8c;
+  color: var(--muted);
   margin-right: 2px;
 }
 .file-menu {
@@ -2028,7 +2099,7 @@ button.swatch {
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--muted);
   white-space: nowrap;
 }
 .sync-dot {
@@ -2055,7 +2126,7 @@ button.swatch {
   color: #fff;
 }
 .offline-banner {
-  background: #fff4e5;
+  background: var(--warning-soft);
   color: #8a4b00;
   font-size: 12px;
   padding: 6px 16px;
@@ -2069,13 +2140,13 @@ button.swatch {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f5f5;
+  background: var(--hover);
   padding: 16px;
   box-sizing: border-box;
 }
 .auth-card {
   width: min(360px, 100%);
-  background: #fff;
+  background: var(--panel);
   border-radius: 12px;
   padding: 28px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
@@ -2096,12 +2167,12 @@ button.swatch {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: #555;
+  color: var(--muted);
 }
 .auth-card input {
   height: 34px;
   padding: 0 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font: inherit;
   font-size: 13px;
@@ -2127,7 +2198,7 @@ button.swatch {
   align-items: center;
   justify-content: center;
   height: 36px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   color: inherit;
   text-decoration: none;
@@ -2135,19 +2206,19 @@ button.swatch {
 }
 .auth-or {
   text-align: center;
-  color: #999;
+  color: var(--muted);
   font-size: 12px;
 }
 .auth-error {
-  background: #fdecea;
-  color: #b42318;
+  background: var(--danger-soft);
+  color: var(--danger);
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 12px;
 }
 .auth-switch {
   font-size: 12px;
-  color: #666;
+  color: var(--muted);
 }
 .auth-switch button {
   border: none;
@@ -2159,18 +2230,18 @@ button.swatch {
 }
 .auth-local {
   font-size: 12px;
-  color: #888;
+  color: var(--muted);
   text-align: center;
 }
 .dash {
   display: flex;
   height: 100vh;
-  background: #fff;
+  background: var(--panel);
 }
 .dash-side {
   width: 240px;
   flex: none;
-  border-right: 1px solid #e6e6e6;
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   padding: 12px 8px;
@@ -2191,7 +2262,7 @@ button.swatch {
 }
 .dash-user-name span {
   font-size: 11px;
-  color: #888;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2217,7 +2288,7 @@ button.swatch {
   display: inline-flex;
 }
 .icon-btn:hover {
-  background: #f0f0f0;
+  background: var(--hover);
 }
 .dash-nav {
   display: flex;
@@ -2234,10 +2305,10 @@ button.swatch {
   color: inherit;
 }
 .dash-nav:hover {
-  background: #f5f5f5;
+  background: var(--hover);
 }
 .dash-nav.active {
-  background: #e5f4ff;
+  background: var(--selected);
   font-weight: 600;
 }
 .dash-nav span {
@@ -2251,7 +2322,7 @@ button.swatch {
   gap: 6px;
   padding: 8px 8px 4px;
   font-size: 11px;
-  color: #888;
+  color: var(--muted);
 }
 .dash-team-head .icon-btn {
   margin-left: auto;
@@ -2262,7 +2333,7 @@ button.swatch {
   font-size: 12px;
 }
 .dash-side-foot a {
-  color: #888;
+  color: var(--muted);
 }
 .dash-main {
   flex: 1;
@@ -2273,7 +2344,7 @@ button.swatch {
 .dash-head {
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--panel);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2292,8 +2363,8 @@ button.swatch {
   height: 32px;
   padding: 0 10px;
   border-radius: 6px;
-  background: #f5f5f5;
-  color: #888;
+  background: var(--hover);
+  color: var(--muted);
 }
 .dash-search input {
   border: none;
@@ -2301,7 +2372,7 @@ button.swatch {
   outline: none;
   font: inherit;
   width: 180px;
-  color: #1e1e1e;
+  color: var(--text);
 }
 .btn {
   display: inline-flex;
@@ -2310,13 +2381,13 @@ button.swatch {
   height: 32px;
   padding: 0 12px;
   border-radius: 6px;
-  border: 1px solid #ddd;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--panel);
   font: inherit;
   cursor: pointer;
 }
 .dash-empty {
-  color: #888;
+  color: var(--muted);
   padding: 48px 0;
   text-align: center;
 }
@@ -2327,14 +2398,14 @@ button.swatch {
 }
 .file-card {
   position: relative;
-  border: 1px solid #e6e6e6;
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: visible;
-  background: #fff;
+  background: var(--panel);
 }
 .file-thumb {
   height: 150px;
-  background: #f5f5f5;
+  background: var(--hover);
   border-radius: 8px 8px 0 0;
   overflow: hidden;
   display: flex;
@@ -2357,7 +2428,7 @@ button.swatch {
   justify-content: space-between;
   gap: 8px;
   padding: 10px 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border);
 }
 .file-meta > div {
   min-width: 0;
@@ -2370,7 +2441,7 @@ button.swatch {
 }
 .file-sub {
   font-size: 11px;
-  color: #888;
+  color: var(--muted);
 }
 .file-card-menu {
   position: absolute;
@@ -2502,8 +2573,8 @@ button.swatch {
   max-height: 70%;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  color: #1e1e1e;
+  background: var(--panel);
+  color: var(--text);
   border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
   pointer-events: auto;
@@ -2514,7 +2585,7 @@ button.swatch {
   align-items: center;
   gap: 8px;
   padding: 8px 8px 8px 12px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
   font-weight: 600;
   font-size: 12px;
 }
@@ -2525,7 +2596,7 @@ button.swatch {
   font-size: 10px;
   font-weight: 600;
   color: #14ae5c;
-  background: #e8f7ee;
+  background: var(--success-soft);
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -2554,7 +2625,7 @@ button.swatch {
   font-size: 10px;
 }
 .c-time {
-  color: #999;
+  color: var(--muted);
   font-size: 11px;
   margin-right: auto;
   white-space: nowrap;
@@ -2609,13 +2680,13 @@ button.swatch {
   align-items: flex-end;
   gap: 6px;
   padding: 8px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border);
 }
 .c-composer textarea {
   flex: 1;
   min-width: 0;
   resize: none;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
   font: inherit;
@@ -2643,7 +2714,7 @@ button.swatch {
   left: 8px;
   right: 8px;
   bottom: 100%;
-  background: #fff;
+  background: var(--panel);
   border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   padding: 4px;
@@ -2665,7 +2736,7 @@ button.swatch {
   min-width: 0;
 }
 .c-mentions button.active {
-  background: #e5f4ff;
+  background: var(--selected);
 }
 .c-mentions .avatar {
   width: 18px;
@@ -2673,7 +2744,7 @@ button.swatch {
   font-size: 9px;
 }
 .c-mention-email {
-  color: #999;
+  color: var(--muted);
   margin-left: auto;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2690,7 +2761,7 @@ button.swatch {
   display: block;
   width: 100%;
   border: none;
-  border-top: 1px solid var(--border, #eee);
+  border-top: 1px solid var(--border);
   background: none;
   font: inherit;
   text-align: left;
@@ -2699,10 +2770,10 @@ button.swatch {
   color: inherit;
 }
 .c-row:hover {
-  background: #f7f7f7;
+  background: var(--hover);
 }
 .c-row.active {
-  background: #e5f4ff;
+  background: var(--selected);
 }
 .c-row.resolved {
   opacity: 0.6;
@@ -2738,7 +2809,7 @@ button.swatch {
 .version-form input,
 .version-form textarea {
   font: inherit;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
 }
@@ -2748,7 +2819,7 @@ button.swatch {
 }
 .version-day {
   font-size: 11px;
-  color: #888;
+  color: var(--muted);
   padding: 10px 12px 4px;
 }
 .version-item {
@@ -2759,10 +2830,10 @@ button.swatch {
   padding: 6px 8px 6px 12px;
 }
 .version-item:hover {
-  background: #f7f7f7;
+  background: var(--hover);
 }
 .version-item.current {
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
 }
 .version-item.current svg {
@@ -2778,7 +2849,7 @@ button.swatch {
   flex: none;
 }
 .version-clock {
-  color: #aaa;
+  color: var(--muted);
   margin-top: 3px;
   flex: none;
 }
@@ -2802,7 +2873,7 @@ button.swatch {
 }
 .version-desc {
   font-size: 11px;
-  color: #666;
+  color: var(--muted);
   white-space: pre-wrap;
 }
 .version-menu {
@@ -2816,7 +2887,7 @@ button.swatch {
   flex-wrap: wrap;
   gap: 10px;
   padding: 6px 16px;
-  background: #e5f4ff;
+  background: var(--selected);
   color: #0b5394;
   font-size: 12px;
 }
@@ -2846,8 +2917,8 @@ button.swatch {
   max-height: min(640px, 100%);
   display: flex;
   flex-direction: column;
-  background: var(--panel, #fff);
-  color: var(--text, #1e1e1e);
+  background: var(--panel);
+  color: var(--text);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   overflow: hidden;
@@ -2867,7 +2938,7 @@ button.swatch {
   flex: 1;
   min-width: 0;
   height: 32px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0 10px;
   font: inherit;
@@ -2879,7 +2950,7 @@ button.swatch {
   font: inherit;
 }
 .share-notice {
-  background: #e8f7ee;
+  background: var(--success-soft);
   color: #146c3b;
   padding: 8px 10px;
   border-radius: 6px;
@@ -2887,7 +2958,7 @@ button.swatch {
 }
 .share-section {
   font-size: 11px;
-  color: #888;
+  color: var(--muted);
   margin-top: 8px;
 }
 .share-person {
@@ -2903,7 +2974,7 @@ button.swatch {
 }
 .team-avatar {
   background: #e5e5e5;
-  color: #555;
+  color: var(--muted);
 }
 .share-person-name {
   flex: 1;
@@ -2919,11 +2990,11 @@ button.swatch {
 }
 .share-person-name span {
   font-size: 11px;
-  color: #888;
+  color: var(--muted);
 }
 .share-role {
   font-size: 12px;
-  color: #666;
+  color: var(--muted);
 }
 .share-link {
   display: flex;
@@ -2953,7 +3024,7 @@ button.swatch {
   font-size: 11px;
 }
 .export-row input {
-  border: 1px solid var(--border, #e6e6e6);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 6px;
   background: transparent;
@@ -2974,7 +3045,7 @@ button.swatch {
 
 /* Inspect */
 .right-tabs {
-  border-bottom: 1px solid var(--border, #e6e6e6);
+  border-bottom: 1px solid var(--border);
 }
 .inspect-grid {
   display: grid;
@@ -2989,7 +3060,7 @@ button.swatch {
   min-width: 0;
 }
 .inspect-label {
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
   font-size: 11px;
   flex: none;
   min-width: 18px;
@@ -3007,7 +3078,7 @@ button.swatch {
   margin-left: 6px;
   font-size: 10px;
   color: #7b3fe4;
-  background: #f1e9ff;
+  background: var(--component-soft);
   padding: 1px 5px;
   border-radius: 3px;
 }
@@ -3026,7 +3097,7 @@ button.swatch {
 .code-tabs button {
   flex: 1;
   border: none;
-  background: var(--hover, #f0f0f0);
+  background: var(--hover);
   font: inherit;
   font-size: 11px;
   padding: 4px 0;
@@ -3053,7 +3124,7 @@ button.swatch {
 
 /* Prototype */
 .proto-item {
-  border: 1px solid var(--border, #e6e6e6);
+  border: 1px solid var(--border);
   border-radius: 6px;
   margin-bottom: 6px;
 }
@@ -3067,7 +3138,7 @@ button.swatch {
 }
 .proto-trigger {
   font-size: 11px;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
   white-space: nowrap;
 }
 .proto-action {
@@ -3094,7 +3165,7 @@ button.swatch {
 }
 .proto-field > span {
   font-size: 11px;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
 }
 .proto-field select,
 .proto-field input {
@@ -3119,7 +3190,7 @@ button.swatch {
 }
 .proto-num span {
   font-size: 11px;
-  color: var(--text-dim, #8c8c8c);
+  color: var(--text-dim);
 }
 .proto-dirs {
   display: flex;
@@ -3129,7 +3200,7 @@ button.swatch {
 .proto-dirs button {
   width: 28px;
   height: 24px;
-  border: 1px solid var(--border, #e6e6e6);
+  border: 1px solid var(--border);
   background: none;
   border-radius: 4px;
   cursor: pointer;
@@ -3155,11 +3226,11 @@ button.swatch {
   font: inherit;
   padding: 2px 4px;
   border-radius: 4px;
-  color: var(--text, #1e1e1e);
+  color: var(--text);
 }
 .proto-flow input:hover,
 .proto-flow input:focus {
-  border-color: var(--border, #ddd);
+  border-color: var(--border);
 }
 
 /* Present mode */
@@ -3242,7 +3313,7 @@ button.swatch {
 .pv-stage {
   position: relative;
   overflow: hidden;
-  background: #fff;
+  background: var(--panel);
   touch-action: none;
   cursor: default;
 }
@@ -3272,4 +3343,200 @@ button.swatch {
 @keyframes pv-hint {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* ---------- theme-aware form controls and focus ---------- */
+input,
+select,
+textarea {
+  color: var(--text);
+}
+input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='range']),
+select,
+textarea {
+  background-color: var(--input-bg);
+  border-color: var(--border);
+}
+.sidebar,
+.props,
+.libraries-modal,
+.variables-modal,
+.share-modal,
+.auth-card,
+.dash,
+.dash-head,
+.c-popover {
+  background-color: var(--panel);
+  color: var(--text);
+}
+.auth-page {
+  background: var(--canvas-bg);
+}
+.vm-table th {
+  background: var(--panel);
+}
+
+/* Keyboard focus is always visible. */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+button:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Fewer animations for people who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Screen-reader-only text. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Always-dark surfaces keep light secondary text, whatever the theme. */
+.toolbar,
+.menu,
+.file-menu-pop,
+.file-card-menu,
+.c-menu,
+.palette,
+.present,
+.context-menu {
+  --muted: #a8a8a8;
+  --text-dim: #a8a8a8;
+}
+.dash-side-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.dash-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.file-menu-pop button[role='menuitem'] svg {
+  flex: none;
+}
+
+/* Onboarding tour and shortcuts */
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+.tour-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+.tour-spot {
+  position: absolute;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  outline: 2px solid var(--blue);
+  pointer-events: none;
+}
+.tour-card {
+  position: absolute;
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.tour-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.tour-card p {
+  margin: 8px 0 12px;
+  line-height: 1.5;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tour-dots {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+}
+.tour-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+.tour-dots span.on {
+  background: var(--blue);
+}
+.shortcut-search {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+}
+.shortcut-list {
+  margin: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.shortcut-row dt {
+  min-width: 0;
+}
+.shortcut-row dd {
+  margin: 0;
+  white-space: nowrap;
+}
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  margin-left: 3px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font: 600 10px/1.4 Inter, system-ui, sans-serif;
+  text-align: center;
+  background: var(--panel-2);
+  color: var(--text);
 }
