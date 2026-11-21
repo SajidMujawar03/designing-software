@@ -114,6 +114,8 @@ export class DesignDocument {
    * Without it, text keeps its size when layouts change its width.
    */
   textFitter: ((id: NodeId) => void) | null = null;
+  /** Viewing only: local edits are ignored (remote ones still arrive). */
+  readOnly = false;
 
   constructor(ydoc: Y.Doc = new Y.Doc()) {
     this.ydoc = ydoc;
@@ -263,6 +265,8 @@ export class DesignDocument {
 
   /** Runs `fn` as one transaction and (unless merging) one undo step. */
   change<T>(fn: () => T, opts: ChangeOptions = {}): T {
+    // A file opened for viewing only takes no local edits (results are undefined).
+    if (this.readOnly && this.depth === 0) return undefined as T;
     if (!opts.merge) this.undoManager.stopCapturing();
     let result!: T;
     this.depth++;

@@ -18,6 +18,8 @@ import {
   useLibraries,
 } from '../editor/libraryStore';
 import { useUI } from '../editor/store';
+import { api } from '../cloud/api';
+import { renameCloudFile, useCloudFile } from '../cloud/cloudFile';
 import { IconButton } from './controls';
 
 const ago = (t: number) => {
@@ -46,6 +48,86 @@ function useFiles(): FileEntry[] {
 // ------------------------------------------------------------ file menu (toolbar)
 
 export function FileMenu() {
+  return location.pathname.startsWith('/file/') ? <CloudFileMenu /> : <LocalFileMenu />;
+}
+
+/** Toolbar title of a cloud file: name, sync status and the file menu. */
+function CloudFileMenu() {
+  const { file, role, status, unsynced, team, project } = useCloudFile();
+  const [open, setOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
+  }, [open]);
+  useEffect(() => {
+    document.title = `${file?.name ?? 'File'} – Figma Clone`;
+  }, [file?.name]);
+  const canEdit = role === 'owner' || role === 'editor';
+  const sync =
+    status === 'connected' ? (unsynced ? 'Saving…' : 'Saved') : status === 'connecting' ? 'Connecting…' : unsynced ? 'Offline – changes will sync' : 'Offline';
+
+  if (renaming)
+    return (
+      <input
+        className="file-name-input"
+        autoFocus
+        defaultValue={file?.name}
+        onFocus={(e) => e.target.select()}
+        onBlur={(e) => {
+          void renameCloudFile(e.target.value);
+          setRenaming(false);
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') setRenaming(false);
+        }}
+      />
+    );
+
+  return (
+    <div className="file-menu" ref={ref}>
+      {(project || team) && <span className="file-crumb">{project?.name ?? 'Drafts'} /</span>}
+      <button type="button" className="file-name" title="File menu (double-click to rename)" onClick={() => setOpen(!open)} onDoubleClick={() => canEdit && setRenaming(true)}>
+        {file?.name ?? 'Untitled'} <ChevronDown size={12} />
+      </button>
+      <span className={`sync-status ${status}${unsynced ? ' unsynced' : ''}`} title={sync}>
+        <span className="sync-dot" /> {sync}
+      </span>
+      {role === 'viewer' && <span className="view-only">View only</span>}
+      {open && (
+        <div className="menu file-menu-pop" role="menu">
+          <button role="menuitem" onClick={() => location.assign('/')}>
+            <FileText size={12} /> Back to files
+          </button>
+          {canEdit && (
+            <button role="menuitem" onClick={() => (setOpen(false), setRenaming(true))}>
+              Rename file
+            </button>
+          )}
+          <button
+            role="menuitem"
+            onClick={async () => {
+              const { file: f } = await api<{ file: { id: string } }>('/files', { body: { name: 'Untitled', teamId: team?.id, projectId: project?.id ?? null } });
+              location.assign(`/file/${f.id}`);
+            }}
+          >
+            <FilePlus size={12} /> New file
+          </button>
+          <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ librariesOpen: true }))}>
+            <BookOpen size={12} /> Libraries…
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LocalFileMenu() {
   useLibraries();
   const files = useFiles();
   const [open, setOpen] = useState(false);
@@ -90,6 +172,9 @@ export function FileMenu() {
         <div className="menu file-menu-pop" role="menu">
           <button role="menuitem" onClick={() => (setOpen(false), setRenaming(true))}>
             Rename file
+          </button>
+          <button role="menuitem" onClick={() => location.assign('/')}>
+            <FileText size={12} /> Your account's files
           </button>
           <button role="menuitem" onClick={() => openFile(createFile())}>
             <FilePlus size={12} /> New file

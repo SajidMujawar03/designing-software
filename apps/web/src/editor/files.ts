@@ -43,13 +43,21 @@ export function listFiles(): FileEntry[] {
   return list.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+/** The open cloud file's name (set when it loads or is renamed). */
+let cloudName = 'Untitled';
+export const setCloudFileName = (name: string) => (cloudName = name);
+const cloudId = () => /^\/file\/([\w-]+)/.exec(location.pathname)?.[1];
+
 export function currentFileId(): string {
+  const cloud = cloudId();
+  if (cloud) return cloud;
   const m = /[#&]file=([\w-]+)/.exec(location.hash);
   return m?.[1] ?? DEFAULT_FILE;
 }
 
 export function currentFile(): FileEntry {
   const id = currentFileId();
+  if (cloudId()) return { id, name: cloudName, updatedAt: Date.now() };
   return listFiles().find((f) => f.id === id) ?? { id, name: 'Untitled', updatedAt: 0 };
 }
 
@@ -71,8 +79,10 @@ export function renameFile(id: string, name: string): void {
 
 /** Opens a file in this tab (the editor starts fresh for it). */
 export function openFile(id: string): void {
-  location.hash = `file=${id}`;
-  location.reload();
+  if (location.pathname.startsWith('/local')) {
+    location.hash = `file=${id}`;
+    location.reload();
+  } else location.assign(`/local#file=${id}`);
 }
 
 export function createFile(name = 'Untitled'): string {
