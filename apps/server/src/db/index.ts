@@ -6,6 +6,8 @@ import * as schema from './schema';
 
 export type DB = NodePgDatabase<typeof schema>;
 export let db: DB;
+/** Using the embedded PGlite (which, unlike a Postgres server, never vacuums on its own). */
+export let embedded = false;
 
 /**
  * Schema changes, applied in order once each. Plain SQL that runs on both
@@ -160,9 +162,27 @@ export async function initDb(): Promise<void> {
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');
     db = drizzle(new PGlite(config.dataDir), { schema }) as unknown as DB;
+    embedded = true;
     console.log(`[db] using embedded Postgres (PGlite) in ${config.dataDir}`);
   }
   await migrate();
+  await vacuumLog(true);
+}
+
+let lastVacuum = 0;
+/**
+ * The update log churns (every change is appended, then folded into a
+ * snapshot and deleted). A Postgres server's autovacuum cleans up after that;
+ * PGlite has none, and without it inserts and lookups slow down until they
+ * stall the server. Runs at most once a minute.
+ */
+export async function vacuumLog(force = false): Promise<void> {
+  if (!embedded || (!force && Date.now() - lastVacuum < 60_000)) return;
+  lastVacuum = Date.now();
+  const t0 = performance.now();
+  await db.execute(sql`VACUUM ANALYZE doc_updates`);
+  const ms = performance.now() - t0;
+  if (ms > 200) console.warn(`[db] vacuuming the update log took ${Math.round(ms)} ms`);
 }
 
 export { schema };

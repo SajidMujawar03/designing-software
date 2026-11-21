@@ -1,7 +1,7 @@
 import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
 import { Boxes, Combine, Component, Contrast, Diamond, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
-import { useEffect, useState, type DragEvent } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
@@ -129,12 +129,29 @@ function PagesList() {
 
 type DropPos = 'above' | 'below' | 'inside';
 
+const ROW_H = 28;
+/** Above this many rows, only the rows in view are rendered. */
+const VIRTUAL_FROM = 150;
+const compType = (t: string) => t === 'COMPONENT' || t === 'INSTANCE' || t === 'COMPONENT_SET';
+
+interface Row {
+  node: SceneNode;
+  depth: number;
+  hasKids: boolean;
+  /** An ancestor is hidden. */
+  parentHidden: boolean;
+  /** Inside (or is) a component or instance. */
+  inComponent: boolean;
+}
+
 function LayerTree() {
   const pageId = useUI((s) => s.pageId);
   const selection = useUI((s) => s.selection);
   const [expanded, setExpanded] = useState<Set<NodeId>>(new Set());
   const [drop, setDrop] = useState<{ id: NodeId; pos: DropPos } | null>(null);
   const [dragIds, setDragIds] = useState<NodeId[]>([]);
+  const [view, setView] = useState({ top: 0, height: 800 });
+  const treeRef = useRef<HTMLDivElement>(null);
 
   // Reveal selected layers by expanding their ancestors.
   useEffect(() => {
@@ -143,106 +160,194 @@ function LayerTree() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection]);
 
+  // Track the part of the list in view (the sidebar scrolls).
+  useEffect(() => {
+    const tree = treeRef.current;
+    const scroller = tree?.closest('.sidebar') as HTMLElement | null;
+    if (!tree || !scroller) return;
+    const update = () => setView({ top: scroller.scrollTop - tree.offsetTop, height: scroller.clientHeight });
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(scroller);
+    return () => {
+      scroller.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [pageId]);
+
+  // Handlers read the latest state through a ref, so rows can skip re-rendering.
+  const state = useRef({ selection, drop, dragIds });
+  state.current = { selection, drop, dragIds };
+  const handlers = useMemo(
+    () => ({
+      toggle: (id: NodeId) =>
+        setExpanded((s) => {
+          const next = new Set(s);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        }),
+      dragStart: (e: DragEvent, id: NodeId) => {
+        const ids = state.current.selection.includes(id) ? editor.topLevelSelection() : [id];
+        setDragIds(ids);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', ids.join(','));
+      },
+      dragOver: (e: DragEvent, n: SceneNode) => {
+        if (!state.current.dragIds.length) return;
+        e.preventDefault();
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const t = (e.clientY - r.top) / r.height;
+        const pos: DropPos = isFrameLike(n) ? (t < 0.25 ? 'above' : t > 0.75 ? 'below' : 'inside') : t < 0.5 ? 'above' : 'below';
+        const d = state.current.drop;
+        if (d?.id !== n.id || d.pos !== pos) setDrop({ id: n.id, pos });
+      },
+      drop: (e: DragEvent) => {
+        e.preventDefault();
+        const { drop: d, dragIds: ids } = state.current;
+        if (d && ids.length) {
+          const target = editor.doc.get(d.id)!;
+          if (d.pos === 'inside') {
+            editor.moveLayers(ids, { parentId: target.id });
+            setExpanded((s) => new Set([...s, target.id]));
+          } else if (d.pos === 'above') editor.moveLayers(ids, { parentId: target.parentId!, aboveId: target.id });
+          else editor.moveLayers(ids, { parentId: target.parentId!, belowId: target.id });
+        }
+        setDrop(null);
+        setDragIds([]);
+      },
+      dragEnd: () => {
+        setDrop(null);
+        setDragIds([]);
+      },
+    }),
+    [],
+  );
+
   if (!pageId) return null;
 
-  const rows: Array<{ node: SceneNode; depth: number }> = [];
-  const walk = (parent: NodeId, depth: number) => {
+  const rows: Row[] = [];
+  const walk = (parent: NodeId, depth: number, hidden: boolean, comp: boolean) => {
     const kids = editor.doc.children(parent);
     for (let i = kids.length - 1; i >= 0; i--) {
       const n = kids[i];
-      rows.push({ node: n, depth });
-      if (expanded.has(n.id)) walk(n.id, depth + 1);
+      const inComponent = comp || compType(n.type);
+      rows.push({ node: n, depth, hasKids: editor.doc.childIds(n.id).length > 0, parentHidden: hidden, inComponent });
+      if (expanded.has(n.id)) walk(n.id, depth + 1, hidden || !n.visible, inComponent);
     }
   };
-  walk(pageId, 0);
+  walk(pageId, 0, false, false);
 
-  const onDragOver = (e: DragEvent, n: SceneNode) => {
-    if (!dragIds.length) return;
+  /** Arrow keys move through the layers; Left/Right collapse and expand. */
+  const onTreeKey = (e: React.KeyboardEvent, list: Row[]) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    const current = list.findIndex((r) => r.node.id === selection[selection.length - 1]);
+    const go = (i: number) => {
+      const r = list[Math.max(0, Math.min(list.length - 1, i))];
+      if (!r) return;
+      editor.select([r.node.id]);
+      const scroller = treeRef.current?.closest('.sidebar') as HTMLElement | null;
+      const idx = list.indexOf(r);
+      if (scroller && treeRef.current) {
+        const top = treeRef.current.offsetTop + idx * ROW_H;
+        if (top < scroller.scrollTop) scroller.scrollTop = top;
+        else if (top + ROW_H > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = top + ROW_H - scroller.clientHeight;
+      }
+      requestAnimationFrame(() => (treeRef.current?.querySelector(`[data-id="${r.node.id}"]`) as HTMLElement | null)?.focus());
+    };
+    const row = list[current];
+    if (e.key === 'ArrowDown') go(current + 1);
+    else if (e.key === 'ArrowUp') go(current < 0 ? 0 : current - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(list.length - 1);
+    else if (e.key === 'ArrowRight' && row?.hasKids) {
+      if (!expanded.has(row.node.id)) handlers.toggle(row.node.id);
+      else go(current + 1);
+    } else if (e.key === 'ArrowLeft' && row) {
+      if (expanded.has(row.node.id)) handlers.toggle(row.node.id);
+      else {
+        const parent = list.findIndex((r) => r.node.id === row.node.parentId);
+        if (parent >= 0) go(parent);
+      }
+    } else return;
     e.preventDefault();
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const t = (e.clientY - r.top) / r.height;
-    const canNest = isFrameLike(n);
-    const pos: DropPos = canNest ? (t < 0.25 ? 'above' : t > 0.75 ? 'below' : 'inside') : t < 0.5 ? 'above' : 'below';
-    if (drop?.id !== n.id || drop.pos !== pos) setDrop({ id: n.id, pos });
+    e.stopPropagation();
   };
 
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    if (drop && dragIds.length) {
-      const target = editor.doc.get(drop.id)!;
-      if (drop.pos === 'inside') {
-        editor.moveLayers(dragIds, { parentId: target.id });
-        setExpanded((s) => new Set([...s, target.id]));
-      } else if (drop.pos === 'above') editor.moveLayers(dragIds, { parentId: target.parentId!, aboveId: target.id });
-      else editor.moveLayers(dragIds, { parentId: target.parentId!, belowId: target.id });
-    }
-    setDrop(null);
-    setDragIds([]);
-  };
+  const virtual = rows.length > VIRTUAL_FROM;
+  const first = virtual ? Math.max(0, Math.floor(view.top / ROW_H) - 10) : 0;
+  const last = virtual ? Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_H) + 10) : rows.length;
+  const sel = new Set(selection);
 
   return (
-    <div className="tree" onDragLeave={(e) => e.currentTarget === e.target && setDrop(null)}>
+    <div
+      className="tree"
+      ref={treeRef}
+      role="tree"
+      aria-label="Layers"
+      aria-multiselectable="true"
+      onKeyDown={(e) => onTreeKey(e, rows)}
+      onDragLeave={(e) => e.currentTarget === e.target && setDrop(null)}
+    >
       {rows.length === 0 && <div className="hint pad">Draw something with the toolbar above.</div>}
-      {rows.map(({ node, depth }) => (
+      {virtual && <div style={{ height: first * ROW_H }} />}
+      {rows.slice(first, last).map((r) => (
         <LayerRow
-          key={node.id}
-          node={node}
-          depth={depth}
-          selected={selection.includes(node.id)}
-          expanded={expanded.has(node.id)}
-          dropPos={drop?.id === node.id ? drop.pos : null}
-          onToggleExpand={() =>
-            setExpanded((s) => {
-              const next = new Set(s);
-              if (next.has(node.id)) next.delete(node.id);
-              else next.add(node.id);
-              return next;
-            })
-          }
-          onDragStart={(e) => {
-            const ids = selection.includes(node.id) ? editor.topLevelSelection() : [node.id];
-            setDragIds(ids);
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', ids.join(','));
-          }}
-          onDragOver={(e) => onDragOver(e, node)}
-          onDrop={onDrop}
-          onDragEnd={() => {
-            setDrop(null);
-            setDragIds([]);
-          }}
+          key={r.node.id}
+          {...r}
+          selected={sel.has(r.node.id)}
+          expanded={expanded.has(r.node.id)}
+          dropPos={drop?.id === r.node.id ? drop.pos : null}
+          handlers={handlers}
         />
       ))}
+      {virtual && <div style={{ height: (rows.length - last) * ROW_H }} />}
     </div>
   );
 }
 
-interface LayerRowProps {
-  node: SceneNode;
-  depth: number;
+interface LayerRowProps extends Row {
   selected: boolean;
   expanded: boolean;
   dropPos: DropPos | null;
-  onToggleExpand: () => void;
-  onDragStart: (e: DragEvent) => void;
-  onDragOver: (e: DragEvent) => void;
-  onDrop: (e: DragEvent) => void;
-  onDragEnd: () => void;
+  handlers: {
+    toggle: (id: NodeId) => void;
+    dragStart: (e: DragEvent, id: NodeId) => void;
+    dragOver: (e: DragEvent, n: SceneNode) => void;
+    drop: (e: DragEvent) => void;
+    dragEnd: () => void;
+  };
 }
 
-function LayerRow(p: LayerRowProps) {
-  const { node } = p;
+/** A row re-renders only when what it shows changes (node snapshots change only when edited). */
+const LayerRow = memo(LayerRowView, (a, b) =>
+  a.node === b.node &&
+  a.depth === b.depth &&
+  a.hasKids === b.hasKids &&
+  a.parentHidden === b.parentHidden &&
+  a.inComponent === b.inComponent &&
+  a.selected === b.selected &&
+  a.expanded === b.expanded &&
+  a.dropPos === b.dropPos,
+);
+
+function LayerRowView(p: LayerRowProps) {
+  const { node, hasKids, parentHidden } = p;
+  const isComp = p.inComponent;
   const [renaming, setRenaming] = useState(false);
   const hovered = useUI((s) => s.hoverId === node.id);
-  const hasKids = editor.doc.childIds(node.id).length > 0;
   const Icon = node.isMask ? Contrast : (ICONS[node.type] ?? Square);
-  const ancestors = editor.doc.ancestors(node.id);
-  const parentHidden = ancestors.some((a) => !a.visible);
-  const compType = (t: string) => t === 'COMPONENT' || t === 'INSTANCE' || t === 'COMPONENT_SET';
-  const isComp = compType(node.type) || ancestors.some((a) => compType(a.type));
 
   return (
     <div
+      role="treeitem"
+      aria-level={p.depth + 1}
+      aria-selected={p.selected}
+      aria-expanded={hasKids ? p.expanded : undefined}
+      aria-label={`${node.name}, ${node.type.toLowerCase().replace('_', ' ')}${!node.visible ? ', hidden' : ''}${node.locked ? ', locked' : ''}`}
+      tabIndex={p.selected ? 0 : -1}
+      data-id={node.id}
       className={[
         'layer-row',
         p.selected && 'selected',
@@ -255,10 +360,10 @@ function LayerRow(p: LayerRowProps) {
         .join(' ')}
       style={{ paddingLeft: 8 + p.depth * 14 }}
       draggable={!renaming}
-      onDragStart={p.onDragStart}
-      onDragOver={p.onDragOver}
-      onDrop={p.onDrop}
-      onDragEnd={p.onDragEnd}
+      onDragStart={(e) => p.handlers.dragStart(e, node.id)}
+      onDragOver={(e) => p.handlers.dragOver(e, node)}
+      onDrop={p.handlers.drop}
+      onDragEnd={p.handlers.dragEnd}
       onMouseEnter={() => editor.setUI({ hoverId: node.id })}
       onMouseLeave={() => editor.setUI({ hoverId: null })}
       onClick={(e) => {
@@ -276,7 +381,7 @@ function LayerRow(p: LayerRowProps) {
         className="chevron"
         onClick={(e) => {
           e.stopPropagation();
-          if (hasKids) p.onToggleExpand();
+          if (hasKids) p.handlers.toggle(node.id);
         }}
       >
         {hasKids ? p.expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : null}

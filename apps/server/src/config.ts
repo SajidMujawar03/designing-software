@@ -1,4 +1,7 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 /** Server settings, from environment variables (see .env.example). */
 export const config = {
@@ -16,8 +19,19 @@ export const config = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
   },
   sessionDays: 30,
-  /** Secure cookies (set in production behind HTTPS). */
-  secureCookies: process.env.NODE_ENV === 'production',
+  /**
+   * The built web app to serve (so one process serves everything). Defaults to
+   * apps/web/dist next to this server; empty disables it (e.g. behind a CDN).
+   */
+  webDist: process.env.WEB_DIST ?? resolve(here, '../../web/dist'),
+  /** Behind a reverse proxy or load balancer: trust its X-Forwarded-* headers (client IPs, HTTPS). */
+  trustProxy: process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1',
+  /** Sends server errors and the web app's error reports to Sentry when set. */
+  sentryDsn: process.env.SENTRY_DSN ?? '',
+  /** Shown in error reports (e.g. a git commit). */
+  release: process.env.RELEASE ?? 'dev',
+  /** Secure cookies whenever the app is served over HTTPS. */
+  secureCookies: (process.env.PUBLIC_URL ?? '').startsWith('https:'),
 };
 
 export const googleEnabled = () => !!(config.google.clientId && config.google.clientSecret);

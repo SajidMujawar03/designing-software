@@ -1,7 +1,8 @@
 import type { ExportFormat, ExportSetting, NodeId, SceneNode } from '@figma/document';
 import { Minus, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { editor } from '../editor/editor';
+import { useSettledDocVersion } from '../editor/hooks';
 import {
   constraintLabel,
   DEFAULT_EXPORT,
@@ -141,7 +142,9 @@ export function ExportSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[
 export function BatchExportSection() {
   const [scope, setScope] = useState<'page' | 'file'>('page');
   const [busy, setBusy] = useState(false);
-  const ids = layersWithExports(scope);
+  // Scanning a large file on every edit would slow editing down: update once edits pause.
+  const settled = useSettledDocVersion();
+  const ids = useMemo(() => layersWithExports(scope), [scope, settled]);
   const count = ids.reduce((s, id) => s + (editor.doc.get(id)?.exportSettings?.length ?? 0), 0);
   return (
     <Section title="Export">

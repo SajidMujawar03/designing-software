@@ -1,4 +1,5 @@
 import type { BooleanOperation } from '@figma/document';
+import { useOnboarding } from '../panels/Onboarding';
 import { copyAsPng, exportLayers, saveFiles } from './export';
 import { follow, usePresence } from '../cloud/presence';
 import { createComponent, detachSelection } from './componentCommands';
@@ -52,6 +53,7 @@ export function installShortcuts(): () => void {
 
     if (mod && !e.altKey && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
+    if ((e.key === '?' || (e.shiftKey && (e.key === '/' || e.code === 'Slash'))) && !mod) return run(() => useOnboarding.setState({ shortcuts: true }));
     if (e.key === 'Escape' && usePresence.getState().following !== null) return run(() => follow(null));
     if (ui.shareOpen) {
       if (e.key === 'Escape') run(() => editor.setUI({ shareOpen: false }));

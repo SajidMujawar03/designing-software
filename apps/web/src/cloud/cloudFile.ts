@@ -93,9 +93,21 @@ export async function startCloudFile(id: string): Promise<void> {
       resolve();
     };
     provider!.on('synced', finish);
-    // Offline (or slow): the cached copy is enough to start.
-    cache.once('synced', () => setTimeout(finish, meta ? 1500 : 0));
-    setTimeout(finish, 5000);
+    // The cached copy is enough to start (and to work offline) when it has the
+    // file. An empty cache waits for the server while it's reachable:
+    // starting early would add a blank first page next to the real ones.
+    const hasContent = () => editor.doc.pages().length > 0;
+    cache.once('synced', () => {
+      if (!meta) finish();
+      else if (hasContent()) setTimeout(finish, 1500);
+    });
+    const giveUp = () => {
+      if (!meta || hasContent() || useCloudFile.getState().status === 'offline') finish();
+      else setTimeout(giveUp, 1000);
+    };
+    setTimeout(giveUp, 5000);
+    // A hard limit, so a broken connection can't hang the editor.
+    setTimeout(finish, 20000);
   });
 
   if (!location.pathname.includes('/present')) startThumbnails(id);

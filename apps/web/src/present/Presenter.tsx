@@ -51,6 +51,7 @@ const away = (dir: TransitionDirection | undefined, amount = 100) =>
 
 /** Animates a screen change between two elements (the leaving one may be null). */
 function animate(prev: HTMLElement | null, next: HTMLElement, t: Transition, reverse: boolean): Promise<void> {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
   const opts: KeyframeAnimationOptions = { duration: t.duration, easing: EASING[t.easing], fill: 'both' };
   const dir = reverse && t.direction ? OPPOSITE[t.direction] : t.direction;
   const anims: Animation[] = [];

@@ -1,0 +1,43 @@
+# Runs the app with a Postgres server. Put it behind an HTTPS reverse proxy
+# (see docs/deploy.md) and set the variables below, e.g. in a .env file:
+#   PUBLIC_URL=https://design.example.com
+#   POSTGRES_PASSWORD=<a long random password>
+# Then: docker compose -f docker-compose.prod.yml up -d --build
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_RELEASE: ${RELEASE:-}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL to the address people open, e.g. https://design.example.com}
+      DATABASE_URL: postgres://figma:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/figma
+      TRUST_PROXY: 'true'
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      RELEASE: ${RELEASE:-}
+    # Only the reverse proxy on this machine should reach it.
+    ports: ['127.0.0.1:8080:8080']
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: figma
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: figma
+    volumes: [dbdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U figma -d figma']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dbdata:

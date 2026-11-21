@@ -165,3 +165,25 @@ describe('scene', () => {
     expect(nodesInRect(doc, page.id, { x: -10, y: -10, width: 300, height: 300 }).map((n) => n.id)).toEqual([f]);
   });
 });
+
+describe('subtree versions (for render caches)', () => {
+  it('change when the layer or anything inside it changes, and only then', async () => {
+    const { DesignDocument } = await import('./document');
+    const doc = new DesignDocument();
+    doc.ensureInitialized();
+    const page = doc.pages()[0].id;
+    const a = doc.change(() => doc.createNode({ type: 'FRAME', parentId: page }));
+    const b = doc.change(() => doc.createNode({ type: 'FRAME', parentId: page }));
+    const child = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: a }));
+    const va = doc.subtreeVersion(a);
+    const vb = doc.subtreeVersion(b);
+    doc.change(() => doc.updateNode(child, { x: 10 }));
+    expect(doc.subtreeVersion(a)).toBeGreaterThan(va);
+    expect(doc.subtreeVersion(b)).toBe(vb);
+    // Moving the child out changes both frames.
+    const va2 = doc.subtreeVersion(a);
+    doc.change(() => doc.moveNode(child, b, null));
+    expect(doc.subtreeVersion(a)).toBeGreaterThan(va2);
+    expect(doc.subtreeVersion(b)).toBeGreaterThan(vb);
+  });
+});

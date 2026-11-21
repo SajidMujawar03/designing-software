@@ -2,6 +2,7 @@ import { Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Penc
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
+import { PluginsButton } from './PluginPanels';
 import { presentUrl } from '../cloud/route';
 import { flowsOf, screenOf } from '@figma/document';
 import { Play } from 'lucide-react';
@@ -66,6 +67,7 @@ export function Toolbar() {
       </div>
       <div className="toolbar-right">
         <Avatars />
+        <PluginsButton />
         <PresentButton />
         <ShareButton />
         <ZoomMenu zoom={zoom} />

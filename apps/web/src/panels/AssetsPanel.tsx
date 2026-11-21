@@ -4,7 +4,7 @@ import { BookOpen, Boxes, ChevronDown, ChevronRight, Component, Search } from 'l
 import { useEffect, useMemo, useState } from 'react';
 import { ASSET_MIME, insertInstanceAt } from '../editor/componentCommands';
 import { editor } from '../editor/editor';
-import { useDocVersion } from '../editor/hooks';
+import { useDocVersion, useSettledDocVersion } from '../editor/hooks';
 import { LibraryAssets, LibraryUpdates } from './LibraryPanels';
 
 const THUMB = 64;
@@ -74,7 +74,8 @@ export function AssetsPanel() {
   const version = useDocVersion();
   const [query, setQuery] = useState('');
   const [closed, setClosed] = useState<Set<string>>(new Set());
-  const assets = useMemo(() => collectAssets(query), [query, version]);
+  const settled = useSettledDocVersion();
+  const assets = useMemo(() => collectAssets(query), [query, settled]);
 
   const groups = new Map<string, Asset[]>();
   for (const a of assets) {

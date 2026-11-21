@@ -9,6 +9,7 @@ import {
   type FillStyle,
   type NodeId,
   type NodePatch,
+  type NodeProps,
   type NodeType,
   type SceneNode,
   type SharedStyle,
@@ -25,6 +26,7 @@ import { applyChildConstraints, layoutFrame, layoutRoots } from './autolayout';
 import { propagate, structureSource, syncChildren } from './components';
 import { applyVariables, defaultValue, detachedFields } from './variables';
 import { scalePaths } from './vector';
+import { migrate, storedVersion, type MigrationResult } from './migrations';
 
 export const ROOT_ID = 'root';
 
@@ -115,7 +117,15 @@ export class DesignDocument {
    */
   textFitter: ((id: NodeId) => void) | null = null;
   /** Viewing only: local edits are ignored (remote ones still arrive). */
-  readOnly = false;
+  get readOnly(): boolean {
+    return this._readOnly || !!this.schema?.tooNew || !!this.schema?.failed;
+  }
+  set readOnly(v: boolean) {
+    this._readOnly = v;
+  }
+  private _readOnly = false;
+  /** What the last migration check found (set by ensureInitialized). */
+  schema: MigrationResult | null = null;
 
   constructor(ydoc: Y.Doc = new Y.Doc()) {
     this.ydoc = ydoc;
@@ -150,7 +160,17 @@ export class DesignDocument {
 
   /** Ensures the root and at least one page exist. Call after loading persisted state. */
   ensureInitialized(): void {
+    const fresh = this.yNodes.size === 0;
+    // Older files are upgraded first (see migrations.ts).
+    try {
+      this.schema = migrate(this.ydoc, (type, k, v) => isDefault(k, v, defaultsFor(type as NodeType)), { fresh });
+    } catch (e) {
+      // Open it view-only rather than not at all (the app reports the error).
+      const v = storedVersion(this.ydoc) ?? 0;
+      this.schema = { from: v, to: v, ran: [], tooNew: false, failed: e };
+    }
     if (this.nodes.get(ROOT_ID) && this.pages().length > 0) return;
+    if (this.schema.tooNew || this.schema.failed) return;
     this.ydoc.transact(() => {
       if (!this.yNodes.get(ROOT_ID)) {
         this.yNodes.set(ROOT_ID, toY({ ...defaultProps('DOCUMENT'), id: ROOT_ID, parentId: null, index: 'a0' }));
@@ -377,16 +397,27 @@ export class DesignDocument {
     }
     this.change(() => {
       let changed = false;
+      const oldType = y.get('type') as NodeType;
+      let defs = defaultsFor(oldType);
+      // A new type has other defaults: keep the old effective values that would change.
+      if (patch.type && patch.type !== oldType) {
+        const next = defaultsFor(patch.type);
+        for (const [k, v] of Object.entries(defs)) {
+          if (!y.has(k) && k !== 'type' && k !== 'name' && !shallowEqual(v, (next as unknown as Record<string, unknown>)[k])) y.set(k, v);
+        }
+        defs = next;
+      }
       for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined || k === 'textRuns') continue;
+        if (v === undefined || k === 'textRuns' || k === 'id') continue;
         if (k === 'characters') {
           changed = this.replaceText(y, v as string) || changed;
           continue;
         }
-        if (!shallowEqual(y.get(k), v)) {
-          y.set(k, v);
-          changed = true;
-        }
+        const cur = y.has(k) ? y.get(k) : (defs as unknown as Record<string, unknown>)[k];
+        if (shallowEqual(cur, v) || (cur == null && v == null)) continue;
+        if (isDefault(k, v, defs)) y.delete(k);
+        else y.set(k, v);
+        changed = true;
       }
       if (!changed) return;
       this.refresh(id, 'parentId' in patch || 'index' in patch);
@@ -994,9 +1025,32 @@ export class DesignDocument {
     }
   }
 
+  /** Bumped on every node change; renderers cache by it. */
+  private changeCounter = 0;
+  private subtreeVersions = new Map<NodeId, number>();
+
+  /**
+   * Changes whenever the layer or anything inside it changes (or a child is
+   * added, removed or reordered). Renderers use it to reuse cached drawings.
+   */
+  subtreeVersion(id: NodeId): number {
+    return this.subtreeVersions.get(id) ?? 0;
+  }
+
+  /** Marks a layer and its ancestors as changed. */
+  private touchSubtree(id: NodeId | null | undefined): void {
+    const v = ++this.changeCounter;
+    for (let cur = id, guard = 0; cur && guard < 256; guard++) {
+      this.subtreeVersions.set(cur, v);
+      cur = this.nodes.get(cur)?.parentId ?? null;
+    }
+  }
+
   /** Stores a node's snapshot (or removes it) and keeps the component indexes current. */
   private setSnapshot(id: NodeId, n: SceneNode | undefined): void {
     const old = this.nodes.get(id);
+    // The old parent chain (if moved or deleted) and the new one have changed.
+    if (old?.parentId && old.parentId !== n?.parentId) this.touchSubtree(old.parentId);
     const link = (m: Map<NodeId, Set<NodeId>>, from: NodeId | null | undefined, to: NodeId | null | undefined) => {
       if (from === to) return;
       if (from) {
@@ -1015,7 +1069,11 @@ export class DesignDocument {
     link(this.bySource, old?.sourceId, n?.sourceId);
     link(this.byComponent, old?.componentId, n?.componentId);
     if (n) this.nodes.set(id, n);
-    else this.nodes.delete(id);
+    else {
+      this.nodes.delete(id);
+      this.subtreeVersions.delete(id);
+    }
+    if (n) this.touchSubtree(id);
   }
 
   private onYEvents(events: Array<Y.YEvent<Y.AbstractType<unknown>>>): void {
@@ -1026,7 +1084,8 @@ export class DesignDocument {
         this.childrenDirty = true;
       } else {
         const target = e.target instanceof Y.Text ? (e.target.parent as YNode) : (e.target as YNode);
-        const id = target?.get('id') as NodeId | undefined;
+        // A node map's key in the nodes map is its id (older files also store it inside).
+        const id = ((target as unknown as { _item?: { parentSub?: string } })?._item?.parentSub ?? target?.get('id')) as NodeId | undefined;
         if (id) changed.add(id);
         if (e instanceof Y.YMapEvent && (e.keysChanged.has('parentId') || e.keysChanged.has('index'))) {
           this.childrenDirty = true;
@@ -1099,10 +1158,33 @@ function indexAboveIn(siblings: NodeId[], nodes: Map<NodeId, SceneNode>, aboveId
   return generateKeyBetween(lo, hi);
 }
 
+/**
+ * Stored sparsely: a node's map holds only values that differ from its type's
+ * defaults (and never its id, which is the key). Files load several times
+ * faster, since every stored property is a CRDT entry to decode, while edits
+ * to different properties of one layer still merge.
+ */
+const ALWAYS_STORED = new Set(['type', 'parentId', 'index']);
+const defaultsCache = new Map<NodeType, NodeProps>();
+export function defaultsFor(type: NodeType): NodeProps {
+  let d = defaultsCache.get(type);
+  if (!d) defaultsCache.set(type, (d = defaultProps(type)));
+  return d;
+}
+/** Whether a value can be left out of storage (it equals the default, or clears an unset one). */
+function isDefault(k: string, v: unknown, defs: NodeProps): boolean {
+  if (ALWAYS_STORED.has(k) || k === 'characters') return false;
+  const d = (defs as unknown as Record<string, unknown>)[k];
+  if (d === undefined) return v === null || v === undefined;
+  return shallowEqual(v, d);
+}
+
 function toY(obj: Record<string, unknown>): YNode {
   const y = new Y.Map<unknown>();
+  const defs = defaultsFor(obj.type as NodeType);
   for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined || k === 'textRuns') continue;
+    if (v === undefined || k === 'textRuns' || k === 'id') continue;
+    if (isDefault(k, v, defs)) continue;
     if (k === 'characters' && typeof v === 'string') {
       const t = new Y.Text();
       t.insert(0, v);
@@ -1121,7 +1203,14 @@ function runAttrs(r: TextRun): Record<string, unknown> {
 }
 
 function snapshot(id: NodeId, y: YNode): SceneNode {
-  const n = { ...(y.toJSON() as SceneNode), id };
+  const raw = y.toJSON() as SceneNode;
+  const defs = defaultsFor(raw.type);
+  const n = { ...defs, ...raw, id } as SceneNode;
+  // Default lists are shared: give each snapshot its own copies.
+  const m = n as unknown as Record<string, unknown>;
+  for (const k of ['fills', 'strokes', 'vectorPaths', 'dashPattern'] as const) {
+    if (!(k in raw) && Array.isArray(m[k])) m[k] = [...(m[k] as unknown[])];
+  }
   const t = y.get('characters');
   if (t instanceof Y.Text) n.textRuns = runsOf(t);
   return n;

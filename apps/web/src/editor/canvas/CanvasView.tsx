@@ -1,4 +1,5 @@
 import { hitTest, paintColor, selectableAncestor } from '@figma/document';
+import { recordFrame } from '../perf';
 import { ASSET_MIME, insertInstanceAt } from '../componentCommands';
 import { Canvas2DRenderer, CanvasKitRenderer, type SceneRenderer } from '@figma/renderer';
 import type { CanvasKit } from 'canvaskit-wasm';
@@ -90,6 +91,7 @@ export function CanvasView() {
 
     function draw() {
       frame = 0;
+      const t0 = performance.now();
       const { viewport } = editor.ui;
       const { width, height } = editor.canvasSize;
       fonts.requestUsed(editor.doc);
@@ -103,11 +105,13 @@ export function CanvasView() {
         },
         background: pageBackground(),
       });
+      const t1 = performance.now();
       octx.setTransform(1, 0, 0, 1, 0, 0);
       octx.clearRect(0, 0, overlay.width, overlay.height);
       drawOverlay(octx, editor, dpr);
       octx.setTransform(dpr, 0, 0, dpr, 0, 0);
       drawPresence(octx, editor);
+      recordFrame(t1 - t0, performance.now() - t1);
     }
 
     const unsubDoc = editor.doc.subscribe(schedule);
@@ -383,7 +387,16 @@ export function CanvasView() {
     >
       {/* A fresh element per backend: a canvas cannot switch between WebGL and 2D contexts. */}
       <canvas key={backend} ref={sceneRef} className="scene-canvas" data-renderer={backend} />
-      <canvas ref={canvasRef} className="overlay-canvas" style={{ cursor: css }} data-testid="canvas" />
+      <canvas
+        ref={canvasRef}
+        className="overlay-canvas"
+        style={{ cursor: css }}
+        data-testid="canvas"
+        role="application"
+        aria-label="Design canvas. Use the tools above to draw; arrow keys move the selection."
+        aria-describedby="canvas-status"
+      />
+      <SelectionAnnouncer />
       <TextInput />
       <FollowFrame />
       <CommentsLayer />
@@ -401,6 +414,18 @@ function FollowFrame() {
       <button className="follow-label" style={{ background: p.user.color }} onClick={() => follow(null)}>
         Following {p.user.name} · Stop
       </button>
+    </div>
+  );
+}
+
+/** Tells screen readers what is selected (polite live region). */
+function SelectionAnnouncer() {
+  const selection = useUI((s) => s.selection);
+  const names = selection.map((id) => editor.doc.get(id)?.name).filter(Boolean);
+  const text = !names.length ? 'Nothing selected' : names.length === 1 ? `${names[0]} selected` : `${names.length} layers selected`;
+  return (
+    <div id="canvas-status" className="sr-only" role="status" aria-live="polite">
+      {text}
     </div>
   );
 }
