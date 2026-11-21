@@ -10,6 +10,8 @@ export type NodeType =
   | 'DOCUMENT'
   | 'PAGE'
   | 'FRAME'
+  | 'COMPONENT'
+  | 'INSTANCE'
   | 'GROUP'
   | 'BOOLEAN'
   | 'RECTANGLE'
@@ -235,6 +237,20 @@ export interface SceneNode {
   /** How the layer follows its parent frame's resizing (left/top by default). */
   constraints?: Constraints;
 
+  // Components and instances
+  /** INSTANCE (and nested instances inside one): the main component it is an instance of. */
+  componentId?: NodeId | null;
+  /**
+   * Layers inside an instance (and the instance itself): the layer it mirrors.
+   * For an instance, the main component, or the nested instance it was copied
+   * from inside another component. Edits to the source reach every mirror
+   * whose value still matches the source's old value; differing values are
+   * overrides and survive.
+   */
+  sourceId?: NodeId | null;
+  /** COMPONENT: shown in the assets panel and inspector. */
+  description?: string;
+
   // PAGE
   guides?: Guide[];
 
@@ -306,7 +322,7 @@ export type NodePatch = Partial<NodeProps>;
 
 /** Node types that can contain children on the canvas. */
 export const isContainer = (n: SceneNode): boolean =>
-  n.type === 'FRAME' || isGroupLike(n) || n.type === 'PAGE' || n.type === 'DOCUMENT';
+  FRAME_LIKE.has(n.type) || isGroupLike(n) || n.type === 'PAGE' || n.type === 'DOCUMENT';
 
 /**
  * Groups and boolean operations hold children but have no box of their own:
@@ -321,9 +337,13 @@ export const isGroupLike = (n: SceneNode | undefined | null): boolean => n?.type
 export const hasOwnTransform = (n: SceneNode): boolean =>
   !isGroupLike(n) && n.type !== 'PAGE' && n.type !== 'DOCUMENT';
 
+/** Frames, main components and instances: boxes that hold, clip and lay out children. */
+export const isFrameLike = (n: SceneNode | undefined | null): n is SceneNode => !!n && FRAME_LIKE.has(n.type);
+const FRAME_LIKE = new Set<NodeType>(['FRAME', 'COMPONENT', 'INSTANCE']);
+
 /** A frame that lays out its children (auto layout). */
 export const isAutoLayout = (n: SceneNode | undefined | null): boolean =>
-  n?.type === 'FRAME' && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
+  isFrameLike(n) && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
 
 /** A child placed by its auto layout parent (rather than positioned freely). */
 export const isLayoutChild = (n: SceneNode, parent: SceneNode | undefined | null): boolean =>

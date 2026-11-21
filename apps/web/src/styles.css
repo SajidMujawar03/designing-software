@@ -1469,3 +1469,44 @@ button.swatch {
   cursor: pointer;
   flex-shrink: 0;
 }
+
+/* Components */
+.layer-row.component-layer .layer-icon,
+.layer-row.component-layer .name {
+  color: var(--component, #9747ff);
+}
+.component-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--component, #9747ff);
+  font-weight: 600;
+  min-width: 0;
+}
+.component-head .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.component-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.component-actions button {
+  flex: 1 1 auto;
+}
+.component-desc {
+  width: 100%;
+  min-height: 48px;
+  resize: vertical;
+  box-sizing: border-box;
+  font: inherit;
+}
+.override-dot {
+  color: var(--component, #9747ff);
+  font-size: 11px;
+}

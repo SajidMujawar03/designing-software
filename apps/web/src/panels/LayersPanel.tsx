@@ -1,5 +1,5 @@
-import type { NodeId, NodeType, SceneNode } from '@figma/document';
-import { Combine, Contrast, Star, Triangle } from 'lucide-react';
+import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
+import { Combine, Component, Contrast, Diamond, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import { useEffect, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
@@ -9,6 +9,8 @@ import { IconButton } from './controls';
 
 const ICONS: Partial<Record<NodeType, typeof Square>> = {
   FRAME: Hash,
+  COMPONENT: Component,
+  INSTANCE: Diamond,
   GROUP: SquareDashed,
   RECTANGLE: Square,
   ELLIPSE: Circle,
@@ -126,7 +128,7 @@ function LayerTree() {
     e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const t = (e.clientY - r.top) / r.height;
-    const canNest = n.type === 'FRAME';
+    const canNest = isFrameLike(n);
     const pos: DropPos = canNest ? (t < 0.25 ? 'above' : t > 0.75 ? 'below' : 'inside') : t < 0.5 ? 'above' : 'below';
     if (drop?.id !== n.id || drop.pos !== pos) setDrop({ id: n.id, pos });
   };
@@ -201,7 +203,9 @@ function LayerRow(p: LayerRowProps) {
   const hovered = useUI((s) => s.hoverId === node.id);
   const hasKids = editor.doc.childIds(node.id).length > 0;
   const Icon = node.isMask ? Contrast : (ICONS[node.type] ?? Square);
-  const parentHidden = editor.doc.ancestors(node.id).some((a) => !a.visible);
+  const ancestors = editor.doc.ancestors(node.id);
+  const parentHidden = ancestors.some((a) => !a.visible);
+  const isComp = node.type === 'COMPONENT' || node.type === 'INSTANCE' || ancestors.some((a) => a.type === 'COMPONENT' || a.type === 'INSTANCE');
 
   return (
     <div
@@ -209,6 +213,7 @@ function LayerRow(p: LayerRowProps) {
         'layer-row',
         p.selected && 'selected',
         hovered && 'hovered',
+        isComp && 'component-layer',
         (!node.visible || parentHidden) && 'hidden-layer',
         p.dropPos && `drop-${p.dropPos}`,
       ]

@@ -1,4 +1,5 @@
 import {
+  isFrameLike,
   effectOutset,
   gradientMatrix,
   isGroupLike,
@@ -162,7 +163,7 @@ function drawNode(
     opts.visible,
   );
   // Unclipped frames can have children outside their bounds, so still visit them.
-  if (culled && !(n.type === 'FRAME' && !n.clipsContent)) return;
+  if (culled && !(isFrameLike(n) && !n.clipsContent)) return;
 
   const m = multiply(screenParent, local);
   ctx.save();
@@ -172,7 +173,7 @@ function drawNode(
 
   if (!culled && !opts.hidden?.has(n.id)) drawShape(ctx, doc, n, Math.hypot(m[0], m[1]));
 
-  if (n.type === 'FRAME') {
+  if (isFrameLike(n)) {
     if (n.clipsContent) {
       shapePath(ctx, n);
       ctx.clip();
@@ -239,7 +240,7 @@ function drawShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneN
     ctx.shadowColor = 'transparent';
   }
   // Clipped frames stroke after their children so the border stays on top.
-  if (!(n.type === 'FRAME' && n.clipsContent)) strokeShape(ctx, doc, n);
+  if (!(isFrameLike(n) && n.clipsContent)) strokeShape(ctx, doc, n);
 }
 
 const isClosedShape = (n: SceneNode): boolean =>

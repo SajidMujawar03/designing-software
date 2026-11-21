@@ -22,6 +22,8 @@ const NAMES: Record<NodeType, string> = {
   DOCUMENT: 'Document',
   PAGE: 'Page',
   FRAME: 'Frame',
+  COMPONENT: 'Component',
+  INSTANCE: 'Instance',
   GROUP: 'Group',
   BOOLEAN: 'Boolean',
   POLYGON: 'Polygon',
@@ -37,6 +39,8 @@ export function defaultProps(type: NodeType): NodeProps {
   const p: NodeProps = { ...BASE, type, name: NAMES[type] };
   switch (type) {
     case 'FRAME':
+    case 'COMPONENT':
+    case 'INSTANCE':
       p.fills = [solid('#FFFFFF')];
       p.clipsContent = true;
       break;

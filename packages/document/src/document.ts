@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { defaultProps } from './defaults';
 import {
+  isFrameLike,
   isGroupLike,
   type EffectStyle,
   type FillStyle,
@@ -16,6 +17,7 @@ import {
   type TextStyleProps,
 } from './types';
 import { applyChildConstraints, layoutFrame, layoutRoots } from './autolayout';
+import { propagate, structureSource, syncChildren } from './components';
 import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
@@ -83,6 +85,13 @@ export class DesignDocument {
   private layoutDirty = new Set<NodeId>();
   /** Text layers whose width changed and must be measured again. */
   private fitDirty = new Set<NodeId>();
+  /** Layers whose children were added, removed or reordered (their mirrors must follow). */
+  private structDirty = new Set<NodeId>();
+  /** Mirrors by the layer they mirror (`sourceId`), and instances by main component. */
+  private bySource = new Map<NodeId, Set<NodeId>>();
+  private byComponent = new Map<NodeId, Set<NodeId>>();
+  /** Nesting of component propagation (guards against cycles). */
+  private propagating = 0;
   /**
    * Re-measures a text layer (set by the app, which owns text shaping).
    * Without it, text keeps its size when layouts change its width.
@@ -99,7 +108,7 @@ export class DesignDocument {
       captureTimeout: Number.POSITIVE_INFINITY,
     });
 
-    this.yNodes.forEach((y, id) => this.nodes.set(id, snapshot(id, y)));
+    this.yNodes.forEach((y, id) => this.setSnapshot(id, snapshot(id, y)));
     this.yNodes.observeDeep((events) => this.onYEvents(events));
     this.yStyles.forEach((y, id) => this.stylesById.set(id, { ...(y.toJSON() as SharedStyle), id }));
     this.yStyles.observeDeep((events) => {
@@ -201,6 +210,20 @@ export class DesignDocument {
     return out;
   }
 
+  /**
+   * Layers that mirror `id`: copies of it inside instances, and (for a main
+   * component) its instances, including swapped nested ones.
+   */
+  dependentsOf(id: NodeId): NodeId[] {
+    const out = new Set(this.bySource.get(id) ?? []);
+    for (const i of this.byComponent.get(id) ?? []) {
+      const n = this.nodes.get(i);
+      if (n && structureSource(this, n) === id) out.add(i);
+    }
+    out.delete(id);
+    return [...out];
+  }
+
   /** Encoded bytes of a stored image, if present. */
   getImage(hash: string): Uint8Array | undefined {
     return this.yImages.get(hash);
@@ -237,7 +260,16 @@ export class DesignDocument {
 
   /** Lays out every auto layout frame touched by this change, until nothing moves. */
   private runLayout(): void {
-    for (let pass = 0; pass < 10 && (this.layoutDirty.size || this.fitDirty.size); pass++) {
+    for (let pass = 0; pass < 32 && (this.layoutDirty.size || this.fitDirty.size || this.structDirty.size); pass++) {
+      const struct = [...this.structDirty];
+      this.structDirty.clear();
+      for (const p of struct) {
+        if (!this.nodes.has(p)) continue;
+        for (const d of this.dependentsOf(p)) {
+          const n = this.nodes.get(d);
+          if (n && structureSource(this, n) === p) syncChildren(this, d, p);
+        }
+      }
       const fit = [...this.fitDirty];
       this.fitDirty.clear();
       if (this.textFitter) for (const id of fit) if (this.nodes.has(id)) this.textFitter(id);
@@ -247,6 +279,7 @@ export class DesignDocument {
     }
     this.layoutDirty.clear();
     this.fitDirty.clear();
+    this.structDirty.clear();
   }
 
   /** Lays out an auto layout frame now (e.g. after turning auto layout on). */
@@ -294,12 +327,40 @@ export class DesignDocument {
       this.refresh(id, 'parentId' in patch || 'index' in patch);
       const after = this.nodes.get(id)!;
       if (
-        before?.type === 'FRAME' &&
+        isFrameLike(before) &&
         opts.constraints !== false &&
         (after.width !== before.width || after.height !== before.height)
       ) {
         applyChildConstraints(this, id, before, after);
       }
+      if (before) this.propagateFrom(before);
+    }, { merge: true });
+  }
+
+  /** Sends a layer's changes (since `before`) to the layers mirroring it. */
+  private propagateFrom(before: SceneNode): void {
+    const after = this.nodes.get(before.id);
+    if (!after || this.propagating > 48) return;
+    if (!this.bySource.has(before.id) && !this.byComponent.has(before.id)) return;
+    this.propagating++;
+    try {
+      propagate(this, before, after);
+    } finally {
+      this.propagating--;
+    }
+  }
+
+  /** Replaces a text layer's text and formatting outright. */
+  setRichText(id: NodeId, characters: string, runs: TextRun[]): void {
+    const before = this.nodes.get(id);
+    this.change(() => {
+      const t = this.yText(id);
+      if (!t) return;
+      if (t.length) t.delete(0, t.length);
+      t.insert(0, characters);
+      for (const r of runs) t.format(r.start, r.end - r.start, runAttrs(r));
+      this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
@@ -440,6 +501,7 @@ export class DesignDocument {
    * of the character before it (as typing does); `style` sets it exactly.
    */
   insertText(id: NodeId, index: number, text: string, style?: TextStyleProps): void {
+    const before = this.nodes.get(id);
     this.change(() => {
       const t = this.yText(id);
       if (!t || !text) return;
@@ -447,16 +509,19 @@ export class DesignDocument {
       if (style) t.insert(at, text, cleanStyle(style));
       else t.insert(at, text);
       this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
   deleteText(id: NodeId, index: number, length: number): void {
+    const before = this.nodes.get(id);
     this.change(() => {
       const t = this.yText(id);
       if (!t || length <= 0) return;
       const at = Math.max(0, Math.min(index, t.length));
       t.delete(at, Math.min(length, t.length - at));
       this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
@@ -466,11 +531,13 @@ export class DesignDocument {
    */
   formatText(id: NodeId, index: number, length: number, style: { [K in keyof TextStyleProps]?: TextStyleProps[K] | null }): void {
     if (!('textStyleId' in style) && TEXT_STYLE_KEYS.some((k) => k in style)) style = { ...style, textStyleId: null };
+    const before = this.nodes.get(id);
     this.change(() => {
       const t = this.yText(id);
       if (!t || length <= 0) return;
       t.format(index, length, style as Record<string, unknown>);
       this.refresh(id, false);
+      if (before) this.propagateFrom(before);
     }, { merge: true });
   }
 
@@ -651,9 +718,37 @@ export class DesignDocument {
       if (old?.parentId) this.layoutDirty.add(old.parentId);
     }
     const y = this.yNodes.get(id);
-    if (y) this.nodes.set(id, snapshot(id, y));
+    const now = y ? snapshot(id, y) : undefined;
+    this.setSnapshot(id, now);
+    if (structural) {
+      this.childrenDirty = true;
+      if (this.depth > 0) {
+        if (old?.parentId) this.structDirty.add(old.parentId);
+        if (now?.parentId) this.structDirty.add(now.parentId);
+      }
+    }
+  }
+
+  /** Stores a node's snapshot (or removes it) and keeps the component indexes current. */
+  private setSnapshot(id: NodeId, n: SceneNode | undefined): void {
+    const old = this.nodes.get(id);
+    const link = (m: Map<NodeId, Set<NodeId>>, from: NodeId | null | undefined, to: NodeId | null | undefined) => {
+      if (from === to) return;
+      if (from) {
+        const s = m.get(from);
+        s?.delete(id);
+        if (s && !s.size) m.delete(from);
+      }
+      if (to) {
+        let s = m.get(to);
+        if (!s) m.set(to, (s = new Set()));
+        s.add(id);
+      }
+    };
+    link(this.bySource, old?.sourceId, n?.sourceId);
+    link(this.byComponent, old?.componentId, n?.componentId);
+    if (n) this.nodes.set(id, n);
     else this.nodes.delete(id);
-    if (structural) this.childrenDirty = true;
   }
 
   private onYEvents(events: Array<Y.YEvent<Y.AbstractType<unknown>>>): void {
@@ -682,8 +777,7 @@ export class DesignDocument {
         if (old?.parentId) relayout.add(old.parentId);
       }
       const y = this.yNodes.get(id);
-      if (y) this.nodes.set(id, snapshot(id, y));
-      else this.nodes.delete(id);
+      this.setSnapshot(id, y ? snapshot(id, y) : undefined);
     }
     this._version++;
     for (const l of this.listeners) l();

@@ -1,4 +1,5 @@
 import type { BooleanOperation } from '@figma/document';
+import { createComponent, detachSelection } from './componentCommands';
 import { addAutoLayout, removeAutoLayout } from './layoutCommands';
 import { editor } from './editor';
 import { importImages, pickImageFiles } from './images';
@@ -46,12 +47,14 @@ export function installShortcuts(): () => void {
       fn();
     };
 
-    if (mod && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
+    if (mod && !e.altKey && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
 
     if (mod && e.altKey) {
       const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
       if (e.code === 'KeyG') return run(() => editor.frameSelection());
+      if (e.code === 'KeyK') return run(() => createComponent(editor));
+      if (e.code === 'KeyB') return run(() => detachSelection(editor));
       if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));
       if (e.code === 'KeyO') return run(() => void outlineStrokeSelection(editor));
       if (e.code === 'KeyM') return run(() => editor.useAsMask());

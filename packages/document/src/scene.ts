@@ -17,7 +17,7 @@ import {
   type Vec2,
 } from '@figma/geometry';
 import type { DesignDocument } from './document';
-import { hasOwnTransform, isGroupLike, type NodeId, type SceneNode } from './types';
+import { hasOwnTransform, isFrameLike, isGroupLike, type NodeId, type SceneNode } from './types';
 import { shapePaths, vectorContainsPoint } from './vector';
 
 const DEG = Math.PI / 180;
@@ -110,19 +110,27 @@ export interface HitTestOptions {
 /** Top-most visible, unlocked node under the point; returns the deepest hit. */
 export function hitTest(doc: DesignDocument, pageId: NodeId, p: Vec2, opts: HitTestOptions = {}): SceneNode | null {
   const tol = opts.tolerance ?? 0;
+  // With framesOnly, a point over an instance stops the search: the frame
+  // holding the instance is the target (layers can't go inside instances).
+  const BLOCKED = {} as SceneNode;
   const visit = (parentId: NodeId): SceneNode | null => {
     const kids = doc.children(parentId);
     for (let i = kids.length - 1; i >= 0; i--) {
       const n = kids[i];
       if (!n.visible || n.locked || opts.exclude?.has(n.id)) continue;
-      const inside = shapeContainsPoint(doc, n, p, n.type === 'FRAME' ? 0 : tol);
+      const inside = shapeContainsPoint(doc, n, p, isFrameLike(n) ? 0 : tol);
+      if (opts.framesOnly && n.type === 'INSTANCE') {
+        if (inside) return BLOCKED;
+        continue;
+      }
       if (isGroupLike(n)) {
         if (opts.framesOnly) continue;
         const child = visit(n.id);
         if (child) return child;
-      } else if (n.type === 'FRAME') {
+      } else if (isFrameLike(n)) {
         if (!n.clipsContent || inside) {
           const child = visit(n.id);
+          if (child === BLOCKED) return n;
           if (child) return child;
         }
         if (inside) return n;
@@ -132,7 +140,8 @@ export function hitTest(doc: DesignDocument, pageId: NodeId, p: Vec2, opts: HitT
     }
     return null;
   };
-  return visit(pageId);
+  const hit = visit(pageId);
+  return hit === BLOCKED ? null : hit;
 }
 
 /**
@@ -153,7 +162,7 @@ export function nodesInRect(doc: DesignDocument, pageId: NodeId, r: Rect, deep =
         continue;
       }
       // A top-level frame only partly covered by the marquee selects its children.
-      if (n.type === 'FRAME' && hasKids && (deep || (topLevel && !rectContainsRect(r, b)))) {
+      if (isFrameLike(n) && hasKids && (deep || (topLevel && !rectContainsRect(r, b)))) {
         const before = out.length;
         visit(n.id, false);
         if (out.length === before && rectContainsRect(r, b)) out.push(n);

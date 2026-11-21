@@ -1,4 +1,5 @@
 import {
+  isFrameLike,
   baseTextStyle,
   gradientMatrix,
   isGroupLike,
@@ -100,7 +101,9 @@ function paintAttr(c: SvgContext, n: SceneNode, p: Paint, kind: 'fill' | 'stroke
 function geometryTag(c: SvgContext, n: SceneNode): string | null {
   switch (n.type) {
     case 'RECTANGLE':
-    case 'FRAME': {
+    case 'FRAME':
+    case 'COMPONENT':
+    case 'INSTANCE': {
       const r = n.cornerRadius ? ` rx="${num(n.cornerRadius)}"` : '';
       return `<rect width="${num(n.width)}" height="${num(n.height)}"${r}`;
     }
@@ -270,7 +273,7 @@ function nodeToSvg(c: SvgContext, n: SceneNode): string {
     const geo = geometryTag(c, n);
     // Without a boolean result (no path ops available), export the children as a group.
     if (!geo) body = n.type === 'BOOLEAN' ? children() : '';
-    else if (n.type === 'FRAME') {
+    else if (isFrameLike(n)) {
       body = paintedShape(c, { ...n, strokes: [] }, geo);
       const kids = children();
       if (n.clipsContent && kids) {

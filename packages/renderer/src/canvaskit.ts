@@ -1,4 +1,5 @@
 import {
+  isFrameLike,
   effectOutset,
   isGroupLike,
   localTransform,
@@ -142,7 +143,7 @@ export class CanvasKitRenderer implements SceneRenderer {
         ctx.visible,
       );
       // Unclipped frames can have children outside their bounds, so still visit them.
-      if (culled && !(n.type === 'FRAME' && !n.clipsContent)) return;
+      if (culled && !(isFrameLike(n) && !n.clipsContent)) return;
     }
 
     c.save();
@@ -216,6 +217,8 @@ export class CanvasKitRenderer implements SceneRenderer {
         this.stroke(c, n);
         return;
       case 'FRAME':
+      case 'COMPONENT':
+      case 'INSTANCE':
         if (draw) this.fill(c, n);
         inner();
         if (n.clipsContent) {

@@ -1,4 +1,4 @@
-import { DesignDocument, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
+import { canReparent, createInstance, DesignDocument, isInInstance, normalizeLinks, outerInstance, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
 import { importImages } from './images';
@@ -9,7 +9,7 @@ import { useUI, type ToolId, type UIState, type Viewport } from './store';
 import { boundsOf, fitText, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
 import { nudgeInLayout } from './layoutCommands';
 import { fonts } from './fonts';
-import { gridSnapEdges, isGroupLike, worldBounds, worldTransform } from '@figma/document';
+import { gridSnapEdges, isFrameLike, isGroupLike, worldBounds, worldTransform } from '@figma/document';
 
 const LAST_PAGE_KEY = 'figma-clone:last-page';
 export const MIN_ZOOM = 0.02;
@@ -154,14 +154,15 @@ export class Editor {
   }
 
   deleteSelection(): void {
-    const ids = this.topLevelSelection();
+    // Layers inside an instance can be hidden but not deleted.
+    const ids = this.topLevelSelection().filter((id) => !isInInstance(this.doc, id));
     if (!ids.length) return;
     this.doc.change(() => this.doc.deleteNodes(ids));
     this.select([]);
   }
 
   duplicateSelection(): void {
-    const ids = this.topLevelSelection();
+    const ids = this.topLevelSelection().filter((id) => !isInInstance(this.doc, id));
     if (!ids.length) return;
     const newIds = this.doc.change(() => this.duplicateInPlace(ids));
     this.select(newIds);
@@ -171,7 +172,9 @@ export class Editor {
   duplicateInPlace(ids: NodeId[]): NodeId[] {
     return ids.flatMap((id) => {
       const n = this.doc.get(id)!;
-      return insertNodes(this.doc, serializeNodes(this.doc, [id]), n.parentId!, { x: 0, y: 0 }, id);
+      const out = insertNodes(this.doc, serializeNodes(this.doc, [id]), n.parentId!, { x: 0, y: 0 }, id);
+      for (const nid of out) normalizeLinks(this.doc, nid);
+      return out;
     });
   }
 
@@ -224,9 +227,32 @@ export class Editor {
     const clip = data;
     const sel = this.selectedNodes();
     let parentId = this.pageId;
-    if (sel.length === 1 && sel[0].type === 'FRAME') parentId = sel[0].id;
+    if (sel.length === 1 && isFrameLike(sel[0])) parentId = sel[0].id;
     else if (sel[0]?.parentId && this.doc.pageOf(sel[0].id)?.id === this.pageId) parentId = sel[0].parentId;
-    const ids = this.doc.change(() => insertNodes(this.doc, clip, parentId));
+    // Nothing goes inside an instance: paste next to it instead.
+    const inst = outerInstance(this.doc, parentId);
+    if (inst) parentId = inst.parentId!;
+    const ids = this.doc.change(() => {
+      const out = insertNodes(this.doc, clip, parentId).map((id, i) => {
+        // A pasted main component becomes an instance of it (while it exists).
+        const orig = clip.roots[i]?.node;
+        const placed = this.doc.get(id)!;
+        if (orig?.type === 'COMPONENT' && this.doc.get(orig.id)?.type === 'COMPONENT') {
+          const inst = createInstance(this.doc, orig.id, parentId, { x: placed.x, y: placed.y }, id);
+          if (inst) {
+            this.doc.updateNode(inst, { rotation: placed.rotation });
+            this.doc.deleteNodes([id]);
+            return inst;
+          }
+        }
+        normalizeLinks(this.doc, id);
+        return id;
+      });
+      // Something that would put a component inside itself goes to the page.
+      const bad = out.filter((id) => !canReparent(this.doc, [id], parentId));
+      for (const id of bad) reparentKeepingPosition(this.doc, id, this.pageId);
+      return out;
+    });
     this.select(ids);
   }
 
@@ -275,6 +301,7 @@ export class Editor {
    */
   moveLayers(ids: NodeId[], target: { parentId: NodeId; aboveId?: NodeId; belowId?: NodeId }): void {
     const { parentId } = target;
+    if (ids.some((id) => isInInstance(this.doc, id)) || !canReparent(this.doc, ids, parentId)) return;
     const valid = this.sortByZ(ids.filter((id) => id !== parentId && !this.doc.isAncestor(id, parentId)));
     if (target.belowId && valid.includes(target.belowId)) return;
     if (target.aboveId && valid.includes(target.aboveId)) return;
@@ -313,6 +340,7 @@ export class Editor {
   /** Ctrl+G: wraps the selection in a group, placed where the top-most layer was. */
   groupSelection(): void {
     const ids = this.sortByZ(this.topLevelSelection());
+    if (ids.some((id) => isInInstance(this.doc, id))) return;
     if (!ids.length) return;
     const top = this.doc.get(ids[ids.length - 1])!;
     const groupId = this.doc.change(() => {
@@ -333,6 +361,7 @@ export class Editor {
   /** Ctrl+Shift+G: replaces selected groups (and frames) with their children. */
   ungroupSelection(): void {
     const containers = this.topLevelSelection().filter((id) => {
+      if (isInInstance(this.doc, id)) return false;
       const t = this.doc.get(id)!.type;
       return isGroupLike(this.doc.get(id)) || t === 'FRAME';
     });
@@ -373,6 +402,7 @@ export class Editor {
    */
   useAsMask(): void {
     const ids = this.sortByZ(this.topLevelSelection());
+    if (ids.some((id) => isInInstance(this.doc, id))) return;
     if (!ids.length) return;
     if (ids.length === 1) {
       const n = this.doc.get(ids[0])!;
@@ -391,6 +421,7 @@ export class Editor {
   /** Ctrl+Alt+G: wraps the selection in a frame of the same size. */
   frameSelection(): void {
     const ids = this.sortByZ(this.topLevelSelection());
+    if (ids.some((id) => isInInstance(this.doc, id))) return;
     const b = boundsOf(this.doc, ids);
     if (!ids.length || !b) return;
     const top = this.doc.get(ids[ids.length - 1])!;
@@ -491,7 +522,7 @@ export class Editor {
     const skip = new Set(exclude);
     const rects: Rect[] = [];
     const container = this.doc.get(ctxId);
-    if (container?.type === 'FRAME') rects.push(worldBounds(this.doc, ctxId));
+    if (isFrameLike(container)) rects.push(worldBounds(this.doc, ctxId));
     for (const c of this.doc.children(ctxId)) {
       if (!c.visible || skip.has(c.id)) continue;
       if (exclude.some((id) => this.doc.isAncestor(c.id, id))) {
@@ -505,7 +536,7 @@ export class Editor {
     const guideX = guides.filter((g) => g.axis === 'x').map((g) => g.offset);
     const guideY = guides.filter((g) => g.axis === 'y').map((g) => g.offset);
     // The containing frame's layout grid (when shown and the frame is not rotated).
-    if (container?.type === 'FRAME' && container.layoutGrids?.length && this.ui.showLayoutGrids) {
+    if (isFrameLike(container) && container.layoutGrids?.length && this.ui.showLayoutGrids) {
       const m = worldTransform(this.doc, ctxId);
       if (Math.abs(m[1]) < 1e-9 && Math.abs(m[2]) < 1e-9) {
         const e = gridSnapEdges(container.layoutGrids, container.width, container.height);
