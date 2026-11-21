@@ -17,6 +17,7 @@ export interface MenuActions {
   newWindow(): void;
   openCloud(): void;
   hasServer(): boolean;
+  openLogs(): void;
 }
 
 const EMPTY: MenuModel = { file: [], menus: [] };
@@ -83,7 +84,11 @@ export function buildMenu(win: BrowserWindow | null): Menu {
     { role: 'windowMenu' },
     {
       role: 'help',
-      submenu: [...(help ? [...page(help.items), { type: 'separator' as const }] : []), { label: `Design Clone ${app.getVersion()}`, enabled: false }],
+      submenu: [
+        ...(help ? [...page(help.items), { type: 'separator' as const }] : []),
+        { label: 'Open Logs Folder', click: () => actions.openLogs() },
+        { label: `Design Clone ${app.getVersion()}`, enabled: false },
+      ],
     },
   ];
   return Menu.buildFromTemplate(template);

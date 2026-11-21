@@ -1,0 +1,75 @@
+# Builds the desktop app's Windows installers, smoke-tests the packaged app, and
+# for a tag like desktop-v0.1.0, publishes them as a GitHub Release.
+#   git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
+# Run it by hand (Actions > Desktop release > Run workflow) to just build and download them.
+name: Desktop release
+
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          if [ "desktop-v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag $GITHUB_REF_NAME doesn't match apps/desktop/package.json ($version)."
+            exit 1
+          fi
+
+      - name: Build the installers
+        run: pnpm dist:desktop
+        env:
+          # Optional: crash and error reports to Sentry (set them as repository secrets).
+          DESKTOP_SENTRY_DSN: ${{ secrets.DESKTOP_SENTRY_DSN }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          # Optional code signing (a .pfx as base64, and its password).
+          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
+      - name: Smoke-test the packaged app
+        shell: bash
+        run: '"apps/desktop/release/win-unpacked/Design Clone.exe" --smoke'
+        env:
+          SMOKE_OUT: ${{ github.workspace }}/smoke
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: design-clone-windows
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest*.yml
+            smoke/
+          if-no-files-found: warn
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#desktop-v}
+          gh release create "$GITHUB_REF_NAME" \
+            apps/desktop/release/Design-Clone-Setup-$version.exe \
+            apps/desktop/release/Design-Clone-Setup-$version.exe.blockmap \
+            apps/desktop/release/Design-Clone-$version-portable.exe \
+            --title "Design Clone $version for Windows" \
+            --notes "Download **Design-Clone-Setup-$version.exe** to install, or the portable .exe to run it without installing. The installers aren't code-signed yet, so Windows SmartScreen may warn on first run (More info > Run anyway)." \
+            --verify-tag

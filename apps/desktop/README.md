@@ -45,6 +45,60 @@ This drives the app through the start screen, the editor, the security rules
 and a plugin, and saves screenshots and a `results.json` (to `SMOKE_OUT`, or a
 temporary folder). It exits with 1 if a check fails.
 
+## Installers
+
+From the repository root, run:
+
+```powershell
+pnpm dist:desktop
+```
+
+This builds the web app and packages the desktop app into `apps/desktop/release/`:
+
+- `Design-Clone-Setup-<version>.exe`: the installer. It installs per user and
+  lets you choose the folder. It adds Start menu and desktop shortcuts and
+  registers `.design` files and `design-clone://` links.
+- `Design-Clone-<version>-portable.exe`: runs without installing.
+- `win-unpacked/`: the app folder the installer contains. Run
+  `"release/win-unpacked/Design Clone.exe" --smoke` to smoke-test the packaged
+  build.
+
+The packaged app has these Electron fuses set:
+
+- It can't be run as a plain Node.js interpreter.
+- No Node options or inspector flags.
+- The app archive is integrity-checked, and the app loads only from it.
+- Cookies are encrypted.
+
+The installers aren't code-signed yet, so Windows SmartScreen warns on first
+run (More info > Run anyway). To sign them, set `CSC_LINK` (a .pfx file or its
+base64) and `CSC_KEY_PASSWORD`, locally or as repository secrets.
+
+## Releases
+
+Bump `version` in `apps/desktop/package.json`, merge, then push a matching tag:
+
+```powershell
+git tag desktop-v0.1.0
+```
+
+```powershell
+git push origin desktop-v0.1.0
+```
+
+The **Desktop release** workflow builds the installers on Windows,
+smoke-tests the packaged app, and publishes a GitHub Release with them. Run it
+by hand from the Actions tab to only build them and download the result.
+
+## Logs and crash reports
+
+The main process logs to `logs/main.log` in the app's data folder
+(`%APPDATA%\Design Clone` on Windows). Help > Open Logs Folder opens it.
+
+Native crashes are saved as minidumps by Electron. They're uploaded only when
+the build has a Sentry DSN (`DESKTOP_SENTRY_DSN` when building, or the
+repository secret). If a window's page crashes, the app offers to reload it.
+
 ## Plan
 
 1. **App shell** (done): windows, the `app://` protocol, security rules,
@@ -61,5 +115,7 @@ temporary folder). It exits with 1 if a check fails.
    different server asks first), "Open in the desktop app" in the browser's
    file menu creates one, and comment mentions show native notifications.
    File associations and the link registration come with the installers.
-4. **Windows installers,** plus crash reporting and a release workflow.
+4. **Windows installers** (done): NSIS installer and portable build, file
+   associations and link registration, Electron fuses, logs and crash
+   reports, and a release workflow for `desktop-v*` tags.
 5. **Auto-update, macOS and Linux.**

@@ -1,4 +1,4 @@
-import type { BrowserWindow } from 'electron';
+import { app, type BrowserWindow } from 'electron';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as Y from 'yjs';
@@ -43,6 +43,7 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
   const checks: Array<[string, boolean]> = [];
   const check = (name: string, ok: boolean) => checks.push([name, ok]);
 
+  results.app = { name: app.getName(), version: app.getVersion(), packaged: app.isPackaged, userData: app.getPath('userData') };
   const win = createWindow('offline', opts.offlineUrl('/'));
   win.webContents.on('console-message', (e) => {
     const msg = (e as unknown as { message?: string }).message ?? '';

@@ -1,7 +1,8 @@
-import { app, BrowserWindow, dialog, ipcMain, net, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { join, resolve } from 'node:path';
 import { designFilesIn, fileBridge, newFile, openFileDialog, openPath } from './files';
 import { linksIn, openLink, registerScheme } from './links';
+import { log, logsDir, startCrashReporting } from './log';
 import { startMenus } from './menus';
 import { APP_ORIGIN, handleAppScheme, registerAppScheme } from './protocol';
 import { checkServerUrl, saveSettings, settings } from './settings';
@@ -26,6 +27,7 @@ const webDist = () => (app.isPackaged ? join(process.resourcesPath, 'web') : res
 
 registerAppScheme();
 app.enableSandbox();
+startCrashReporting();
 // Windows shows notifications (comment mentions) only for an app with an id.
 if (process.platform === 'win32') app.setAppUserModelId('com.sajidmujawar.designclone');
 if (SMOKE) {
@@ -85,7 +87,10 @@ app.on('open-file', (e, path) => {
   else early.files.push(path);
 });
 
-const showError = (e: unknown) => dialog.showErrorBox("Couldn't open the file", e instanceof Error ? e.message : String(e));
+function showError(e: unknown): void {
+  log('warn', 'could not open a file', e);
+  dialog.showErrorBox("Couldn't open the file", e instanceof Error ? e.message : String(e));
+}
 
 function openFiles(paths: string[]): void {
   for (const p of paths) {
@@ -180,6 +185,7 @@ async function start(): Promise<void> {
       newWindow: () => void openStart(),
       openCloud: () => void openCloud(),
       hasServer: () => !!settings().serverUrl,
+      openLogs: () => void shell.openPath(logsDir()),
     },
   });
   if (SMOKE) {

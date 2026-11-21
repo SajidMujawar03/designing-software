@@ -1,0 +1,66 @@
+# Packaging (pnpm --filter @figma/desktop dist). Build the web app first: it is bundled as a resource.
+appId: com.sajidmujawar.designclone
+productName: Design Clone
+copyright: Copyright © 2026 Sajid Mujawar
+
+directories:
+  output: release
+  buildResources: build
+
+# The main process and preload are bundled by build.mjs (everything they need is inside), so no node_modules ship.
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: ../web/dist
+    to: web
+asar: true
+npmRebuild: false
+
+fileAssociations:
+  - ext: design
+    name: Design Clone file
+    description: Design file
+    role: Editor
+protocols:
+  - name: Design Clone link
+    schemes: [design-clone]
+
+# Locks down what the packaged app can be made to do.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+
+win:
+  icon: build/icon.png
+  target:
+    - nsis
+    - portable
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Design Clone
+  artifactName: Design-Clone-Setup-${version}.${ext}
+portable:
+  artifactName: Design-Clone-${version}-portable.${ext}
+
+mac:
+  icon: build/icon.png
+  category: public.app-category.graphics-design
+  target: [dmg]
+linux:
+  icon: build/icon.png
+  category: Graphics
+  target: [AppImage, deb]
+  maintainer: Sajid Mujawar
+
+# Releases are uploaded by the release workflow.
+publish: null
