@@ -128,6 +128,7 @@ export function ShortcutsSheet() {
     ['Section', 'Shift+S'],
     ['Slice', 'S'],
     ['Spec', 'D'],
+    ['Code layer', 'B'],
     ['Rectangle', 'R'],
     ['Ellipse', 'O'],
     ['Line', 'L'],

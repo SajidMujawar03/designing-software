@@ -181,6 +181,7 @@ export function shapePaths(n: SceneNode): VectorPath[] {
     case 'SLICE':
     case 'CODE_SNIPPET':
     case 'SPEC':
+    case 'CODE_LAYER':
     case 'COMPONENT':
     case 'COMPONENT_SET':
     case 'INSTANCE':

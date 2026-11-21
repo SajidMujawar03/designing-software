@@ -68,7 +68,7 @@ const BOOTSTRAP = String.raw`
 `;
 
 /** The page's script nonce (set by the server in production): plugin frames inherit its CSP. */
-function pageNonce(): string {
+export function pageNonce(): string {
   const n = document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content ?? '';
   return /^[A-Za-z0-9+/=]+$/.test(n) ? n : '';
 }

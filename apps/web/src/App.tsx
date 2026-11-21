@@ -23,9 +23,11 @@ import { Toolbar } from './panels/Toolbar';
 import { ErrorBoundary } from './panels/ErrorBoundary';
 import { usePrefs } from './editor/prefs';
 import { startLayerThumbs } from './editor/layerThumbs';
+import { startCodeLayers } from './editor/codeLayers';
 import { NudgeDialog, RestoreUIButton } from './panels/ViewSettings';
 import { FindReplacePanel } from './panels/FindReplace';
 import { SpecEditorLayer } from './panels/SpecEditor';
+import { CodeEditorPanel, CodeLayerOverlay } from './panels/CodeLayers';
 import { VariablesModal } from './panels/VariablesPanel';
 
 let started = false;
@@ -64,6 +66,7 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
   // In the desktop app: the native menus follow this editor.
   useEffect(() => startDesktopMenus(), []);
   useEffect(() => startLayerThumbs(editor.doc), []);
+  useEffect(() => startCodeLayers(editor.doc), []);
   const uiMode = usePrefs((s) => s.ui);
 
   return (
@@ -93,6 +96,8 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
           </ErrorBoundary>
           <FindReplacePanel />
           <SpecEditorLayer />
+          <CodeLayerOverlay />
+          <CodeEditorPanel />
         </main>
         <aside className="sidebar right">
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>

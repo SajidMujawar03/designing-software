@@ -1,4 +1,4 @@
-import { canHoldSection, hitTest, worldBounds, type NodeId, type NodePatch, type NodeType } from '@figma/document';
+import { canHoldSection, defaultProps, hitTest, worldBounds, type NodeId, type NodePatch, type NodeType } from '@figma/document';
 import { rectContainsRect, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { fitText, placementIn, reparentKeepingPosition, setLineEndpoints, worldRotation } from '../transforms';
@@ -22,7 +22,7 @@ export class ShapeTool implements Tool {
 
   constructor(
     private ed: Editor,
-    private type: 'FRAME' | 'SECTION' | 'SLICE' | 'RECTANGLE' | 'ELLIPSE' | 'POLYGON' | 'STAR' | 'LINE',
+    private type: 'FRAME' | 'SECTION' | 'SLICE' | 'CODE_LAYER' | 'RECTANGLE' | 'ELLIPSE' | 'POLYGON' | 'STAR' | 'LINE',
     /** Extra properties and name for variants, e.g. an arrow is a line with an end marker. */
     private variant?: { name: string; props: NodePatch },
   ) {}
@@ -72,6 +72,7 @@ export class ShapeTool implements Tool {
       FRAME: 'Frame',
       SECTION: 'Section',
       SLICE: 'Slice',
+      CODE_LAYER: 'Code layer',
       RECTANGLE: 'Rectangle',
       ELLIPSE: 'Ellipse',
       POLYGON: 'Polygon',
@@ -132,8 +133,10 @@ export class ShapeTool implements Tool {
       const a = this.start.px;
       if (this.type === 'LINE') setLineEndpoints(this.doc, id, a, { x: a.x + DEFAULT_SIZE, y: a.y });
       else {
+        // Code layers start at a usable page size; other shapes at 100 × 100.
+        const size = this.type === 'CODE_LAYER' ? defaultProps('CODE_LAYER') : { width: DEFAULT_SIZE, height: DEFAULT_SIZE };
         const rot = worldRotation(this.doc, this.parentId!);
-        this.doc.updateNode(id, placementIn(this.doc, this.parentId!, { x: a.x + 50, y: a.y + 50 }, rot, DEFAULT_SIZE, DEFAULT_SIZE));
+        this.doc.updateNode(id, placementIn(this.doc, this.parentId!, { x: a.x + size.width / 2, y: a.y + size.height / 2 }, rot, size.width, size.height));
       }
     }
     if (this.type === 'FRAME' || this.type === 'SECTION') this.adoptContainedSiblings(id);
@@ -143,6 +146,8 @@ export class ShapeTool implements Tool {
     this.created = null;
     this.ed.select([id]);
     this.ed.setTool('select');
+    // A new code layer opens its code editor.
+    if (this.type === 'CODE_LAYER') this.ed.openCodeEditor(id);
   }
 
   /** A new frame or section drawn around existing layers takes them in, like Figma. */

@@ -44,7 +44,9 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   const labelled = (parentId: NodeId): SceneNode[] =>
     doc.children(parentId).flatMap((n) => (n.type === 'SECTION' && n.visible ? [n, ...labelled(n.id)] : [n]));
   for (const n of labelled(pageId)) {
-    if (!isFrameLike(n) || !n.visible) continue;
+    // Code layers get a label too (when running, the drag handle shows it instead).
+    const stoppedCode = n.type === 'CODE_LAYER' && !(n.id in ed.ui.runningCode);
+    if (!(stoppedCode || isFrameLike(n)) || !n.visible) continue;
     const p = ed.worldToScreen(applyToPoint(worldTransform(doc, n.id), { x: 0, y: 0 }));
     const maxW = n.width * viewport.zoom;
     if (n.type === 'SECTION') {

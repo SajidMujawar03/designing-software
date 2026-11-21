@@ -1,4 +1,5 @@
 import type { Editor } from '../editor';
+import { SAMPLE_CODE_FILES } from '@figma/document';
 import type { ToolId } from '../store';
 import { HandTool, ShapeTool, TextTool } from './create';
 import { SelectTool } from './select';
@@ -17,6 +18,7 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     snippet: new CodeSnippetTool(ed),
     annotate: new AnnotateTool(ed),
     spec: new SpecTool(ed),
+    code: new ShapeTool(ed, 'CODE_LAYER', { name: 'Code layer', props: { codeFiles: SAMPLE_CODE_FILES } }),
     rectangle: new ShapeTool(ed, 'RECTANGLE'),
     ellipse: new ShapeTool(ed, 'ELLIPSE'),
     polygon: new ShapeTool(ed, 'POLYGON'),

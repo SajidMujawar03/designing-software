@@ -133,7 +133,7 @@ Figma's own versions of the recording's **Spec (D)** and **Code (B)** tools ([Sp
 
 **2. Code (B): a live code layer**
 - A `CODE_LAYER` node type holding files (HTML, CSS, JS) and a size. B, then drag or pick a frame size.
-- **Running:** a sandboxed iframe (the plugin system's sandbox and CSP) positioned over the canvas, following pan and zoom. **Play** runs it; when stopped, the canvas shows the last captured snapshot, so exports and thumbnails have something to draw.
+- **Running:** a sandboxed iframe (scripts only, no network, no access to the app; the plugin system's nonce approach) positioned over the canvas, following pan and zoom. **Play** runs it; when stopped, the canvas shows a snapshot of its HTML and CSS (rendered without scripts through an SVG `foreignObject`), so exports and thumbnails have something to draw.
 - **Code editor panel:** file tabs with syntax highlighting (the F5 tokenizer), **Reload code layer**, and a Browser tab.
 - **Out of scope for now:** building from a prompt or a selection (needs an AI integration), GitHub or local-folder import, point and edit, and "Extract designs" (turning the running page into layers). Each could be its own phase.
 
@@ -204,11 +204,11 @@ Before starting, write `docs/motion-plan.md` with the data model, the playback l
 | F3 | Layer thumbnails | ~2 days | None |
 | F4 | Section, slice, scale tool | 4–5 days | **v2** (new node types) |
 | F5 | Code snippets, annotations | ~4 days | **v3** (CODE_SNIPPET) |
-| F5b | Spec documents, live code layers | ~2 weeks | **v4** (SPEC, CODE_LAYER) |
+| F5b | Spec documents, live code layers (two PRs) | ~2 weeks | **v4** (SPEC), **v5** (CODE_LAYER) |
 | F6 | Draw mode and brushes | ~5 days | Optional fields |
 | F7 | Width profiles and draw actions | 1–2 weeks | Optional fields |
 | F8 | Text on path | ~1 week | Optional fields |
-| F9 | Motion timeline | 3–4 weeks | **v5** (separate plan) |
+| F9 | Motion timeline | 3–4 weeks | **v6** (separate plan) |
 
 F1–F3 can ship in any order. F5b builds on F5's tokenizer. F7 needs F6. F9 is best done last.
 
