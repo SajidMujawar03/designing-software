@@ -14,6 +14,7 @@ import { CommentsPanel } from './panels/CommentsLayer';
 import { VersionHistoryPanel, VersionPreviewBar } from './panels/VersionHistory';
 import { ShareDialog } from './panels/ShareDialog';
 import { InspectPanel, RightTabs } from './panels/InspectPanel';
+import { PrototypePanel } from './panels/PrototypePanel';
 import { Toolbar } from './panels/Toolbar';
 import { VariablesModal } from './panels/VariablesPanel';
 
@@ -65,7 +66,7 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
           ) : (
             <>
               <RightTabs />
-              {rightTab === 'inspect' ? <InspectPanel /> : <PropertiesPanel />}
+              {rightTab === 'inspect' ? <InspectPanel /> : rightTab === 'prototype' ? <PrototypePanel /> : <PropertiesPanel />}
             </>
           )}
         </aside>

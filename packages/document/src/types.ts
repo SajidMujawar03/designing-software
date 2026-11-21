@@ -273,6 +273,17 @@ export interface SceneNode {
   /** Export settings: one file per entry (format, size and file name suffix). */
   exportSettings?: ExportSetting[] | null;
 
+  // Prototyping
+  /** What happens when someone interacts with this layer in a prototype. */
+  reactions?: Reaction[] | null;
+  /** Frames: which way their content scrolls in a prototype when it overflows. */
+  overflowDirection?: 'NONE' | 'HORIZONTAL' | 'VERTICAL' | 'BOTH' | null;
+  /** Frames: stays in place while the frame scrolls (headers, tab bars). */
+  scrollFixed?: boolean | null;
+  /** Pages: where prototypes start (each is a flow), and the device to show them on. */
+  prototypeFlows?: PrototypeFlow[] | null;
+  prototypeDevice?: PrototypeDevice | null;
+
   // PAGE
   guides?: Guide[];
 
@@ -380,6 +391,62 @@ export interface ExportSetting {
   constraint: { type: 'SCALE' | 'WIDTH' | 'HEIGHT'; value: number };
   /** Added to the file name, e.g. "@2x". */
   suffix: string;
+}
+
+export type TriggerType = 'ON_CLICK' | 'ON_HOVER' | 'ON_PRESS' | 'AFTER_TIMEOUT';
+
+export interface Trigger {
+  type: TriggerType;
+  /** AFTER_TIMEOUT: milliseconds after the frame appears. */
+  timeout?: number;
+}
+
+export type TransitionType = 'INSTANT' | 'DISSOLVE' | 'SMART_ANIMATE' | 'MOVE_IN' | 'MOVE_OUT' | 'PUSH' | 'SLIDE_IN' | 'SLIDE_OUT';
+export type TransitionDirection = 'LEFT' | 'RIGHT' | 'TOP' | 'BOTTOM';
+export type Easing = 'LINEAR' | 'EASE_IN' | 'EASE_OUT' | 'EASE_IN_AND_OUT';
+
+export interface Transition {
+  type: TransitionType;
+  /** For MOVE / PUSH / SLIDE: the side the new screen comes from (or leaves toward). */
+  direction?: TransitionDirection;
+  /** Milliseconds. */
+  duration: number;
+  easing: Easing;
+}
+
+export type OverlayPosition = 'CENTER' | 'TOP_LEFT' | 'TOP_CENTER' | 'TOP_RIGHT' | 'BOTTOM_LEFT' | 'BOTTOM_CENTER' | 'BOTTOM_RIGHT';
+
+export type Action =
+  | { type: 'NAVIGATE'; destinationId: NodeId | null; transition: Transition }
+  | {
+      type: 'OVERLAY';
+      destinationId: NodeId | null;
+      transition: Transition;
+      position: OverlayPosition;
+      closeOnClickOutside: boolean;
+      /** Dims what's behind the overlay. */
+      background: boolean;
+    }
+  | { type: 'SCROLL_TO'; destinationId: NodeId | null; transition: Transition }
+  | { type: 'BACK' }
+  | { type: 'CLOSE' }
+  | { type: 'URL'; url: string };
+
+export interface Reaction {
+  trigger: Trigger;
+  action: Action;
+}
+
+export interface PrototypeFlow {
+  /** The frame the flow starts on. */
+  nodeId: NodeId;
+  name: string;
+}
+
+export interface PrototypeDevice {
+  /** A preset id (see DEVICES in prototype.ts), or NONE for the frame alone. */
+  type: string;
+  rotation: 0 | 90;
 }
 
 /** Where something imported from a library came from. */

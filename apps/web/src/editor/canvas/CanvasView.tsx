@@ -15,6 +15,8 @@ import { drawPresence } from './presenceOverlay';
 import { CommentsLayer } from '../../panels/CommentsLayer';
 import { follow, reportCursor, usePresence } from '../../cloud/presence';
 import { hitGradientHandle, moveGradientHandle } from './gradientHandles';
+import { hitProtoHandle, screenAt } from './prototypeOverlay';
+import { connect } from '@figma/document';
 import { hitGuide, RULER } from './rulers';
 import { TextInput } from './TextInput';
 import { textEngine } from '../textEngine';
@@ -151,6 +153,7 @@ export function CanvasView() {
     let guide: { index: number; axis: 'x' | 'y' } | null = null;
     /** Gradient handle being dragged (paint editor open). */
     let gradientHandle: number | null = null;
+    let protoFrom: string | null = null;
     /** Selecting text with the pointer (anchor index). */
     let textDrag: number | null = null;
     /** Click counting (pointer events report no click count): time and place of the last press. */
@@ -201,6 +204,13 @@ export function CanvasView() {
         }
         editor.commitTextEdit();
       }
+      // Prototype tab: drag the handle on the selected layer onto a frame to connect them.
+      const protoHit = e.button === 0 && !ui.spaceHeld ? hitProtoHandle(editor, ev.screen) : null;
+      if (protoHit) {
+        protoFrom = protoHit;
+        editor.setUI({ protoDrag: { from: protoHit, to: ev.world, target: null } });
+        return;
+      }
       const gradHit = e.button === 0 && !ui.spaceHeld ? hitGradientHandle(editor, ev.screen) : null;
       if (gradHit !== null) {
         editor.doc.endGesture();
@@ -224,6 +234,10 @@ export function CanvasView() {
         TextEdit.setSelection(textDrag, TextEdit.indexAtWorld(ev.world));
         return;
       }
+      if (protoFrom) {
+        editor.setUI({ protoDrag: { from: protoFrom, to: ev.world, target: screenAt(editor, ev.world) } });
+        return;
+      }
       if (gradientHandle !== null) {
         moveGradientHandle(editor, gradientHandle, ev.world);
         return;
@@ -235,6 +249,7 @@ export function CanvasView() {
       if (active) return active.move(ev);
       currentTool().hover?.(ev);
       if (hitGradientHandle(editor, ev.screen) !== null) return editor.setUI({ cursor: 'move', hoverId: null });
+      if (hitProtoHandle(editor, ev.screen)) return editor.setUI({ cursor: 'crosshair', hoverId: null });
       if (editor.ui.editingTextId) {
         const over = hitTest(editor.doc, editor.pageId, ev.world, { tolerance: 4 / editor.ui.viewport.zoom })?.id;
         if (over === editor.ui.editingTextId) return editor.setUI({ cursor: 'text' });
@@ -247,6 +262,14 @@ export function CanvasView() {
       if (textDrag !== null) {
         textDrag = null;
         if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        return;
+      }
+      if (protoFrom) {
+        const from = protoFrom;
+        protoFrom = null;
+        // Dropped on a frame: connect to it; on empty canvas: remove the connection.
+        connect(editor.doc, from, screenAt(editor, toEvent(e).world));
+        editor.setUI({ protoDrag: null });
         return;
       }
       if (gradientHandle !== null) {

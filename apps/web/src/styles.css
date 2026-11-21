@@ -3050,3 +3050,114 @@ button.swatch {
   max-height: 340px;
   overflow: auto;
 }
+
+/* Prototype */
+.proto-item {
+  border: 1px solid var(--border, #e6e6e6);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+.proto-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px 6px 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+.proto-trigger {
+  font-size: 11px;
+  color: var(--text-dim, #8c8c8c);
+  white-space: nowrap;
+}
+.proto-action {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proto-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 8px 10px;
+}
+.proto-field {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.proto-field.two {
+  grid-template-columns: minmax(0, 1fr) 90px;
+}
+.proto-field > span {
+  font-size: 11px;
+  color: var(--text-dim, #8c8c8c);
+}
+.proto-field select,
+.proto-field input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  height: 26px;
+  font: inherit;
+}
+.proto-num {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.proto-num input {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  font: inherit;
+  box-sizing: border-box;
+}
+.proto-num span {
+  font-size: 11px;
+  color: var(--text-dim, #8c8c8c);
+}
+.proto-dirs {
+  display: flex;
+  gap: 4px;
+  margin-left: 80px;
+}
+.proto-dirs button {
+  width: 28px;
+  height: 24px;
+  border: 1px solid var(--border, #e6e6e6);
+  background: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+.proto-dirs button.active {
+  background: #0d99ff;
+  color: #fff;
+  border-color: #0d99ff;
+}
+.proto-flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #0d99ff;
+  min-width: 0;
+}
+.proto-flow input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--text, #1e1e1e);
+}
+.proto-flow input:hover,
+.proto-flow input:focus {
+  border-color: var(--border, #ddd);
+}

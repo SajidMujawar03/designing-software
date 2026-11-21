@@ -206,6 +206,7 @@ export function RightTabs() {
       {(
         [
           ['design', 'Design'],
+          ['prototype', 'Prototype'],
           ['inspect', 'Inspect'],
         ] as const
       ).map(([k, label]) => (
