@@ -17,6 +17,7 @@ import { startCloudFile, useCloudFile } from '../cloud/cloudFile';
 import type { Route } from '../cloud/route';
 import { editor } from '../editor/editor';
 import { currentFileId, fileStoreName } from '../editor/files';
+import { loadDiskForPresent } from '../desktop/diskFile';
 import { fonts } from '../editor/fonts';
 import { hotspots, reactionAt, rectInScreen, renderScreen, scrollRange, type RenderedScreen } from './screens';
 
@@ -134,6 +135,7 @@ function overlayRect(pos: OverlayAction['position'], ow: number, oh: number, sw:
 /** Loads the file to play (read-only, kept live for cloud files). */
 async function loadFile(route: Extract<Route, { kind: 'present' }>): Promise<void> {
   if (route.id) await startCloudFile(route.id);
+  else if (route.disk) await loadDiskForPresent();
   else {
     const p = new IndexeddbPersistence(fileStoreName(currentFileId()), editor.doc.ydoc);
     await new Promise<void>((r) => {
@@ -483,7 +485,13 @@ export function Presenter({ route }: { route: Extract<Route, { kind: 'present' }
     return (
       <div className="loading error-page">
         <p>{error}</p>
-        <a href="/">Back to your files</a>
+        {route.disk ? (
+          <button className="btn" onClick={() => window.close()}>
+            Back to the editor
+          </button>
+        ) : (
+          <a href="/">Back to your files</a>
+        )}
       </div>
     );
   if (!ready || !current || !frame) return <div className="loading present-loading">Loading prototype…</div>;
@@ -498,9 +506,16 @@ export function Presenter({ route }: { route: Extract<Route, { kind: 'present' }
   return (
     <div className="present">
       <header className="pv-bar">
-        <a className="pv-btn" href={editUrl} title="Back to the editor">
-          <Pencil size={14} /> Edit
-        </a>
+        {route.disk ? (
+          // The editor is still open in its own window.
+          <button className="pv-btn" title="Back to the editor" onClick={() => window.close()}>
+            <Pencil size={14} /> Edit
+          </button>
+        ) : (
+          <a className="pv-btn" href={editUrl} title="Back to the editor">
+            <Pencil size={14} /> Edit
+          </a>
+        )}
         {history.length > 1 && (
           <button className="pv-btn" title="Back" onClick={() => perform({ type: 'BACK' }, current)}>
             <ArrowLeft size={14} />

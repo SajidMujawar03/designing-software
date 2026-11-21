@@ -1,7 +1,19 @@
 import type { BrowserWindow } from 'electron';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import * as Y from 'yjs';
+import { decodeDesignFile } from '../../../web/src/desktop/designFile';
+import { dialogs, openPath } from './files';
 import { createWindow, findWindow, setOpenExternal } from './windows';
+
+/** The names of the layers stored in a .design file (read straight from disk). */
+function layersInFile(path: string): string[] {
+  const bytes = readFileSync(path);
+  const { state } = decodeDesignFile(new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+  const doc = new Y.Doc();
+  Y.applyUpdate(doc, state);
+  return [...doc.getMap<Y.Map<unknown>>('nodes').values()].map((n) => n.get('name')).filter((n): n is string => typeof n === 'string');
+}
 
 /**
  * A scripted run of the app (pnpm --filter @figma/desktop smoke): opens the
@@ -34,10 +46,12 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
     consoleLog.push(msg.slice(0, 300));
     if (/Refused to|Content Security Policy/i.test(msg)) refused.push(msg.slice(0, 300));
   });
-  const js = <T>(code: string) => win.webContents.executeJavaScript(code, true) as Promise<T>;
+  // Scripts and screenshots go to the window being tested (the first one, then the reopened file window).
+  let page: BrowserWindow = win;
+  const js = <T>(code: string) => page.webContents.executeJavaScript(code, true) as Promise<T>;
   const shot = async (name: string) => {
     try {
-      writeFileSync(join(opts.out, `${name}.png`), (await win.webContents.capturePage()).toPNG());
+      writeFileSync(join(opts.out, `${name}.png`), (await page.webContents.capturePage()).toPNG());
     } catch (e) {
       console.warn(`[smoke] no screenshot for ${name}: ${e}`);
     }
@@ -124,6 +138,86 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
     results.badServer = badServer;
     check('plain http servers are refused', /https/.test(badServer));
 
+    // ---- Files on disk (dialogs answered with paths in the output folder)
+    const filesDir = join(opts.out, 'files');
+    rmSync(filesDir, { recursive: true, force: true });
+    mkdirSync(filesDir, { recursive: true });
+    const designPath = join(filesDir, 'Smoke design.design');
+    dialogs.save = async () => designPath;
+    dialogs.open = async () => designPath;
+    await js(`location.assign('/')`);
+    await wait(300);
+    await loaded(win);
+    await wait(1500);
+    await js(`window.desktop.newFile()`);
+    await wait(400);
+    await loaded(win);
+    await wait(3500);
+    const disk = await js<{ path: string; ready: boolean; status: string; title: string }>(`({ path: location.pathname, ready: !!window.editor?.ui.ready, status: document.querySelector('.sync-status')?.textContent?.trim() ?? '', title: document.title })`);
+    results.disk = disk;
+    check('new file opens in the editor', disk.path === '/disk' && disk.ready);
+    check('new file is on disk', existsSync(designPath));
+    await js(`(() => { const e = window.editor; e.doc.change(() => e.doc.createNode({ type: 'RECTANGLE', name: 'Disk box', parentId: e.pageId, x: 0, y: 0, width: 120, height: 80, fills: [{ type: 'SOLID', color: { r: 0.08, g: 0.68, b: 0.36 }, opacity: 1, visible: true }] })); e.zoomToRect({ x: -40, y: -40, width: 200, height: 160 }); })()`);
+    await wait(2500);
+    check('changes are saved automatically', layersInFile(designPath).includes('Disk box'));
+    const status = await js<string>(`document.querySelector('.sync-status')?.textContent?.trim() ?? ''`);
+    results.diskStatus = status;
+    check('the title shows it saved', status === 'Saved');
+    await shot('5-disk');
+    const recent = await js<Array<{ path: string }>>(`window.desktop.recentFiles()`);
+    check('the file is in recent files', recent.some((r) => r.path === designPath));
+
+    // Rename it in its folder.
+    const renamed = await js<{ path: string; name: string }>(`window.desktop.file.rename('Renamed design')`);
+    const renamedPath = join(filesDir, 'Renamed design.design');
+    check('rename moves the file', renamed.path === renamedPath && existsSync(renamedPath) && !existsSync(designPath));
+
+    // An edit right before closing is saved by the close.
+    await js(`(() => { const e = window.editor; e.doc.change(() => e.doc.createNode({ type: 'ELLIPSE', name: 'Last second', parentId: e.pageId, x: 160, y: 0, width: 60, height: 60 })); })()`);
+    await new Promise<void>((resolve) => {
+      win.once('closed', () => resolve());
+      win.close();
+    });
+    check('closing saves the last change', layersInFile(renamedPath).includes('Last second'));
+
+    // Reopen it in a new window.
+    const reopened = openPath(renamedPath);
+    if (reopened) {
+      await loaded(reopened);
+      await wait(3000);
+      const names = await reopened.webContents.executeJavaScript(`(() => { const e = window.editor; return e?.ui.ready ? e.doc.children(e.pageId).map(n => n.name) : []; })()`, true);
+      results.reopened = names;
+      check('the file reopens with its layers', names.includes('Disk box') && names.includes('Last second'));
+      page = reopened;
+      await shot('6-reopened');
+      // Present mode opens a window that reads the same file (read-only). It needs a frame to play.
+      await js(`(() => { const e = window.editor; e.doc.change(() => e.doc.createNode({ type: 'FRAME', name: 'Screen', parentId: e.pageId, x: 0, y: 200, width: 320, height: 200, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, opacity: 1, visible: true }] })); })()`);
+      await wait(1500);
+      const opened = new Promise<BrowserWindow>((resolve) => reopened.webContents.once('did-create-window', (child) => resolve(child)));
+      await js(`void window.open('/disk/present?page=' + window.editor.pageId, '_blank')`);
+      const presenter = await Promise.race([opened, wait(5000).then(() => null)]);
+      if (presenter) {
+        await loaded(presenter);
+        await wait(2500);
+        const p = await presenter.webContents.executeJavaScript(`({ present: !!document.querySelector('.present'), error: document.querySelector('.loading.error-page, .pv-error')?.textContent ?? null })`, true);
+        results.present = p;
+        const writeBlocked = await presenter.webContents.executeJavaScript(`window.desktop.file.write(new Uint8Array([1])).then(() => 'written', (e) => e.message)`, true);
+        check('present mode plays the file', p.present && !p.error);
+        check('present windows cannot write the file', /read-only/.test(String(writeBlocked)));
+        presenter.close();
+      } else check('present mode plays the file', false);
+    } else check('the file reopens with its layers', false);
+
+    // A missing file gives a reason instead of an empty window.
+    let missing = '';
+    try {
+      openPath(join(filesDir, 'Nope.design'));
+    } catch (e) {
+      missing = String(e instanceof Error ? e.message : e);
+    }
+    results.missing = missing;
+    check('missing files are explained', /moved or deleted/.test(missing));
+
     // With SMOKE_SERVER set (e.g. http://localhost:5281), connect and check the cloud window.
     const server = process.env.SMOKE_SERVER;
     if (server) {
@@ -141,6 +235,38 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
         writeFileSync(join(opts.out, '4-cloud.png'), (await cloud.webContents.capturePage()).toPNG());
         const blocked = await cloud.webContents.executeJavaScript(`window.desktop.connectServer('https://example.com').then(() => 'accepted', (e) => e.message)`, true);
         check('cloud pages cannot change the server', /Not allowed/.test(String(blocked)));
+
+        // Upload the disk file: sign in on the server with a throwaway test account first.
+        const signup = await cloud.webContents.executeJavaScript(`(async () => {
+          const pw = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('');
+          const r = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Smoke test', email: 'smoke-' + Date.now() + '@example.test', password: pw }) });
+          return r.status;
+        })()`, true);
+        results.signup = signup;
+        // The file menu's "Upload to cloud", in the disk window.
+        const clicked = await js<boolean>(`(async () => {
+          document.querySelector('.file-name').click();
+          await new Promise(r => setTimeout(r, 200));
+          const item = [...document.querySelectorAll('.file-menu-pop [role=menuitem]')].find(b => b.textContent.includes('Upload to cloud'));
+          if (!item) return false;
+          item.click();
+          return true;
+        })()`);
+        // Notifications disappear after a few seconds: watch for it while the upload runs.
+        const toast = await js<string>(`(async () => {
+          for (let i = 0; i < 60; i++) {
+            const t = [...document.querySelectorAll('.toast')].map(t => t.textContent).join(' | ');
+            if (t) return t;
+            await new Promise(r => setTimeout(r, 100));
+          }
+          return '';
+        })()`);
+        await wait(1500);
+        const cloudUrl = cloud.webContents.getURL();
+        results.upload = { clicked, cloudUrl, toast };
+        check('upload to cloud opens the new cloud file', clicked && /\/file\/[\w-]+/.test(cloudUrl) && /Uploaded/.test(toast));
+        const fileId = /\/file\/([\w-]+)/.exec(cloudUrl)?.[1];
+        if (fileId) await cloud.webContents.executeJavaScript(`fetch('/api/files/${fileId}?forever=1', { method: 'DELETE' }).then(r => r.status)`, true);
       }
     }
   } catch (e) {

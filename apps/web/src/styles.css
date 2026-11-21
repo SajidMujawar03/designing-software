@@ -3819,3 +3819,54 @@ a.btn {
   color: inherit;
   font: inherit;
 }
+
+/* Desktop: recent files and disk save status */
+.desktop-actions {
+  display: flex;
+  gap: 8px;
+}
+.desktop-files li {
+  display: flex;
+  align-items: center;
+}
+.desktop-files li > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.desktop-files li.missing {
+  opacity: 0.55;
+}
+.desktop-file-name small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desktop-forget {
+  margin-right: 8px;
+}
+.desktop-empty {
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+.sync-status.disk-saved .sync-dot {
+  background: #14ae5c;
+}
+.sync-status.disk-unsaved .sync-dot,
+.sync-status.disk-saving .sync-dot {
+  background: #ffa629;
+}
+.sync-status.disk-error {
+  color: #f24822;
+}
+.sync-status.disk-error .sync-dot {
+  background: #f24822;
+}
+.disk-retry {
+  margin-left: 6px;
+  font-size: 11px;
+}

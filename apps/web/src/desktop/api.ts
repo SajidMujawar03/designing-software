@@ -12,6 +12,41 @@ export interface DesktopSettings {
   serverUrl: string;
 }
 
+/** A .design file on disk. */
+export interface DiskFileInfo {
+  path: string;
+  /** The file name without .design. */
+  name: string;
+}
+
+export interface RecentFile extends DiskFileInfo {
+  /** The folder it's in. */
+  folder: string;
+  /** Last modified (ms), if the file still exists. */
+  modified: number | null;
+  missing: boolean;
+}
+
+export interface DesktopFiles {
+  /** This window's file (null when it shows no file on disk). */
+  info(): Promise<DiskFileInfo | null>;
+  /** Reads this window's file: the document's state. Rejects with a readable message. */
+  read(): Promise<{ state: Uint8Array; docId: string }>;
+  /** Saves this window's file (atomically: a crash mid-save leaves the old file). */
+  write(state: Uint8Array): Promise<void>;
+  /** Unsaved changes, for the title and the close check. */
+  setDirty(dirty: boolean): void;
+  /** Asks where, saves there, and keeps editing that file. Null if cancelled. */
+  saveAs(state: Uint8Array): Promise<DiskFileInfo | null>;
+  /** Saves a copy (of a cloud file or a draft) to a new file and opens it. Null if cancelled. */
+  saveCopy(state: Uint8Array, suggestedName: string): Promise<DiskFileInfo | null>;
+  /** Renames this window's file in its folder. */
+  rename(name: string): Promise<DiskFileInfo>;
+  showInFolder(): void;
+  /** Called before the window closes, to save unsaved changes. */
+  onFlushRequest(save: () => Promise<boolean>): void;
+}
+
 export interface DesktopBridge {
   readonly platform: 'win32' | 'darwin' | 'linux' | string;
   readonly version: string;
@@ -23,4 +58,16 @@ export interface DesktopBridge {
   openCloud(): Promise<void>;
   /** Opens the start screen in a new window. */
   newWindow(): Promise<void>;
+
+  /** Asks where to save, creates an empty .design file there and opens it. */
+  newFile(): Promise<void>;
+  /** Asks for a .design file and opens it. */
+  openFile(): Promise<void>;
+  /** Opens a .design file by path (from the recent list). */
+  openPath(path: string): Promise<void>;
+  recentFiles(): Promise<RecentFile[]>;
+  forgetRecent(path: string): Promise<void>;
+  /** Uploads a document to the server as a new cloud file and opens it there. */
+  uploadToCloud(state: Uint8Array, name: string): Promise<void>;
+  readonly file: DesktopFiles;
 }

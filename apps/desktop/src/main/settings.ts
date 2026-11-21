@@ -14,9 +14,11 @@ export interface Bounds {
 export interface Settings {
   serverUrl: string;
   windows: Record<string, Bounds>;
+  /** Recently opened .design files, newest first. */
+  recent: string[];
 }
 
-const DEFAULTS: Settings = { serverUrl: '', windows: {} };
+const DEFAULTS: Settings = { serverUrl: '', windows: {}, recent: [] };
 
 let cache: Settings | null = null;
 const file = () => join(app.getPath('userData'), 'settings.json');
@@ -28,9 +30,10 @@ export function settings(): Settings {
     cache = {
       serverUrl: typeof raw.serverUrl === 'string' ? raw.serverUrl : '',
       windows: raw.windows && typeof raw.windows === 'object' ? raw.windows : {},
+      recent: Array.isArray(raw.recent) ? raw.recent.filter((p: unknown): p is string => typeof p === 'string').slice(0, 15) : [],
     };
   } catch {
-    cache = { ...DEFAULTS, windows: {} };
+    cache = { ...DEFAULTS, windows: {}, recent: [] };
   }
   return cache;
 }

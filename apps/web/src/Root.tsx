@@ -19,7 +19,7 @@ export function Root() {
   // Playing a prototype of a browser file needs no server either.
   if (route.kind === 'present' && !route.id) return <Presenter route={route} />;
   // Files kept in this browser never need the server.
-  if (route.kind === 'local') return <App route={route} />;
+  if (route.kind === 'local' || route.kind === 'disk') return <App route={route} />;
   if (status === 'loading') return <div className="loading">Loading…</div>;
   if (route.kind === 'present') return status === 'signed-out' ? <SignIn /> : <Presenter route={route} />;
   if (route.kind === 'file') {
