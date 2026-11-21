@@ -8,7 +8,7 @@ describe('view settings', () => {
   });
 
   it('keeps valid stored values', () => {
-    const stored = { snapToPixel: false, showCursors: false, nudge: 2, bigNudge: 8, ui: 'minimized' };
+    const stored = { snapToPixel: false, showCursors: false, nudge: 2, bigNudge: 8, layerThumbnails: false, ui: 'minimized' };
     expect(parsePrefs(JSON.stringify(stored))).toEqual(stored);
   });
 
