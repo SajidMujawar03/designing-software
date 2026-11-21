@@ -27,12 +27,12 @@ let started = false;
 export function App({ route, offlineNotice = false }: { route: Route; offlineNotice?: boolean }) {
   const ready = useUI((s) => s.ready);
   const error = useCloudFile((s) => s.error);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
     if (!started) {
       started = true;
-      startPersistence(route).catch(() => setFailed(true));
+      startPersistence(route).catch((e) => setFailed(e instanceof Error && e.message ? e.message : 'This file could not be opened.'));
     }
     return installShortcuts();
   }, [route]);
@@ -40,8 +40,8 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
   if (failed || (error && !ready))
     return (
       <div className="loading error-page">
-        <p>{error ?? 'This file could not be opened.'}</p>
-        <a href="/">Back to your files</a>
+        <p>{error ?? failed}</p>
+        <a href="/">{route.kind === 'disk' ? 'Back to the start screen' : 'Back to your files'}</a>
       </div>
     );
   if (!ready) return <div className="loading">Loading…</div>;

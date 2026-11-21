@@ -152,6 +152,7 @@ export function secureAllContents(): void {
       const id = child.webContents.id;
       origins.set(id, own);
       child.on('closed', () => origins.delete(id));
+      for (const fn of childListeners) fn(child, contents.id);
     });
   });
 
@@ -164,6 +165,10 @@ export function secureAllContents(): void {
 }
 
 export const allWindows = () => BrowserWindow.getAllWindows();
+
+/** Called when a page opens a window of its own origin (present mode, previews). */
+const childListeners: Array<(child: BrowserWindow, openerId: number) => void> = [];
+export const onChildWindow = (fn: (child: BrowserWindow, openerId: number) => void) => void childListeners.push(fn);
 
 /** An open window of this role (on this origin), if any. */
 export function findWindow(role: DesktopRole, origin?: string): BrowserWindow | undefined {
