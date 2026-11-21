@@ -53,6 +53,8 @@ export interface UIState {
   librariesOpen: boolean;
   /** The version history panel (cloud files). */
   historyOpen: boolean;
+  /** The share dialog (cloud files). */
+  shareOpen: boolean;
   /** Editing a vector's points and handles. */
   vectorEdit: { id: NodeId; selected: PointRef[] } | null;
   /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
@@ -113,6 +115,7 @@ export const useUI = create<UIState>()(() => ({
   variablesOpen: false,
   librariesOpen: false,
   historyOpen: false,
+  shareOpen: false,
   vectorEdit: null,
   penPreview: null,
   paintEdit: null,

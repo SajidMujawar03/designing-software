@@ -1,6 +1,7 @@
 import { Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
+import { ShareButton } from './ShareDialog';
 import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -62,6 +63,7 @@ export function Toolbar() {
       </div>
       <div className="toolbar-right">
         <Avatars />
+        <ShareButton />
         <ZoomMenu zoom={zoom} />
       </div>
     </header>

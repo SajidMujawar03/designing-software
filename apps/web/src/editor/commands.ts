@@ -48,6 +48,7 @@ export const COMMANDS: Command[] = [
   { id: 'create-component', label: 'Create component', shortcut: 'Ctrl+Alt+K', run: () => createComponent(editor), enabled: canMakeComponent },
   { id: 'detach-instance', label: 'Detach instance', shortcut: 'Ctrl+Alt+B', run: () => detachSelection(editor), enabled: hasInstance },
   { id: 'reset-instance', label: 'Reset all changes', run: () => resetSelection(editor), enabled: () => editor.selectedNodes().some((n) => n.type === 'INSTANCE' || !!n.sourceId) },
+  { id: 'share', label: 'Share…', run: () => editor.setUI({ shareOpen: true }), enabled: () => location.pathname.startsWith('/file/') },
   {
     id: 'version-history',
     label: 'Version history',

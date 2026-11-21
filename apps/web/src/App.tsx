@@ -12,6 +12,7 @@ import { PaintPopover } from './panels/PaintPopover';
 import { PropertiesPanel } from './panels/PropertiesPanel';
 import { CommentsPanel } from './panels/CommentsLayer';
 import { VersionHistoryPanel, VersionPreviewBar } from './panels/VersionHistory';
+import { ShareDialog } from './panels/ShareDialog';
 import { Toolbar } from './panels/Toolbar';
 import { VariablesModal } from './panels/VariablesPanel';
 
@@ -69,6 +70,7 @@ export function App({ route, offlineNotice = false }: { route: Route; offlineNot
       <CommandPalette />
       <VariablesModal />
       <LibrariesModal />
+      <ShareDialog />
     </div>
   );
 }

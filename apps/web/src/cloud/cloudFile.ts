@@ -74,6 +74,16 @@ export async function startCloudFile(id: string): Promise<void> {
     onAuthenticationFailed: ({ reason }) => useCloudFile.setState({ error: reason || "You don't have access to this file." }),
   });
   provider.on('unsyncedChanges', (n: number) => useCloudFile.setState({ unsynced: n > 0 }));
+  provider.on('authenticated', () => {
+    const readOnly = provider?.authorizedScope === 'readonly';
+    editor.doc.readOnly = readOnly;
+    const was = useCloudFile.getState().role;
+    if (readOnly !== (was === 'viewer')) {
+      void api<{ role: Role }>(`/files/${id}`)
+        .then(({ role }) => useCloudFile.setState({ role }))
+        .catch(() => {});
+    }
+  });
 
   await new Promise<void>((resolve) => {
     let done = false;
