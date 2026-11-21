@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "pnpm -r --parallel typecheck",
     "start": "pnpm --filter @figma/server start",
-    "dev:desktop": "pnpm --filter @figma/desktop dev"
+    "dev:desktop": "pnpm --filter @figma/desktop dev",
+    "dist:desktop": "pnpm --filter @figma/web build && pnpm --filter @figma/desktop dist"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
