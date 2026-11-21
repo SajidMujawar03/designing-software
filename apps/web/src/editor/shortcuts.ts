@@ -1,4 +1,5 @@
 import type { BooleanOperation } from '@figma/document';
+import { addAutoLayout, removeAutoLayout } from './layoutCommands';
 import { editor } from './editor';
 import { importImages, pickImageFiles } from './images';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
@@ -60,6 +61,7 @@ export function installShortcuts(): () => void {
     // Alignment: Alt+A/D/H (left/right/center), Alt+W/S/V (top/bottom/middle); with Shift, H/V distribute.
     if (e.altKey && !mod) {
       const k = e.code.replace('Key', '').toLowerCase();
+      if (e.shiftKey && k === 'a') return run(() => removeAutoLayout(editor));
       if (e.shiftKey && k === 'h') return run(() => editor.distribute('x'));
       if (e.shiftKey && k === 'v') return run(() => editor.distribute('y'));
       const map: Record<string, Parameters<typeof editor.align>[0]> = {
@@ -88,6 +90,7 @@ export function installShortcuts(): () => void {
       if (key === '-') return run(() => editor.zoomOut());
       if (key === '0') return run(() => editor.zoomTo(1));
       if (e.shiftKey && key === 'h') return run(() => editor.toggleVisible());
+      if (e.shiftKey && e.code === 'Digit4') return run(() => editor.setUI({ showLayoutGrids: !ui.showLayoutGrids }));
       if (e.shiftKey && key === 'l') return run(() => editor.toggleLocked());
       return;
     }
@@ -96,6 +99,7 @@ export function installShortcuts(): () => void {
 
     if (e.shiftKey && !e.altKey) {
       if (e.code === 'KeyR') return run(() => editor.setUI({ showRulers: !ui.showRulers }));
+      if (e.code === 'KeyA') return run(() => addAutoLayout(editor));
       if (e.code === 'KeyP') return run(() => editor.setTool('pencil'));
       if (e.code === 'KeyG') return run(() => editor.setTool('polygon'));
       if (e.code === 'KeyS') return run(() => editor.setTool('star'));

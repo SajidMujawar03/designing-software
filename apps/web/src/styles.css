@@ -1237,3 +1237,235 @@ button.swatch {
 .font-heading.flush {
   padding-left: 0;
 }
+
+/* ---------- layout ---------- */
+
+.sizing-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sizing-row > .select,
+.sizing-row > .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.al-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 6px 10px;
+  align-items: start;
+}
+
+.al-grid > .seg {
+  grid-column: 1;
+}
+
+.al-grid > .align-pad {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.al-grid > .al-gap {
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seg {
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.align-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 22px);
+  grid-template-rows: repeat(3, 18px);
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 3px;
+}
+
+.align-cell {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.align-cell .bar {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #b3b3b3;
+}
+
+.align-cell:hover .bar {
+  background: var(--muted);
+}
+
+.align-cell.on .bar.v {
+  width: 3px;
+  height: 11px;
+  border-radius: 1px;
+  background: var(--blue);
+}
+
+.align-cell.on .bar.h {
+  width: 11px;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--blue);
+}
+
+.auto-gap {
+  gap: 4px;
+  color: var(--text);
+}
+
+.constraints {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.constraint-selects {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cbox {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: var(--hover);
+}
+
+.cinner {
+  position: absolute;
+  inset: 20px;
+  border: 1px solid #c4c4c4;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.cbar {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cbar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 1px;
+  background: #c4c4c4;
+}
+
+.cbar:hover::after {
+  background: var(--muted);
+}
+
+.cbar.on::after {
+  background: var(--blue);
+}
+
+.cbar.left,
+.cbar.right {
+  top: 26px;
+  width: 18px;
+  height: 12px;
+}
+
+.cbar.left {
+  left: 2px;
+}
+
+.cbar.right {
+  right: 2px;
+}
+
+.cbar.left::after,
+.cbar.right::after {
+  width: 12px;
+  height: 2px;
+}
+
+.cbar.top,
+.cbar.bottom {
+  left: 26px;
+  width: 12px;
+  height: 18px;
+}
+
+.cbar.top {
+  top: 2px;
+}
+
+.cbar.bottom {
+  bottom: 2px;
+}
+
+.cbar.top::after,
+.cbar.bottom::after {
+  width: 2px;
+  height: 12px;
+}
+
+.cbar.hcenter {
+  left: 2px;
+  right: 2px;
+  top: 9px;
+  height: 4px;
+}
+
+.cbar.hcenter::after {
+  width: 14px;
+  height: 2px;
+}
+
+.cbar.vcenter {
+  top: 2px;
+  bottom: 2px;
+  left: 9px;
+  width: 4px;
+}
+
+.cbar.vcenter::after {
+  width: 2px;
+  height: 14px;
+}
+
+.color-input {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.color-input input[type='color'] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}

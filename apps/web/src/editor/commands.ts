@@ -1,4 +1,5 @@
-import { isGroupLike } from '@figma/document';
+import { isAutoLayout, isGroupLike } from '@figma/document';
+import { addAutoLayout, removeAutoLayout } from './layoutCommands';
 import { editor } from './editor';
 import { placeImages } from './shortcuts';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
@@ -37,6 +38,14 @@ export const COMMANDS: Command[] = [
   { id: 'group', label: 'Group selection', shortcut: 'Ctrl+G', run: () => editor.groupSelection(), enabled: hasSelection },
   { id: 'ungroup', label: 'Ungroup', shortcut: 'Ctrl+Shift+G', run: () => editor.ungroupSelection(), enabled: hasContainer },
   { id: 'frame-selection', label: 'Frame selection', shortcut: 'Ctrl+Alt+G', run: () => editor.frameSelection(), enabled: hasSelection },
+  { id: 'add-auto-layout', label: 'Add auto layout', shortcut: 'Shift+A', run: () => addAutoLayout(editor), enabled: hasSelection },
+  {
+    id: 'remove-auto-layout',
+    label: 'Remove auto layout',
+    shortcut: 'Shift+Alt+A',
+    run: () => removeAutoLayout(editor),
+    enabled: () => editor.selectedNodes().some((n) => isAutoLayout(n)),
+  },
 
   { id: 'union', label: 'Union selection', shortcut: 'Ctrl+Alt+U', run: () => booleanSelection(editor, 'UNION'), enabled: canBoolean },
   { id: 'subtract', label: 'Subtract selection', shortcut: 'Ctrl+Alt+S', run: () => booleanSelection(editor, 'SUBTRACT'), enabled: canBoolean },
@@ -69,6 +78,12 @@ export const COMMANDS: Command[] = [
   { id: 'zoom-fit', label: 'Zoom to fit', shortcut: 'Shift+1', run: () => editor.zoomToFit() },
   { id: 'zoom-selection', label: 'Zoom to selection', shortcut: 'Shift+2', run: () => editor.zoomToSelection(), enabled: hasSelection },
   { id: 'rulers', label: 'Show/Hide rulers', shortcut: 'Shift+R', run: () => editor.setUI({ showRulers: !editor.ui.showRulers }) },
+  {
+    id: 'layout-grids',
+    label: 'Show/Hide layout grids',
+    shortcut: 'Ctrl+Shift+4',
+    run: () => editor.setUI({ showLayoutGrids: !editor.ui.showLayoutGrids }),
+  },
   { id: 'clear-guides', label: 'Remove all guides on this page', run: () => editor.clearGuides() },
 
   {
@@ -109,6 +124,8 @@ export const CANVAS_MENU = [
   'group',
   'ungroup',
   'frame-selection',
+  'add-auto-layout',
+  'remove-auto-layout',
   'use-as-mask',
   '-',
   'union',

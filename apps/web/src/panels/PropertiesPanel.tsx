@@ -42,6 +42,7 @@ import { useUI } from '../editor/store';
 import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
 import { ColorPicker } from './ColorPicker';
 import { LocalStyles, StyleMenu, StyleRow } from './Styles';
+import { AutoLayoutSection, ConstraintsSection, LayoutGridSection, SizingRow } from './LayoutPanels';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -116,7 +117,15 @@ export function PropertiesPanel() {
             value={num('width')}
             min={0.01}
             onChange={(v, live) =>
-              apply(ids, (n) => ({ width: v, ...(n.type === 'TEXT' ? { textAutoResize: n.textAutoResize === 'NONE' ? 'NONE' : 'HEIGHT' } : {}) }), live)
+              apply(
+                ids,
+                (n) => ({
+                  width: v,
+                  ...(n.layoutSizingHorizontal && n.layoutSizingHorizontal !== 'FIXED' ? { layoutSizingHorizontal: 'FIXED' as const } : {}),
+                  ...(n.type === 'TEXT' ? { textAutoResize: n.textAutoResize === 'NONE' ? 'NONE' : 'HEIGHT' } : {}),
+                }),
+                live,
+              )
             }
           />
           {!isLine && (
@@ -124,7 +133,17 @@ export function PropertiesPanel() {
               label="H"
               value={num('height')}
               min={0.01}
-              onChange={(v, live) => apply(ids, (n) => ({ height: v, ...(n.type === 'TEXT' ? { textAutoResize: 'NONE' } : {}) }), live)}
+              onChange={(v, live) =>
+                apply(
+                  ids,
+                  (n) => ({
+                    height: v,
+                    ...(n.layoutSizingVertical && n.layoutSizingVertical !== 'FIXED' ? { layoutSizingVertical: 'FIXED' as const } : {}),
+                    ...(n.type === 'TEXT' ? { textAutoResize: 'NONE' } : {}),
+                  }),
+                  live,
+                )
+              }
             />
           )}
           <NumberField
@@ -144,6 +163,7 @@ export function PropertiesPanel() {
             />
           )}
         </div>
+        <SizingRow ids={ids} nodes={nodes} />
         {types === 'FRAME' && (
           <label className="checkbox">
             <input
@@ -156,6 +176,9 @@ export function PropertiesPanel() {
         )}
       </Section>
       )}
+
+      {!isLine && <AutoLayoutSection ids={ids} nodes={nodes} />}
+      <ConstraintsSection ids={ids} nodes={nodes} />
 
       <ShapeSection ids={ids} nodes={nodes} />
 
@@ -181,6 +204,7 @@ export function PropertiesPanel() {
       {nodes.some((n) => n.strokes.length > 0) && <StrokeOptions ids={ids} nodes={nodes} />}
 
       <EffectsSection ids={ids} nodes={nodes} />
+      <LayoutGridSection ids={ids} nodes={nodes} />
 
       <ExportSection ids={ids} />
     </div>

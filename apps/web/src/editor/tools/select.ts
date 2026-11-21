@@ -1,7 +1,9 @@
 import {
   childOfGroupContaining,
   hitTest,
+  isAutoLayout,
   isGroupLike,
+  worldTransform,
   nodesInRect,
   selectableAncestor,
   type NodeId,
@@ -10,6 +12,7 @@ import {
 import { applyToPoint, invert, rectContainsPoint, rectFromPoints, type Mat2D, type Rect, type Vec2 } from '@figma/geometry';
 import { getSelectionFrame, handleCursor, hitHandle, HANDLES, type HandleId, type SelectionFrame } from '../canvas/handles';
 import type { Editor } from '../editor';
+import { insertIntoLayout, layoutDropAt } from '../layoutCommands';
 import { snapPoint, snapRect } from '../snapping';
 import {
   boundsOf,
@@ -211,6 +214,20 @@ export class SelectTool implements Tool {
     // Dragging over a frame moves the layers into it; dragging out moves them to the page.
     const target =
       hitTest(this.doc, this.ed.pageId, e.world, { framesOnly: true, exclude: new Set(g.tops) })?.id ?? this.ed.pageId;
+
+    // Over an auto layout frame, the layers are slotted into its order instead of positioned.
+    const tf = this.doc.get(target);
+    const absolute = g.tops.some((id) => this.doc.get(id)!.parentId === target && this.doc.get(id)!.layoutPositioning === 'ABSOLUTE');
+    if (isAutoLayout(tf) && !absolute) {
+      const m = worldTransform(this.doc, target);
+      const drop = layoutDropAt(this.doc, target, applyToPoint(invert(m), e.world), new Set(g.tops));
+      insertIntoLayout(this.doc, target, this.ed.sortByZ(g.tops), drop.beforeId);
+      for (const it of g.items) it.parentId = this.doc.get(it.id)!.parentId!;
+      this.ed.setUI({ snapGuides: null, dropLine: [applyToPoint(m, drop.line[0]), applyToPoint(m, drop.line[1])] });
+      return;
+    }
+    if (this.ed.ui.dropLine) this.ed.setUI({ dropLine: null });
+
     for (const id of g.tops) {
       const n = this.doc.get(id)!;
       if (n.parentId === target) continue;
@@ -294,9 +311,15 @@ export class SelectTool implements Tool {
         if (ay !== null || (e.shift && ax !== null)) patch.textAutoResize = 'NONE';
         else if (ax !== null) patch.textAutoResize = 'HEIGHT';
       }
+      // Dragging a size makes it fixed (no longer hugging or filling).
+      const resizedW = ax !== null || (e.shift && ay !== null);
+      const resizedH = ay !== null || (e.shift && ax !== null);
+      if (resizedW && n.layoutSizingHorizontal && n.layoutSizingHorizontal !== 'FIXED') patch.layoutSizingHorizontal = 'FIXED';
+      if (resizedH && n.layoutSizingVertical && n.layoutSizingVertical !== 'FIXED') patch.layoutSizingVertical = 'FIXED';
       return [it.id, patch];
     });
-    this.doc.updateNodes(patches);
+    // Ctrl resizes a frame without moving its children by their constraints.
+    this.doc.updateNodes(patches, { constraints: !e.mod });
     for (const [id] of patches) fitText(this.doc, id);
   }
 
@@ -314,7 +337,7 @@ export class SelectTool implements Tool {
   }
 
   private finish(): void {
-    this.ed.setUI({ marquee: null, snapGuides: null });
+    this.ed.setUI({ marquee: null, snapGuides: null, dropLine: null });
     this.doc.endGesture();
     this.g = { kind: 'none' };
   }

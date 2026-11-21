@@ -73,6 +73,10 @@ export interface UIState {
   rendererPref: 'canvaskit' | 'canvas2d';
   /** Renderer actually drawing the canvas. */
   activeRenderer: 'canvaskit' | 'canvas2d' | null;
+  /** Ctrl+Shift+4: draw frames' layout grids. */
+  showLayoutGrids: boolean;
+  /** Where a dragged layer will land in an auto layout frame (canvas coords). */
+  dropLine: [Vec2, Vec2] | null;
 }
 
 function storedRenderer(): 'canvaskit' | 'canvas2d' {
@@ -108,4 +112,6 @@ export const useUI = create<UIState>()(() => ({
   caretTick: 0,
   rendererPref: storedRenderer(),
   activeRenderer: null,
+  showLayoutGrids: true,
+  dropLine: null,
 }));
