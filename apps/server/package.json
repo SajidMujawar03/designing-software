@@ -8,7 +8,8 @@
     "start": "node --enable-source-maps dist/index.mjs",
     "typecheck": "tsc -p .",
     "loadtest": "tsx scripts/loadtest.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --packages=external --sourcemap --outfile=dist/index.mjs"
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --packages=external --sourcemap --outfile=dist/index.mjs",
+    "db:restore": "tsx scripts/restore-db.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.17",
