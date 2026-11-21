@@ -47,6 +47,9 @@ export interface DesktopFiles {
   onFlushRequest(save: () => Promise<boolean>): void;
 }
 
+/** Edit actions the window can do natively in a focused text field. */
+export type NativeEditAction = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll' | 'delete';
+
 /** An item of a native menu, described by the page. */
 export type MenuModelItem =
   | { type: 'command'; id: string; label: string; accelerator?: string; enabled: boolean }
@@ -87,5 +90,7 @@ export interface DesktopBridge {
     set(model: MenuModel): void;
     /** Menu clicks, as command ids from the model. */
     onCommand(run: (id: string) => void): void;
+    /** The native text action in the focused text field (undo, copy… while typing). */
+    native(action: NativeEditAction): void;
   };
 }

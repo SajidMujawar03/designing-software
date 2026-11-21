@@ -57,6 +57,7 @@ const desktop: DesktopBridge = {
       ipcRenderer.removeAllListeners('menu:command');
       ipcRenderer.on('menu:command', (_e, id: unknown) => typeof id === 'string' && run(id));
     },
+    native: (action) => ipcRenderer.send('menu:native', action),
   }),
 };
 

@@ -22,6 +22,7 @@ fileAssociations:
     name: Design Clone file
     description: Design file
     role: Editor
+    mimeType: application/x-design-clone
 protocols:
   - name: Design Clone link
     schemes: [design-clone]
@@ -52,15 +53,32 @@ nsis:
 portable:
   artifactName: Design-Clone-${version}-portable.${ext}
 
+# macOS: signed and notarized when the release workflow has Apple credentials
+# (MAC_CERTIFICATE, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID); unsigned otherwise.
+# The zip is what installed apps update from.
 mac:
   icon: build/icon.png
   category: public.app-category.graphics-design
-  target: [dmg]
+  target: [dmg, zip]
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+dmg:
+  artifactName: Design-Clone-${version}-${arch}.${ext}
 linux:
   icon: build/icon.png
   category: Graphics
   target: [AppImage, deb]
   maintainer: Sajid Mujawar
+  executableName: design-clone
+  synopsis: A design tool for interfaces and prototypes
+  artifactName: Design-Clone-${version}-${arch}.${ext}
+  mimeTypes: [application/x-design-clone]
+deb:
+  depends: [libnotify4, libxtst6, libnss3]
 
-# Releases are uploaded by the release workflow.
-publish: null
+# Where installed apps look for updates: the latest GitHub release's latest.yml (GitHub redirects
+# /releases/latest/download/<file> to the newest release). The release workflow uploads the files.
+publish:
+  provider: generic
+  url: https://github.com/SajidMujawar03/designing-software/releases/latest/download

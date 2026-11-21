@@ -18,6 +18,7 @@ export interface MenuActions {
   openCloud(): void;
   hasServer(): boolean;
   openLogs(): void;
+  checkForUpdates(): void;
 }
 
 const EMPTY: MenuModel = { file: [], menus: [] };
@@ -86,6 +87,7 @@ export function buildMenu(win: BrowserWindow | null): Menu {
       role: 'help',
       submenu: [
         ...(help ? [...page(help.items), { type: 'separator' as const }] : []),
+        { label: 'Check for Updates…', click: () => actions.checkForUpdates() },
         { label: 'Open Logs Folder', click: () => actions.openLogs() },
         { label: `Design Clone ${app.getVersion()}`, enabled: false },
       ],
@@ -117,6 +119,18 @@ export function menuLabels(win: BrowserWindow): Array<{ label: string; items: st
 export function startMenus(opts: { actions: MenuActions; trusted: (e: IpcMainEvent) => void }): void {
   actions = opts.actions;
   Menu.setApplicationMenu(buildMenu(null));
+  // The native text action in the page's focused field.
+  const NATIVE = new Set(['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll', 'delete']);
+  ipcMain.on('menu:native', (e, action: unknown) => {
+    try {
+      opts.trusted(e);
+    } catch {
+      return;
+    }
+    if (typeof action !== 'string' || !NATIVE.has(action)) return;
+    const c = e.sender as unknown as Record<string, () => void>;
+    c[action]?.call(e.sender);
+  });
   ipcMain.on('menu:set', (e, model: unknown) => {
     try {
       opts.trusted(e);

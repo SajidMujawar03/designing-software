@@ -53,7 +53,8 @@ From the repository root, run:
 pnpm dist:desktop
 ```
 
-This builds the web app and packages the desktop app into `apps/desktop/release/`:
+This builds the web app and packages the desktop app for the system you run
+it on, into `apps/desktop/release/`. On Windows that's:
 
 - `Design-Clone-Setup-<version>.exe`: the installer. It installs per user and
   lets you choose the folder. It adds Start menu and desktop shortcuts and
@@ -70,9 +71,19 @@ The packaged app has these Electron fuses set:
 - The app archive is integrity-checked, and the app loads only from it.
 - Cookies are encrypted.
 
-The installers aren't code-signed yet, so Windows SmartScreen warns on first
-run (More info > Run anyway). To sign them, set `CSC_LINK` (a .pfx file or its
-base64) and `CSC_KEY_PASSWORD`, locally or as repository secrets.
+On macOS it makes a `.dmg` and a `.zip` (the zip is what installed apps update
+from). On Linux it makes an `.AppImage` and a `.deb`.
+
+**Signing.** Unsigned builds warn on first run. On Windows, SmartScreen asks
+you to click More info > Run anyway. On macOS, right-click the app > Open.
+macOS apps also need signing to update themselves. To sign in the release
+workflow, add these repository secrets:
+
+- **Windows:** `WINDOWS_CERTIFICATE` (a .pfx, base64) and
+  `WINDOWS_CERTIFICATE_PASSWORD`.
+- **macOS:** `MAC_CERTIFICATE` (a Developer ID Application .p12, base64) and
+  `MAC_CERTIFICATE_PASSWORD`. For notarization, add `APPLE_ID`,
+  `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`.
 
 ## Releases
 
@@ -86,9 +97,28 @@ git tag desktop-v0.1.0
 git push origin desktop-v0.1.0
 ```
 
-The **Desktop release** workflow builds the installers on Windows,
-smoke-tests the packaged app, and publishes a GitHub Release with them. Run it
-by hand from the Actions tab to only build them and download the result.
+The **Desktop release** workflow builds on Windows, macOS (Apple silicon and
+Intel) and Linux, smoke-tests each packaged app, and publishes one GitHub
+Release with every file. That includes `latest.yml`, `latest-mac.yml` and
+`latest-linux.yml`, which installed apps update from. Run it by hand from the
+Actions tab to only build them and download the result.
+
+## Updates
+
+Installed apps check the latest GitHub release at startup and every 6 hours.
+They download a newer version in the background, then ask to restart; if you
+choose later, it installs when you quit. Help > Check for Updates checks right
+away.
+
+These builds don't update themselves:
+
+- the Windows portable build
+- a Linux `.deb` (it updates through the package manager)
+- unsigned macOS builds
+
+Version 0.1.0 has no updater; updates work from 0.2.0 on. To test against
+another feed, set `DESKTOP_UPDATE_URL` to a folder URL holding a `latest.yml`
+and the installer it names.
 
 ## Logs and crash reports
 
@@ -118,4 +148,7 @@ repository secret). If a window's page crashes, the app offers to reload it.
 4. **Windows installers** (done): NSIS installer and portable build, file
    associations and link registration, Electron fuses, logs and crash
    reports, and a release workflow for `desktop-v*` tags.
-5. **Auto-update, macOS and Linux.**
+5. **Auto-update, macOS and Linux** (done): updates from GitHub Releases,
+   macOS (signing and notarization switch on with secrets) and Linux builds,
+   all smoke-tested in the release workflow, and Edit commands that act on
+   the focused text field (which is what macOS's menu shortcuts need).

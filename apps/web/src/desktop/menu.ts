@@ -3,7 +3,7 @@ import { useUI } from '../editor/store';
 import { command, isEnabled } from '../editor/commands';
 import { editor } from '../editor/editor';
 import { allPlugins, notify, runPlugin, usePlugins } from '../plugins/host';
-import type { MenuModel, MenuModelItem } from './api';
+import type { MenuModel, MenuModelItem, NativeEditAction } from './api';
 import { bridgeMessage, renameDisk, saveDiskAs, saveNow, useDiskFile } from './diskFile';
 import { desktop } from '.';
 
@@ -169,8 +169,27 @@ export function menuModel(): MenuModel {
   return { file: build(fileEntries()), menus: MENUS().map((m) => ({ label: m.label, items: build(m.items) })) };
 }
 
+/** Edit commands that mean the native text action while a text field has focus. */
+const TEXT_ACTIONS: Record<string, NativeEditAction> = {
+  undo: 'undo',
+  redo: 'redo',
+  cut: 'cut',
+  copy: 'copy',
+  paste: 'paste',
+  'select-all': 'selectAll',
+  delete: 'delete',
+};
+
+const typing = () => {
+  const el = document.activeElement as HTMLElement | null;
+  return !!el && (el.isContentEditable || (el instanceof HTMLInputElement && !['checkbox', 'radio', 'range', 'color', 'button', 'submit'].includes(el.type)) || el instanceof HTMLTextAreaElement);
+};
+
 /** Runs a menu click. */
 export function runMenuCommand(id: string): void {
+  // While typing (renaming a layer, editing text…) Edit commands act on the text, as in any app.
+  // On macOS menus capture these shortcuts, so this is also what Cmd+Z/C/V do in text fields.
+  if (TEXT_ACTIONS[id] && typing()) return desktop?.menu.native(TEXT_ACTIONS[id]);
   if (id.startsWith('plugin:')) {
     const p = allPlugins().find((x) => `plugin:${x.id}` === id);
     if (p) runPlugin(p);
