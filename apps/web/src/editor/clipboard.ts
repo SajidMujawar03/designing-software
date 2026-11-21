@@ -16,14 +16,24 @@ export interface ClipboardData {
   roots: ClipRoot[];
   /** All descendants of the roots (parent links point inside the set). */
   descendants: SceneNode[];
+  /** Canvas placement of descendants that sit directly in a group (groups have no transform). */
+  inGroup?: Record<NodeId, { center: Vec2; rotation: number }>;
 }
 
 /** Serializes nodes (and their subtrees) with canvas positions. */
 export function serializeNodes(doc: DesignDocument, ids: NodeId[]): ClipboardData {
+  const descendants = ids.flatMap((id) => doc.descendants(id));
+  const inGroup: ClipboardData['inGroup'] = {};
+  for (const d of descendants) {
+    if (doc.get(d.parentId)?.type === 'GROUP') {
+      inGroup[d.id] = { center: worldCenter(doc, d.id), rotation: worldRotation(doc, d.id) };
+    }
+  }
   return {
     kind: MARKER,
     roots: ids.map((id) => ({ node: doc.get(id)!, center: worldCenter(doc, id), rotation: worldRotation(doc, id) })),
-    descendants: ids.flatMap((id) => doc.descendants(id)),
+    descendants,
+    inGroup,
   };
 }
 
@@ -76,6 +86,13 @@ export function insertNodes(
     const pid = newId(oldParent!);
     const nid = doc.createNode({ ...props, id: newId(id), parentId: pid, aboveId: lastChild.get(pid) ?? null });
     lastChild.set(pid, nid);
+  }
+  // Children of groups are positioned in canvas terms, now that the group's parent is known.
+  for (const d of data.descendants) {
+    const w = data.inGroup?.[d.id];
+    if (!w) continue;
+    const c = { x: w.center.x + offset.x, y: w.center.y + offset.y };
+    doc.updateNode(newId(d.id), placementIn(doc, newId(d.parentId!), c, w.rotation, d.width, d.height));
   }
   return rootIds;
 }

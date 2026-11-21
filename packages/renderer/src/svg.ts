@@ -1,4 +1,5 @@
-import { rgbToHex, type DesignDocument, type NodeId, type Paint, type SceneNode } from '@figma/document';
+import { rgbToHex, worldBounds, worldTransform, type DesignDocument, type NodeId, type Paint, type SceneNode } from '@figma/document';
+import { multiply, translation } from '@figma/geometry';
 import { layoutText } from './text';
 
 const esc = (s: string) =>
@@ -17,25 +18,28 @@ function paintAttrs(n: SceneNode): string {
   return a;
 }
 
-function transformAttr(n: SceneNode, isRoot: boolean): string {
-  if (isRoot) return '';
+function transformAttr(n: SceneNode): string {
+  if (n.type === 'GROUP') return '';
   let t = `translate(${n.x} ${n.y})`;
   if (n.rotation) t += ` rotate(${n.rotation} ${n.width / 2} ${n.height / 2})`;
   return ` transform="${t}"`;
 }
 
-function nodeToSvg(doc: DesignDocument, n: SceneNode, isRoot: boolean, defs: string[]): string {
+function nodeToSvg(doc: DesignDocument, n: SceneNode, defs: string[]): string {
   if (!n.visible) return '';
   const opacity = n.opacity < 1 ? ` opacity="${n.opacity}"` : '';
-  const open = `<g${transformAttr(n, isRoot)}${opacity}>`;
+  const open = `<g${transformAttr(n)}${opacity}>`;
   let body = '';
   switch (n.type) {
+    case 'GROUP':
+      body = doc.children(n.id).map((c) => nodeToSvg(doc, c, defs)).join('');
+      break;
     case 'RECTANGLE':
     case 'FRAME': {
       const r = n.cornerRadius ? ` rx="${n.cornerRadius}"` : '';
       body = `<rect width="${n.width}" height="${n.height}"${r}${paintAttrs(n)}/>`;
       if (n.type === 'FRAME') {
-        const kids = doc.children(n.id).map((c) => nodeToSvg(doc, c, false, defs)).join('');
+        const kids = doc.children(n.id).map((c) => nodeToSvg(doc, c, defs)).join('');
         if (n.clipsContent && kids) {
           const clipId = `clip-${n.id}`;
           defs.push(`<clipPath id="${clipId}"><rect width="${n.width}" height="${n.height}"${r}/></clipPath>`);
@@ -70,15 +74,20 @@ function nodeToSvg(doc: DesignDocument, n: SceneNode, isRoot: boolean, defs: str
   return `${open}${body}</g>`;
 }
 
-/** Serializes a node (and its children) to a standalone SVG string. */
+/** Serializes a node (and its children) to a standalone SVG covering its on-canvas bounds. */
 export function exportSvg(doc: DesignDocument, id: NodeId): string {
   const n = doc.get(id)!;
+  const b = worldBounds(doc, id);
   const defs: string[] = [];
-  const content = nodeToSvg(doc, { ...n, rotation: 0 }, true, defs);
+  const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : translation(0, 0);
+  const m = multiply(translation(-b.x, -b.y), parentWorld);
+  const content = nodeToSvg(doc, n, defs);
+  const w = Math.ceil(b.width);
+  const h = Math.ceil(b.height);
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${n.width}" height="${n.height}" viewBox="0 0 ${n.width} ${n.height}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
     (defs.length ? `<defs>${defs.join('')}</defs>` : '') +
-    content +
+    `<g transform="matrix(${m.map((v) => Math.round(v * 1000) / 1000).join(' ')})">${content}</g>` +
     `</svg>`
   );
 }

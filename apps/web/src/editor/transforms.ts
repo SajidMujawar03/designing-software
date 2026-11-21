@@ -24,6 +24,10 @@ export function worldRotation(doc: DesignDocument, id: NodeId): number {
 
 export function worldCenter(doc: DesignDocument, id: NodeId): Vec2 {
   const n = doc.get(id)!;
+  if (n.type === 'GROUP') {
+    const b = worldBounds(doc, id);
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  }
   return applyToPoint(worldTransform(doc, id), { x: n.width / 2, y: n.height / 2 });
 }
 
@@ -58,11 +62,16 @@ export function reparentKeepingPosition(
 ): void {
   const n = doc.get(id);
   if (!n || id === parentId || doc.isAncestor(id, parentId)) return;
-  const center = worldCenter(doc, id);
-  const rot = worldRotation(doc, id);
+  // Groups have no transform, so it is their leaves that must be re-placed.
+  const leaves = leafIds(doc, [id]).map((l) => {
+    const ln = doc.get(l)!;
+    return { id: l, center: worldCenter(doc, l), rot: worldRotation(doc, l), w: ln.width, h: ln.height };
+  });
   if (place.below) doc.moveNodeBelow(id, parentId, place.below);
   else doc.moveNode(id, parentId, place.above ?? null);
-  doc.updateNode(id, placementIn(doc, parentId, center, rot, n.width, n.height));
+  for (const l of leaves) {
+    doc.updateNode(l.id, placementIn(doc, doc.get(l.id)!.parentId!, l.center, l.rot, l.w, l.h));
+  }
 }
 
 /** Sets a LINE node from two canvas-space endpoints. */
@@ -106,3 +115,44 @@ export function boundsOf(doc: DesignDocument, ids: NodeId[]): Rect | null {
 }
 
 export const round = (v: number) => Math.round(v * 100) / 100;
+
+/** Groups expanded into the layers that actually carry geometry. */
+export function leafIds(doc: DesignDocument, ids: NodeId[]): NodeId[] {
+  const out: NodeId[] = [];
+  const visit = (id: NodeId) => {
+    const n = doc.get(id);
+    if (!n) return;
+    if (n.type === 'GROUP') doc.childIds(id).forEach(visit);
+    else out.push(id);
+  };
+  ids.forEach(visit);
+  return out;
+}
+
+/** Moves layers (groups included) by a canvas-space delta. */
+export function moveByWorld(doc: DesignDocument, ids: NodeId[], dx: number, dy: number): void {
+  if (!dx && !dy) return;
+  for (const id of leafIds(doc, ids)) {
+    const n = doc.get(id)!;
+    const c = worldCenter(doc, id);
+    const p = placementIn(doc, n.parentId!, { x: c.x + dx, y: c.y + dy }, worldRotation(doc, id), n.width, n.height);
+    doc.updateNode(id, { x: p.x, y: p.y });
+  }
+}
+
+/**
+ * Scales layers so their combined canvas bounds go from `from` to `to`
+ * (used for group W/H edits). Rotated layers keep their rotation.
+ */
+export function scaleBounds(doc: DesignDocument, ids: NodeId[], from: Rect, to: Rect): void {
+  const sx = from.width ? to.width / from.width : 1;
+  const sy = from.height ? to.height / from.height : 1;
+  for (const id of leafIds(doc, ids)) {
+    const n = doc.get(id)!;
+    const c = worldCenter(doc, id);
+    const nc = { x: to.x + (c.x - from.x) * sx, y: to.y + (c.y - from.y) * sy };
+    const height = n.height === 0 ? 0 : n.height * Math.abs(sy);
+    doc.updateNode(id, placementIn(doc, n.parentId!, nc, worldRotation(doc, id), n.width * Math.abs(sx), height));
+    fitText(doc, id);
+  }
+}

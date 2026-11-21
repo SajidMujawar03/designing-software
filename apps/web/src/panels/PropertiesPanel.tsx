@@ -1,5 +1,13 @@
 import { solid, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignHorizontalSpaceAround,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  AlignVerticalSpaceAround,
   AlignCenter,
   AlignLeft,
   AlignRight,
@@ -15,7 +23,7 @@ import { editor } from '../editor/editor';
 import { exportJson, exportPng, exportSvgFile } from '../editor/export';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
-import { fitText } from '../editor/transforms';
+import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
 const FONTS = ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Playfair Display', 'Merriweather', 'Source Code Pro'];
@@ -47,6 +55,8 @@ export function PropertiesPanel() {
   const selection = useUI((s) => s.selection);
   const nodes = selection.map((id) => editor.doc.get(id)).filter((n): n is SceneNode => !!n);
 
+  const tool = useUI((s) => s.tool);
+  if (tool === 'frame') return <FramePresets />;
   if (nodes.length === 0) return <PageProperties />;
 
   const ids = nodes.map((n) => n.id);
@@ -64,6 +74,11 @@ export function PropertiesPanel() {
         <span className="props-type">{types === MIXED ? 'Mixed' : types.toLowerCase()}</span>
       </div>
 
+      <AlignBar count={editor.topLevelSelection().length} />
+
+      {nodes.some((n) => n.type === 'GROUP') ? (
+        <BoxLayout ids={ids} />
+      ) : (
       <Section title="Layout">
         <div className="grid2">
           <NumberField label="X" value={num('x')} onChange={(v, live) => apply(ids, { x: v }, live)} />
@@ -112,6 +127,7 @@ export function PropertiesPanel() {
           </label>
         )}
       </Section>
+      )}
 
       <Section title="Layer">
         <div className="grid2">
@@ -326,6 +342,149 @@ function PageProperties() {
           Export file as JSON
         </button>
       </Section>
+    </div>
+  );
+}
+
+type AlignEdge = Parameters<typeof editor.align>[0];
+
+const ALIGN: Array<[AlignEdge, typeof AlignStartVertical, string]> = [
+  ['left', AlignStartVertical, 'Align left (Alt+A)'],
+  ['hcenter', AlignCenterVertical, 'Align horizontal centers (Alt+H)'],
+  ['right', AlignEndVertical, 'Align right (Alt+D)'],
+  ['top', AlignStartHorizontal, 'Align top (Alt+W)'],
+  ['vcenter', AlignCenterHorizontal, 'Align vertical centers (Alt+V)'],
+  ['bottom', AlignEndHorizontal, 'Align bottom (Alt+S)'],
+];
+
+/** Align and distribute; a single layer aligns to its parent frame. */
+function AlignBar({ count }: { count: number }) {
+  const single = count === 1;
+  const parent = single ? editor.doc.get(editor.selectedNodes()[0]?.parentId) : null;
+  const canAlign = count > 1 || (single && !!parent && parent.type !== 'PAGE');
+  return (
+    <div className="align-bar">
+      {ALIGN.map(([edge, Icon, label]) => (
+        <IconButton key={edge} title={label} disabled={!canAlign} onClick={() => editor.align(edge)}>
+          <Icon size={14} />
+        </IconButton>
+      ))}
+      <span className="spacer" />
+      <IconButton title="Distribute horizontal spacing (Alt+Shift+H)" disabled={count < 3} onClick={() => editor.distribute('x')}>
+        <AlignHorizontalSpaceAround size={14} />
+      </IconButton>
+      <IconButton title="Distribute vertical spacing (Alt+Shift+V)" disabled={count < 3} onClick={() => editor.distribute('y')}>
+        <AlignVerticalSpaceAround size={14} />
+      </IconButton>
+    </div>
+  );
+}
+
+/**
+ * Position and size from on-canvas bounds, for selections that include
+ * groups (which have no box of their own). Values are relative to the parent.
+ */
+function BoxLayout({ ids }: { ids: NodeId[] }) {
+  const doc = editor.doc;
+  const boxes = ids.map((id) => {
+    const b = boundsOf(doc, [id])!;
+    const parent = doc.get(doc.get(id)!.parentId);
+    const origin = parent && parent.type !== 'PAGE' ? boundsOf(doc, [parent.id])! : { x: 0, y: 0 };
+    return { id, b, x: b.x - origin.x, y: b.y - origin.y };
+  });
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const val = (f: (bx: (typeof boxes)[number]) => number) => common(boxes.map((bx) => r2(f(bx))));
+  const run = (live: boolean, fn: () => void) => (live ? fn() : doc.change(fn));
+  return (
+    <Section title="Layout">
+      <div className="grid2">
+        <NumberField
+          label="X"
+          value={val((bx) => bx.x)}
+          onChange={(v, live) => run(live, () => boxes.forEach((bx) => moveByWorld(doc, [bx.id], v - bx.x, 0)))}
+        />
+        <NumberField
+          label="Y"
+          value={val((bx) => bx.y)}
+          onChange={(v, live) => run(live, () => boxes.forEach((bx) => moveByWorld(doc, [bx.id], 0, v - bx.y)))}
+        />
+        <NumberField
+          label="W"
+          value={val((bx) => bx.b.width)}
+          min={0.01}
+          onChange={(v, live) => run(live, () => boxes.forEach((bx) => scaleBounds(doc, [bx.id], bx.b, { ...bx.b, width: v })))}
+        />
+        <NumberField
+          label="H"
+          value={val((bx) => bx.b.height)}
+          min={0.01}
+          onChange={(v, live) => run(live, () => boxes.forEach((bx) => scaleBounds(doc, [bx.id], bx.b, { ...bx.b, height: v })))}
+        />
+      </div>
+    </Section>
+  );
+}
+
+const PRESETS: Array<{ group: string; items: Array<[string, number, number]> }> = [
+  {
+    group: 'Phone',
+    items: [
+      ['iPhone 16', 393, 852],
+      ['iPhone 16 Pro Max', 440, 956],
+      ['iPhone SE', 320, 568],
+      ['Android Compact', 412, 917],
+      ['Android Medium', 700, 840],
+    ],
+  },
+  {
+    group: 'Tablet',
+    items: [
+      ['iPad mini 8.3', 744, 1133],
+      ['iPad Pro 11 inch', 834, 1194],
+      ['Android Expanded', 1280, 800],
+    ],
+  },
+  {
+    group: 'Desktop',
+    items: [
+      ['MacBook Air', 1280, 832],
+      ['Desktop', 1440, 1024],
+      ['TV', 1280, 720],
+    ],
+  },
+  {
+    group: 'Social media',
+    items: [
+      ['Instagram post', 1080, 1350],
+      ['Instagram story', 1080, 1920],
+      ['X post', 1200, 675],
+      ['LinkedIn post', 1200, 1200],
+    ],
+  },
+];
+
+/** Shown while the Frame tool is active: click a size to add a frame. */
+function FramePresets() {
+  return (
+    <div className="props">
+      <div className="props-title">
+        Frame
+        <span className="hint">Drag on canvas or pick a size</span>
+      </div>
+      {PRESETS.map(({ group, items }) => (
+        <Section key={group} title={group}>
+          <div className="preset-list">
+            {items.map(([name, w, h]) => (
+              <button key={name} type="button" className="preset" onClick={() => editor.addFramePreset(name, w, h)}>
+                <span>{name}</span>
+                <span className="hint">
+                  {w}×{h}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,12 @@
 export type NodeId = string;
 
-export type NodeType = 'DOCUMENT' | 'PAGE' | 'FRAME' | 'RECTANGLE' | 'ELLIPSE' | 'LINE' | 'TEXT';
+export type NodeType = 'DOCUMENT' | 'PAGE' | 'FRAME' | 'GROUP' | 'RECTANGLE' | 'ELLIPSE' | 'LINE' | 'TEXT';
+
+/** A ruler guide on a page, in canvas coordinates. */
+export interface Guide {
+  axis: 'x' | 'y';
+  offset: number;
+}
 
 /** Color channels are 0–1. */
 export interface RGB {
@@ -48,6 +54,9 @@ export interface SceneNode {
   // FRAME
   clipsContent?: boolean;
 
+  // PAGE
+  guides?: Guide[];
+
   // TEXT
   characters?: string;
   fontFamily?: string;
@@ -64,4 +73,11 @@ export type NodePatch = Partial<NodeProps>;
 
 /** Node types that can contain children on the canvas. */
 export const isContainer = (n: SceneNode): boolean =>
-  n.type === 'FRAME' || n.type === 'PAGE' || n.type === 'DOCUMENT';
+  n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'PAGE' || n.type === 'DOCUMENT';
+
+/**
+ * Groups have no transform of their own: their children are positioned in the
+ * group's parent space, and the group's box is derived from the children.
+ */
+export const hasOwnTransform = (n: SceneNode): boolean =>
+  n.type !== 'GROUP' && n.type !== 'PAGE' && n.type !== 'DOCUMENT';

@@ -22,6 +22,7 @@ const NAMES: Record<NodeType, string> = {
   DOCUMENT: 'Document',
   PAGE: 'Page',
   FRAME: 'Frame',
+  GROUP: 'Group',
   RECTANGLE: 'Rectangle',
   ELLIPSE: 'Ellipse',
   LINE: 'Line',

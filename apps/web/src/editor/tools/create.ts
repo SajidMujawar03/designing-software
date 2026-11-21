@@ -2,6 +2,7 @@ import { hitTest, worldBounds, type NodeId, type NodeType } from '@figma/documen
 import { rectContainsRect, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { fitText, placementIn, reparentKeepingPosition, setLineEndpoints, worldRotation } from '../transforms';
+import { snapPoint } from '../snapping';
 import { snapAngle, type Tool, type ToolEvent } from './types';
 
 const DEFAULT_SIZE = 100;
@@ -31,10 +32,21 @@ export class ShapeTool implements Tool {
   down(e: ToolEvent): void {
     this.ed.commitTextEdit();
     this.doc.endGesture();
-    this.start = e;
     const frame = hitTest(this.doc, this.ed.pageId, e.world, { framesOnly: true });
     this.parentId = frame?.id ?? this.ed.pageId;
     this.created = null;
+    this.start = { ...e, px: this.snap(e) };
+  }
+
+  /** Pixel-grid point snapped to nearby edges and guides (Ctrl skips snapping). */
+  private snap(e: ToolEvent): Vec2 {
+    if (e.mod) {
+      this.ed.setUI({ snapGuides: null });
+      return e.px;
+    }
+    const r = snapPoint(e.px, this.ed.snapContext(this.created ? [this.created] : [], this.parentId!));
+    this.ed.setUI({ snapGuides: r.guides });
+    return r.p;
   }
 
   move(e: ToolEvent): void {
@@ -63,6 +75,7 @@ export class ShapeTool implements Tool {
   private update(e: ToolEvent): void {
     const id = this.created!;
     const a = this.start!.px;
+    e = { ...e, px: this.snap(e) };
     if (this.type === 'LINE') {
       const b = e.shift ? snapAngle(a, e.px, 45) : e.px;
       setLineEndpoints(this.doc, id, e.alt ? { x: 2 * a.x - b.x, y: 2 * a.y - b.y } : a, b);
@@ -101,6 +114,7 @@ export class ShapeTool implements Tool {
       }
     }
     if (this.type === 'FRAME') this.adoptContainedSiblings(id);
+    this.ed.setUI({ snapGuides: null });
     this.doc.endGesture();
     this.start = null;
     this.created = null;
@@ -119,6 +133,7 @@ export class ShapeTool implements Tool {
   }
 
   cancel(): void {
+    this.ed.setUI({ snapGuides: null });
     this.doc.endGesture();
     this.start = null;
     this.created = null;

@@ -1,6 +1,8 @@
 import {
   localTransform,
   rgbaCss,
+  worldBounds,
+  worldTransform,
   type DesignDocument,
   type NodeId,
   type Paint,
@@ -52,6 +54,14 @@ function drawNode(
   opts: RenderOptions,
 ): void {
   if (!n.visible || n.opacity <= 0) return;
+  if (n.type === 'GROUP') {
+    // Groups have no transform; children live in the group's parent space.
+    ctx.save();
+    ctx.globalAlpha *= n.opacity;
+    for (const c of doc.children(n.id)) drawNode(ctx, doc, c, screenParent, worldParent, opts);
+    ctx.restore();
+    return;
+  }
   const local = localTransform(n);
   const world = multiply(worldParent, local);
   const bounds = transformRect(world, { x: 0, y: 0, width: n.width, height: n.height });
@@ -131,19 +141,23 @@ function strokeShape(ctx: CanvasRenderingContext2D, n: SceneNode): void {
   }
 }
 
-/** Renders a subtree into a fresh canvas (used by PNG export). */
+/**
+ * Renders a node (and its children) into a fresh canvas covering its
+ * on-canvas bounds (used by PNG export).
+ */
 export function renderNodeToCanvas(doc: DesignDocument, id: NodeId, scale = 1): HTMLCanvasElement {
   const n = doc.get(id)!;
+  const b = worldBounds(doc, id);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.ceil(n.width * scale));
-  canvas.height = Math.max(1, Math.ceil(n.height * scale));
+  canvas.width = Math.max(1, Math.ceil(b.width * scale));
+  canvas.height = Math.max(1, Math.ceil(b.height * scale));
   const ctx = canvas.getContext('2d')!;
-  // Draw the node at the origin, unrotated.
-  const flat: SceneNode = { ...n, x: 0, y: 0, rotation: 0 };
-  drawNode(ctx, doc, flat, [scale, 0, 0, scale, 0, 0], [1, 0, 0, 1, 0, 0], {
+  const parentWorld = n.parentId ? worldTransform(doc, n.parentId) : ([1, 0, 0, 1, 0, 0] as Mat2D);
+  const screen = multiply([scale, 0, 0, scale, -b.x * scale, -b.y * scale], parentWorld);
+  drawNode(ctx, doc, n, screen, parentWorld, {
     view: [1, 0, 0, 1, 0, 0],
     dpr: 1,
-    visible: { x: 0, y: 0, width: n.width, height: n.height },
+    visible: b,
     background: 'transparent',
   });
   return canvas;

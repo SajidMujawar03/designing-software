@@ -37,7 +37,30 @@ export function installShortcuts(): () => void {
       fn();
     };
 
+    if (mod && (key === '/' || key === 'k')) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
+    if (ui.paletteOpen) return;
+
+    if (mod && e.altKey && key === 'g') return run(() => editor.frameSelection());
+
+    // Alignment: Alt+A/D/H (left/right/center), Alt+W/S/V (top/bottom/middle); with Shift, H/V distribute.
+    if (e.altKey && !mod) {
+      const k = e.code.replace('Key', '').toLowerCase();
+      if (e.shiftKey && k === 'h') return run(() => editor.distribute('x'));
+      if (e.shiftKey && k === 'v') return run(() => editor.distribute('y'));
+      const map: Record<string, Parameters<typeof editor.align>[0]> = {
+        a: 'left',
+        d: 'right',
+        h: 'hcenter',
+        w: 'top',
+        s: 'bottom',
+        v: 'vcenter',
+      };
+      if (!e.shiftKey && map[k]) return run(() => editor.align(map[k]));
+    }
+
     if (mod) {
+      if (key === 'g') return run(() => (e.shiftKey ? editor.ungroupSelection() : editor.groupSelection()));
+      if (key === 'backspace') return run(() => editor.ungroupSelection());
       if (key === 'z' && !e.shiftKey) return run(() => editor.undo());
       if ((key === 'z' && e.shiftKey) || key === 'y') return run(() => editor.redo());
       if (key === 'c') return run(() => void editor.copy());
@@ -55,7 +78,10 @@ export function installShortcuts(): () => void {
       return;
     }
 
+    if (e.key === 'Tab') return run(() => editor.selectSibling(e.shiftKey ? -1 : 1));
+
     if (e.shiftKey && !e.altKey) {
+      if (e.code === 'KeyR') return run(() => editor.setUI({ showRulers: !ui.showRulers }));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());

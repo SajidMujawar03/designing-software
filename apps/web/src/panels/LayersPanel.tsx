@@ -1,5 +1,5 @@
 import type { NodeId, NodeType, SceneNode } from '@figma/document';
-import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, Plus, Square, Trash2, Type, Unlock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import { useEffect, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -8,6 +8,7 @@ import { IconButton } from './controls';
 
 const ICONS: Partial<Record<NodeType, typeof Square>> = {
   FRAME: Hash,
+  GROUP: SquareDashed,
   RECTANGLE: Square,
   ELLIPSE: Circle,
   LINE: Minus,
@@ -221,6 +222,11 @@ function LayerRow(p: LayerRowProps) {
         else editor.select([node.id]);
       }}
       onDoubleClick={() => setRenaming(true)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (!p.selected) editor.select([node.id]);
+        editor.setUI({ contextMenu: { x: e.clientX, y: e.clientY } });
+      }}
     >
       <span
         className="chevron"
