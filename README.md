@@ -48,3 +48,7 @@ pnpm typecheck
 | Shift+R | Show or hide rulers (drag from a ruler to add a guide, drop it back to remove) |
 | Ctrl+/ or Ctrl+K | Command palette |
 | Right-click | Context menu |
+
+## Contributing
+
+Branches, pull requests and releases follow the rules in [CONTRIBUTING.md](CONTRIBUTING.md): work on a branch from the latest `main`, merge pull requests with a merge commit, and tag a desktop release only after the version bump is merged and pulled.
