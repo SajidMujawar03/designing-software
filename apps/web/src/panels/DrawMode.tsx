@@ -4,6 +4,7 @@ import {
   paintColor,
   rgbToHex,
   solid,
+  profileForStyle,
   styleDashes,
   type BrushStyle,
   type DrawTool,
@@ -15,6 +16,7 @@ import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { setBrush, setPrefs, usePrefs } from '../editor/prefs';
 import { useUI } from '../editor/store';
+import { WidthProfileSelect } from './WidthProfile';
 
 const isDrawTool = (t: string): t is DrawTool => t === 'brush' || t === 'pencil';
 
@@ -159,6 +161,10 @@ export function DrawPanel() {
             <input type="range" min={0} max={100} value={Math.round((opacity ?? 1) * 100)} onChange={(e) => apply(() => ({ opacity: Number(e.target.value) / 100 }), true)} />
             <span className="draw-value">{opacity === null ? 'Mixed' : `${Math.round(opacity * 100)}%`}</span>
           </label>
+          <div className="draw-row">
+            <span>Width</span>
+            <WidthProfileSelect nodes={nodes} />
+          </div>
           {tool && (
             <div className="draw-row">
               <span>Style</span>
@@ -171,6 +177,8 @@ export function DrawPanel() {
                     brush: { tool, style: s },
                     dashPattern: styleDashes(s, n.strokeWeight),
                     strokeCap: s === 'dashed' || s === 'scatter-dashes' ? 'NONE' : 'ROUND',
+                    // Stretch styles shape the stroke; other styles make it uniform.
+                    widthProfile: profileForStyle(s) ?? [],
                   }))
                 }
               />

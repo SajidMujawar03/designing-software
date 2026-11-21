@@ -45,6 +45,7 @@ import { ColorPicker } from './ColorPicker';
 import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { AutoLayoutSection, ConstraintsSection, LayoutGridSection, SizingRow } from './LayoutPanels';
 import { AnnotationsSection, CodeSnippetSection, SpecSection } from './HandoffPanels';
+import { WidthProfileSelect } from './WidthProfile';
 import { ComponentSection } from './ComponentPanel';
 import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
@@ -910,6 +911,12 @@ function StrokeOptions({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
             apply(ids, { strokeCap: v }),
           )}
       </div>
+      {hasOpen && (
+        <div className="row width-profile-row">
+          <span className="row-label">Width</span>
+          <WidthProfileSelect nodes={openNodes} />
+        </div>
+      )}
       {hasOpen && (
         <div className="row end-points">
           {select('Start point', startMarker, MARKERS, (v) => apply(openIds, { startMarker: v }))}

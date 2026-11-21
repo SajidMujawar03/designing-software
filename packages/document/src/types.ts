@@ -10,6 +10,12 @@ export type AnnotationProperty = 'width' | 'height' | 'fills' | 'strokes' | 'cor
 
 export type SpecBlockType = 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet' | 'numbered' | 'todo' | 'quote' | 'divider' | 'code' | 'image' | 'embed';
 
+/** A point of a stroke's width profile: `t` from 0 to 1 along the stroke, `width` as a multiple of the stroke weight. */
+export interface WidthPoint {
+  t: number;
+  width: number;
+}
+
 /** Draw mode's freehand tools (Pen is the regular vector pen). */
 export type DrawTool = 'brush' | 'pencil';
 /** Brush styles (stretch and scatter, as in Figma Draw) and pencil line styles. */
@@ -273,8 +279,10 @@ export interface SceneNode {
   // SPEC: its document, as blocks (its child layers are generated from them).
   specBlocks?: SpecBlock[];
 
-  // VECTOR drawn in draw mode: which brush made it (its shape follows the style once width profiles exist).
+  // VECTOR drawn in draw mode: which brush made it.
   brush?: { tool: DrawTool; style: BrushStyle };
+  /** Lines and open paths: stroke width along the path (empty or missing: uniform). */
+  widthProfile?: WidthPoint[];
 
   // CODE_LAYER: its files, and which version of them its snapshot (image fill) shows.
   codeFiles?: CodeFiles;
