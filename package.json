@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm -r --parallel typecheck",
-    "start": "pnpm --filter @figma/server start"
+    "start": "pnpm --filter @figma/server start",
+    "dev:desktop": "pnpm --filter @figma/desktop dev"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
@@ -19,6 +20,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "electron",
       "esbuild"
     ]
   }

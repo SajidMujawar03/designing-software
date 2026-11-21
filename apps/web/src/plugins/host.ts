@@ -150,7 +150,15 @@ export function closePlugin(runId: number): void {
 const post = (runId: number, msg: object) => frames.get(runId)?.contentWindow?.postMessage({ __designHost: true, ...msg }, '*');
 
 function runOf(source: MessageEventSource | null): RunningPlugin | undefined {
+  if (!source) return undefined;
   for (const [runId, frame] of frames) if (frame.contentWindow === source) return usePlugins.getState().running.find((r) => r.runId === runId);
+  // Not registered yet: find the frame on the page (only frames of running plugins carry a run id).
+  for (const el of document.querySelectorAll<HTMLIFrameElement>('iframe[data-run-id]')) {
+    if (el.contentWindow !== source) continue;
+    const run = usePlugins.getState().running.find((r) => r.runId === Number(el.dataset.runId));
+    if (run) frames.set(run.runId, el);
+    return run;
+  }
   return undefined;
 }
 

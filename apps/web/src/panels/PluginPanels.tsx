@@ -1,5 +1,5 @@
 import { Play, Plus, Puzzle, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PluginError } from '../plugins/api';
 import { BUILTIN_PLUGINS } from '../plugins/examples';
 import {
@@ -29,13 +29,17 @@ export function PluginsButton() {
 
 /** One running plugin: a sandboxed frame, shown as a floating panel once it calls showUI. */
 function PluginWindow({ run }: { run: RunningPlugin }) {
-  const ref = useRef<HTMLIFrameElement>(null);
   const [pos, setPos] = useState({ x: window.innerWidth - run.width - 260, y: 70 });
   const srcDoc = useMemo(() => sandboxDocument(run.plugin, isDark() ? 'dark' : 'light'), [run.runId]);
-  useEffect(() => {
-    if (ref.current) frames.set(run.runId, ref.current);
-    return () => void frames.delete(run.runId);
-  }, [run.runId]);
+  // Registered as soon as React attaches the frame, before its script can run and call the host
+  // (an effect runs later, and a fast plugin's first message would be dropped).
+  const ref = useCallback(
+    (el: HTMLIFrameElement | null) => {
+      if (el) frames.set(run.runId, el);
+      else frames.delete(run.runId);
+    },
+    [run.runId],
+  );
   const drag = (e: React.PointerEvent) => {
     const start = { x: e.clientX - pos.x, y: e.clientY - pos.y };
     const move = (ev: PointerEvent) => setPos({ x: Math.max(0, ev.clientX - start.x), y: Math.max(48, ev.clientY - start.y) });
@@ -61,7 +65,7 @@ function PluginWindow({ run }: { run: RunningPlugin }) {
         </button>
       </div>
       {/* No allow-same-origin: the plugin can't reach the app, its storage or the session. */}
-      <iframe ref={ref} title={run.plugin.name} sandbox="allow-scripts allow-forms allow-modals" srcDoc={srcDoc} style={{ height: run.height }} />
+      <iframe ref={ref} data-run-id={run.runId} title={run.plugin.name} sandbox="allow-scripts allow-forms allow-modals" srcDoc={srcDoc} style={{ height: run.height }} />
     </div>
   );
 }

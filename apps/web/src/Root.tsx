@@ -5,6 +5,8 @@ import { loadSession, useSession } from './cloud/session';
 import { Dashboard } from './dashboard/Dashboard';
 import { SignIn } from './dashboard/SignIn';
 import { Presenter } from './present/Presenter';
+import { isDesktopOffline } from './desktop';
+import { DesktopHome } from './desktop/DesktopHome';
 
 /** Picks the screen for the URL: sign-in, the files dashboard, or the editor. */
 export function Root() {
@@ -12,6 +14,8 @@ export function Root() {
   const status = useSession((s) => s.status);
   useEffect(() => void loadSession(), []);
 
+  // The desktop app's offline windows: its start screen instead of the dashboard, and no server.
+  if (isDesktopOffline && (route.kind === 'dashboard' || route.kind === 'signin')) return <DesktopHome />;
   // Playing a prototype of a browser file needs no server either.
   if (route.kind === 'present' && !route.id) return <Presenter route={route} />;
   // Files kept in this browser never need the server.
