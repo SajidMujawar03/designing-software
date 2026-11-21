@@ -1,5 +1,6 @@
 import { paintColor, rgbToHex, solid } from './color';
 import type { BrushStyle, DrawTool, NodePatch, SceneNode } from './types';
+import { profileForStyle } from './width';
 
 /**
  * Draw mode, after Figma Draw: the toolbar offers Pen (the vector pen),
@@ -8,10 +9,8 @@ import type { BrushStyle, DrawTool, NodePatch, SceneNode } from './types';
  * its brush, so Ctrl+click can pick its settings up again.
  *
  * Brush styles come in two kinds, as in Figma: stretch brushes run one
- * shape along the stroke, scatter brushes repeat a mark along it. Scatter
- * styles and the pencil's dashed and dotted styles draw as dash patterns;
- * the stretch shapes become real variable-width outlines with width
- * profiles (phase F7), until then they draw as round strokes.
+ * shape along the stroke (a width profile), scatter brushes repeat a mark
+ * along it (a dash pattern, like the pencil's dashed and dotted styles).
  */
 
 export interface BrushSettings {
@@ -77,6 +76,7 @@ export function brushStrokeProps(tool: DrawTool, s: BrushSettings): NodePatch {
     strokeCap: s.style === 'dashed' || s.style === 'scatter-dashes' ? 'NONE' : 'ROUND',
     strokeJoin: 'ROUND',
     dashPattern: styleDashes(s.style, weight),
+    widthProfile: profileForStyle(s.style) ?? [],
     fills: [],
     brush: { tool, style: s.style },
   };

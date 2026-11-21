@@ -5,6 +5,10 @@ import {
   localTransform,
   pathData,
   shapePaths,
+  maxWidth,
+  strokeWidthOutline,
+  usesWidthProfile,
+  type VectorPath,
   worldBounds,
   worldTransform,
   type DesignDocument,
@@ -547,6 +551,14 @@ export class CanvasKitRenderer implements SceneRenderer {
     if (n.strokeWeight <= 0 || !n.strokes.some((s) => s.visible)) return;
     const ck = this.ck;
     const paint = this.paint;
+    // Strokes with a width profile are drawn as their filled outline.
+    const outline = strokeWidthOutline(n);
+    if (outline) {
+      this.drawWidthOutline(c, n, outline);
+      const markers = nodeMarkers(n);
+      if (markers.length) this.drawMarkers(c, n, markers);
+      return;
+    }
     paint.setStyle(ck.PaintStyle.Stroke);
     paint.setStrokeCap(n.strokeCap === 'ROUND' ? ck.StrokeCap.Round : n.strokeCap === 'SQUARE' ? ck.StrokeCap.Square : ck.StrokeCap.Butt);
     paint.setStrokeJoin(n.strokeJoin === 'ROUND' ? ck.StrokeJoin.Round : n.strokeJoin === 'BEVEL' ? ck.StrokeJoin.Bevel : ck.StrokeJoin.Miter);
@@ -570,6 +582,32 @@ export class CanvasKitRenderer implements SceneRenderer {
     effect?.delete();
     const markers = nodeMarkers(n);
     if (markers.length) this.drawMarkers(c, n, markers);
+  }
+
+  /** A variable-width stroke: its outline filled with every visible stroke paint. */
+  private drawWidthOutline(c: Canvas, n: SceneNode, outline: VectorPath): void {
+    const ck = this.ck;
+    const d = pathData([outline]);
+    const key = `${n.id}:width`;
+    let cached = this.paths.get(key);
+    if (cached?.d !== d) {
+      cached?.path.delete();
+      const path = ck.Path.MakeFromSVGString(d);
+      if (!path) return;
+      cached = { d, path };
+      this.paths.set(key, cached);
+    }
+    this.paint.setStyle(ck.PaintStyle.Fill);
+    this.paint.setPathEffect(null);
+    const box = this.paintBox(n);
+    for (const p of n.strokes) {
+      if (!p.visible) continue;
+      const shader = this.paints.apply(this.paint, p, box, this.doc!);
+      if (shader === false) continue;
+      c.drawPath(cached.path, this.paint);
+      shader?.delete();
+    }
+    this.paint.setShader(null);
   }
 
   /** Arrowheads and dots at the ends of lines and open paths, in every visible stroke paint (never dashed). */
@@ -638,8 +676,9 @@ const sigma = (radius: number) => Math.max(0, radius / 2);
 export function strokeOutset(n: SceneNode): number {
   if (!n.strokeWeight || !n.strokes?.some((p) => p.visible !== false)) return 0;
   const w = n.strokeWeight;
-  // Centred; round and square caps reach w/2 past the ends too, arrowheads and dots further.
-  if (!isClosedShape(n)) return Math.max(w / 2, markerReach(n));
+  // Centred; round and square caps reach w/2 past the ends too, arrowheads and dots further,
+  // and a width profile as far as its widest point.
+  if (!isClosedShape(n)) return Math.max((w / 2) * (usesWidthProfile(n) ? Math.max(1, maxWidth(n.widthProfile)) : 1), markerReach(n));
   const align = n.strokeAlign ?? 'CENTER';
   if (align === 'INSIDE') return 0;
   const out = align === 'OUTSIDE' ? w : w / 2;

@@ -1,4 +1,5 @@
 import {
+  strokeWidthOutline,
   isFrameLike,
   baseTextStyle,
   gradientMatrix,
@@ -141,6 +142,21 @@ function paintedShape(c: SvgContext, n: SceneNode, geo: string): string {
   }
   const strokes = n.strokes.filter((s) => s.visible);
   if (!strokes.length || n.strokeWeight <= 0) return out;
+  // A width profile: the stroke's outline, filled.
+  const outline = strokeWidthOutline(n);
+  if (outline) {
+    const d = pathData([outline]);
+    for (const s of strokes) out += `<path d="${d}"${paintAttr(c, n, s, 'fill')}/>`;
+    for (const m of nodeMarkers(n)) {
+      for (const s of strokes) {
+        out +=
+          m.mode === 'fill'
+            ? `<path d="${markerPathData(m)}"${paintAttr(c, n, s, 'fill')}/>`
+            : `<path d="${markerPathData(m)}" fill="none" stroke-width="${num(n.strokeWeight)}" stroke-linecap="round" stroke-linejoin="round"${paintAttr(c, n, s, 'stroke')}/>`;
+      }
+    }
+    return out;
+  }
   const align = isClosed(n) ? (n.strokeAlign ?? 'CENTER') : 'CENTER';
   let attrs = ` fill="none" stroke-width="${num(align === 'CENTER' ? n.strokeWeight : n.strokeWeight * 2)}"`;
   if (n.strokeCap && n.strokeCap !== 'NONE') attrs += ` stroke-linecap="${n.strokeCap.toLowerCase()}"`;

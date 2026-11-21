@@ -1,5 +1,6 @@
 import {
   isFrameLike,
+  strokeWidthOutline,
   effectOutset,
   gradientMatrix,
   isGroupLike,
@@ -256,6 +257,19 @@ const isClosedShape = (n: SceneNode): boolean =>
 function strokeShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneNode): void {
   const strokes = n.strokes.filter((s) => s.visible);
   if (strokes.length === 0 || n.strokeWeight <= 0) return;
+  // A width profile: fill the stroke's outline.
+  const outline = strokeWidthOutline(n);
+  if (outline) {
+    ctx.beginPath();
+    outline.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+    for (const s of strokes) paintPath(ctx, n, s, doc, 'fill');
+    for (const m of nodeMarkers(n)) {
+      traceMarker(ctx, m);
+      for (const s of strokes) paintPath(ctx, n, s, doc, m.mode);
+    }
+    return;
+  }
   ctx.save();
   const align = isClosedShape(n) ? (n.strokeAlign ?? 'CENTER') : 'CENTER';
   // Inside/outside: twice the width, clipped to one side of the outline.

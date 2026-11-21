@@ -4844,3 +4844,28 @@ a.btn {
   width: 32px;
   height: 32px;
 }
+
+/* Width profile: the preset picker and the variable width tool button. */
+.width-profile {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.width-profile .select {
+  flex: 1;
+  min-width: 0;
+}
+.width-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.width-profile-row .row-label {
+  width: 40px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}

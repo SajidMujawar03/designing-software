@@ -1,4 +1,4 @@
-import {
+import { strokeWidthOutline,
   isGroupLike,
   mapPaths,
   shapePaths,
@@ -134,12 +134,16 @@ export async function outlineStrokeSelection(ed: Editor): Promise<void> {
     for (const n of targets) {
       const closed = n.type !== 'LINE' && (n.type !== 'VECTOR' || (n.vectorPaths ?? []).every((p) => p.closed));
       const world = worldTransform(doc, n.id);
-      let sk = strokeOutline(ck, mapPaths(shapePaths(n), world), n.strokeWeight, {
-        align: closed ? n.strokeAlign : 'CENTER',
-        cap: n.strokeCap,
-        join: n.strokeJoin,
-        dash: n.dashPattern,
-      });
+      // A variable-width stroke outlines to its own shape; others through Skia's stroker.
+      const widthShape = strokeWidthOutline(n);
+      let sk = widthShape
+        ? toSkPath(ck, mapPaths([widthShape], world))
+        : strokeOutline(ck, mapPaths(shapePaths(n), world), n.strokeWeight, {
+            align: closed ? n.strokeAlign : 'CENTER',
+            cap: n.strokeCap,
+            join: n.strokeJoin,
+            dash: n.dashPattern,
+          });
       if (!sk) continue;
       // Arrowheads and dots become part of the outline.
       for (const m of nodeMarkers(n)) {

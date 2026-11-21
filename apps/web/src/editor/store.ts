@@ -14,6 +14,7 @@ export type ToolId =
   | 'spec'
   | 'code'
   | 'brush'
+  | 'width'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'
@@ -69,6 +70,8 @@ export interface UIState {
   findOpen: boolean;
   /** The Spec document being edited (over the canvas, or full screen), and a block to put the caret in. */
   editingSpec: { id: NodeId; fullscreen: boolean; focus?: SpecFocus } | null;
+  /** Variable width tool: the selected width points, and where on the stroke the pointer is. */
+  widthEdit: { selected: number[]; hoverT: number | null } | null;
   /** Draw mode: the toolbar offers Pen, Brush and Pencil, and the sidebar becomes stroke sliders. */
   drawMode: boolean;
   /** The code layer whose code editor panel is open. */
@@ -154,6 +157,7 @@ export const useUI = create<UIState>()(() => ({
   editingSpec: null,
   codeEditorFor: null,
   drawMode: false,
+  widthEdit: null,
   runningCode: {},
   variablesOpen: false,
   librariesOpen: false,
