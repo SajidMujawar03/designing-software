@@ -1,5 +1,7 @@
 import { IndexeddbPersistence } from 'y-indexeddb';
-import { startCloudFile } from '../cloud/cloudFile';
+import { provider, startCloudFile } from '../cloud/cloudFile';
+import { startPresence } from '../cloud/presence';
+import { useSession } from '../cloud/session';
 import type { Route } from '../cloud/route';
 import { editor } from './editor';
 import { currentFileId, fileStoreName, touchFile } from './files';
@@ -21,6 +23,8 @@ export async function startPersistence(route: Route): Promise<void> {
   if (route.kind === 'file') await startCloudFile(route.id);
   else await startLocal();
   editor.onReady();
+  const me = useSession.getState().user;
+  if (route.kind === 'file' && provider && me) startPresence(provider, me);
   watchFileMeta(editor);
   void refreshLibraries();
   if (route.kind !== 'file') {

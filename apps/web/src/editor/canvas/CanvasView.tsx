@@ -11,6 +11,8 @@ import { useUI } from '../store';
 import { createTools, createVectorEditTool, type Tool, type ToolEvent } from '../tools';
 import { snapPx } from '../tools/types';
 import { drawOverlay } from './overlay';
+import { drawPresence } from './presenceOverlay';
+import { follow, reportCursor, usePresence } from '../../cloud/presence';
 import { hitGradientHandle, moveGradientHandle } from './gradientHandles';
 import { hitGuide, RULER } from './rulers';
 import { TextInput } from './TextInput';
@@ -101,10 +103,13 @@ export function CanvasView() {
       octx.setTransform(1, 0, 0, 1, 0, 0);
       octx.clearRect(0, 0, overlay.width, overlay.height);
       drawOverlay(octx, editor, dpr);
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawPresence(octx, editor);
     }
 
     const unsubDoc = editor.doc.subscribe(schedule);
     const unsubUI = useUI.subscribe(schedule);
+    const unsubPresence = usePresence.subscribe(schedule);
     const unsubFonts = fonts.onLoad(schedule);
 
     const ro = new ResizeObserver(() => {
@@ -128,6 +133,7 @@ export function CanvasView() {
     return () => {
       unsubDoc();
       unsubUI();
+      unsubPresence();
       unsubFonts();
       ro.disconnect();
       if (frame) cancelAnimationFrame(frame);
@@ -212,6 +218,7 @@ export function CanvasView() {
     };
     const onMove = (e: PointerEvent) => {
       const ev = toEvent(e);
+      reportCursor(ev.world);
       if (textDrag !== null) {
         TextEdit.setSelection(textDrag, TextEdit.indexAtWorld(ev.world));
         return;
@@ -269,6 +276,7 @@ export function CanvasView() {
       currentTool().doubleClick?.(toEvent(e));
     };
     const onLeave = () => {
+      reportCursor(null);
       if (!active) editor.setUI({ hoverId: null });
     };
     const onWheel = (e: WheelEvent) => {
@@ -353,6 +361,21 @@ export function CanvasView() {
       <canvas key={backend} ref={sceneRef} className="scene-canvas" data-renderer={backend} />
       <canvas ref={canvasRef} className="overlay-canvas" style={{ cursor: css }} data-testid="canvas" />
       <TextInput />
+      <FollowFrame />
+    </div>
+  );
+}
+
+/** A colored frame and label while following someone's view. */
+function FollowFrame() {
+  const { following, peers } = usePresence();
+  const p = peers.find((x) => x.clientId === following);
+  if (!p) return null;
+  return (
+    <div className="follow-frame" style={{ borderColor: p.user.color }}>
+      <button className="follow-label" style={{ background: p.user.color }} onClick={() => follow(null)}>
+        Following {p.user.name} · Stop
+      </button>
     </div>
   );
 }
