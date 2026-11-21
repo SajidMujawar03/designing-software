@@ -6,6 +6,7 @@ import { startPersistence } from './editor/persistence';
 import { installShortcuts } from './editor/shortcuts';
 import { useUI } from './editor/store';
 import { editor } from './editor/editor';
+import { startDesktopMenus } from './desktop/menu';
 import { LayersPanel } from './panels/LayersPanel';
 import { LibrariesModal } from './panels/LibraryPanels';
 import { CommandPalette, ContextMenu } from './panels/Menus';
@@ -55,6 +56,8 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
   const selection = useUI((s) => s.selection);
   const previewing = route.kind === 'file' && new URLSearchParams(location.search).has('version');
   useEffect(() => maybeStartTour(), []);
+  // In the desktop app: the native menus follow this editor.
+  useEffect(() => startDesktopMenus(), []);
 
   return (
     <div className="app">

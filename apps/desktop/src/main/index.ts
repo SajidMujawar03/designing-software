@@ -1,6 +1,8 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, type IpcMainEvent, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { join, resolve } from 'node:path';
 import { designFilesIn, fileBridge, newFile, openFileDialog, openPath } from './files';
+import { linksIn, openLink, registerScheme } from './links';
+import { startMenus } from './menus';
 import { APP_ORIGIN, handleAppScheme, registerAppScheme } from './protocol';
 import { checkServerUrl, saveSettings, settings } from './settings';
 import { runSmokeTest } from './smoke';
@@ -24,6 +26,8 @@ const webDist = () => (app.isPackaged ? join(process.resourcesPath, 'web') : res
 
 registerAppScheme();
 app.enableSandbox();
+// Windows shows notifications (comment mentions) only for an app with an id.
+if (process.platform === 'win32') app.setAppUserModelId('com.sajidmujawar.designclone');
 if (SMOKE) {
   app.setPath('userData', join(app.getPath('temp'), `design-clone-smoke-${process.pid}`));
   // The test window often sits behind other windows: keep Chromium painting it and running its timers at full speed.
@@ -36,9 +40,11 @@ if (!SMOKE && !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', (_e, otherArgv) => {
-    // Launched again with files (a double-clicked .design file): open them here.
+    // Launched again with files (a double-clicked .design file) or a link: open them here.
     const files = designFilesIn(otherArgv);
     if (files.length) return void openFiles(files);
+    const links = linksIn(otherArgv);
+    if (links.length) return void handleLinks(links);
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
       if (win.isMinimized()) win.restore();
@@ -54,6 +60,30 @@ if (!SMOKE && !app.requestSingleInstanceLock()) {
 function openStart(): BrowserWindow {
   return createWindow('offline', offlineUrl('/'));
 }
+
+/** design-clone:// links (from the command line, a second launch, or macOS). */
+function handleLinks(links: string[]): void {
+  for (const l of links) {
+    void openLink(l, { file: openCloudFile, server: () => void openCloud() }).then((ok) => {
+      // Started by a link that was cancelled or broken: don't leave the app running with no window.
+      if (!ok && !BrowserWindow.getAllWindows().length) openStart();
+    });
+  }
+}
+
+// macOS delivers links and double-clicked files as events (possibly before the app is ready).
+const early: { links: string[]; files: string[] } = { links: [], files: [] };
+let ready = false;
+app.on('open-url', (e, url) => {
+  e.preventDefault();
+  if (ready) handleLinks([url]);
+  else early.links.push(url);
+});
+app.on('open-file', (e, path) => {
+  e.preventDefault();
+  if (ready) openFiles([path]);
+  else early.files.push(path);
+});
 
 const showError = (e: unknown) => dialog.showErrorBox("Couldn't open the file", e instanceof Error ? e.message : String(e));
 
@@ -130,55 +160,40 @@ function bridge(): void {
   });
 }
 
-function menu(): void {
-  const isMac = process.platform === 'darwin';
-  // Edit shortcuts (undo, copy…) stay with the editor itself; native menus for them come later.
-  const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
-    {
-      label: 'File',
-      submenu: [
-        { label: 'New File…', accelerator: 'CmdOrCtrl+N', click: (_i, win) => void newFile((win as BrowserWindow | undefined) ?? null).catch(showError) },
-        { label: 'Open File…', accelerator: 'CmdOrCtrl+O', click: (_i, win) => void openFileDialog((win as BrowserWindow | undefined) ?? null).catch(showError) },
-        { type: 'separator' },
-        { label: 'New Window', accelerator: 'CmdOrCtrl+Shift+N', click: () => openStart() },
-        { label: 'Open Cloud Files', click: () => settings().serverUrl && openCloud() },
-        { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-    { role: 'windowMenu' },
-    {
-      role: 'help',
-      submenu: [{ label: `Design Clone ${app.getVersion()}`, enabled: false }],
-    },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
-
 async function start(): Promise<void> {
   if (!DEV) handleAppScheme(webDist());
   secureAllContents();
   bridge();
   fileBridge({ trusted, openAppWindow: (page) => createWindow('offline', offlineUrl(page)), serverUrl: () => settings().serverUrl, openCloudFile });
-  menu();
+  startMenus({
+    trusted,
+    actions: {
+      newFile: (win) => void newFile(win).catch(showError),
+      openFile: (win) => void openFileDialog(win).catch(showError),
+      openRecent: (path, win) => {
+        try {
+          openPath(path, win);
+        } catch (e) {
+          showError(e);
+        }
+      },
+      newWindow: () => void openStart(),
+      openCloud: () => void openCloud(),
+      hasServer: () => !!settings().serverUrl,
+    },
+  });
   if (SMOKE) {
     const code = await runSmokeTest({ offlineUrl, out: process.env.SMOKE_OUT ?? join(app.getPath('temp'), 'design-clone-smoke') });
     app.exit(code);
     return;
   }
-  const files = designFilesIn(argv.slice(1));
+  registerScheme();
+  ready = true;
+  const files = [...designFilesIn(argv.slice(1)), ...early.files];
+  const links = [...linksIn(argv.slice(1)), ...early.links];
   if (files.length) openFiles(files);
-  else openStart();
+  if (links.length) handleLinks(links);
+  if (!files.length && !links.length) openStart();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openStart();
   });

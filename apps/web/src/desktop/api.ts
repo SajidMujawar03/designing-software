@@ -47,6 +47,18 @@ export interface DesktopFiles {
   onFlushRequest(save: () => Promise<boolean>): void;
 }
 
+/** An item of a native menu, described by the page. */
+export type MenuModelItem =
+  | { type: 'command'; id: string; label: string; accelerator?: string; enabled: boolean }
+  | { type: 'separator' }
+  | { type: 'submenu'; label: string; items: MenuModelItem[] };
+
+/** The menus an editor window adds: items for the File menu, and menus after it. */
+export interface MenuModel {
+  file: MenuModelItem[];
+  menus: Array<{ label: string; items: MenuModelItem[] }>;
+}
+
 export interface DesktopBridge {
   readonly platform: 'win32' | 'darwin' | 'linux' | string;
   readonly version: string;
@@ -70,4 +82,10 @@ export interface DesktopBridge {
   /** Uploads a document to the server as a new cloud file and opens it there. */
   uploadToCloud(state: Uint8Array, name: string): Promise<void>;
   readonly file: DesktopFiles;
+  readonly menu: {
+    /** This window's menus (an empty model for windows without an editor). */
+    set(model: MenuModel): void;
+    /** Menu clicks, as command ids from the model. */
+    onCommand(run: (id: string) => void): void;
+  };
 }

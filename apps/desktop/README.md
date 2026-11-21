@@ -53,7 +53,13 @@ temporary folder). It exits with 1 if a check fails.
    autosave (about a second after edits pause, written atomically), Ctrl+S,
    saving on close, Save as, rename, Show in folder, Upload to cloud, Save a
    copy to disk (from cloud files and drafts), and present mode.
-3. **Native menus** built from the editor's commands, `design://` links, file
-   associations.
+3. **Native menus and links** (done): the menu bar is built from the editor's
+   commands (File, Edit, View, Object, Arrange, Plugins, Help), with items
+   enabled as the selection allows and Open Recent. Shortcuts are shown in the
+   menus but still handled by the editor, so text fields keep their own keys.
+   `design-clone://file/<id>?server=…` links open cloud files (a link to a
+   different server asks first), "Open in the desktop app" in the browser's
+   file menu creates one, and comment mentions show native notifications.
+   File associations and the link registration come with the installers.
 4. **Windows installers,** plus crash reporting and a release workflow.
 5. **Auto-update, macOS and Linux.**

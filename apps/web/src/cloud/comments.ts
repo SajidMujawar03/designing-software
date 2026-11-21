@@ -4,6 +4,8 @@ import { create } from 'zustand';
 import { editor } from '../editor/editor';
 import { api, type CloudUser } from './api';
 import { provider, useCloudFile } from './cloudFile';
+import { useSession } from './session';
+import { desktop } from '../desktop';
 
 export interface Comment {
   id: string;
@@ -64,6 +66,7 @@ export async function loadComments(): Promise<void> {
   if (!id) return;
   const data = await api<{ threads: Thread[]; users: CloudUser[] }>(`/files/${id}/comments`);
   const users = Object.fromEntries(data.users.map((u) => [u.id, u]));
+  notifyMentions(data.threads, users);
   const openId = useComments.getState().openId;
   useComments.setState({
     threads: data.threads,
@@ -71,6 +74,33 @@ export async function loadComments(): Promise<void> {
     loaded: true,
     openId: openId && data.threads.some((t) => t.id === openId) ? openId : null,
   });
+}
+
+/** Comments already seen (null until the first load: what's there then isn't news). */
+let seen: Set<string> | null = null;
+const plain = (body: string) => body.replace(/@\[([^\]]+)\]\([\w-]+\)/g, '@$1');
+
+/**
+ * In the desktop app: a native notification when someone mentions you in a
+ * new comment while the window isn't focused. Clicking it opens the thread.
+ */
+function notifyMentions(threads: Thread[], users: Record<string, CloudUser>): void {
+  const all = threads.flatMap((t) => t.comments.map((c) => ({ t, c })));
+  const first = seen === null;
+  const known = seen ?? new Set<string>();
+  seen = new Set(all.map(({ c }) => c.id));
+  const me = useSession.getState().user?.id;
+  if (first || !desktop || !me || typeof Notification === 'undefined' || document.hasFocus()) return;
+  for (const { t, c } of all) {
+    if (known.has(c.id) || c.authorId === me || !c.mentions.includes(me)) continue;
+    const who = users[c.authorId]?.name ?? 'Someone';
+    const file = useCloudFile.getState().file?.name ?? 'a file';
+    const n = new Notification(`${who} mentioned you in ${file}`, { body: plain(c.body).slice(0, 200), tag: c.id });
+    n.onclick = () => {
+      window.focus();
+      revealThread(t);
+    };
+  }
 }
 
 /** Loads comments and keeps them current as people comment (pushed over the sync connection). */

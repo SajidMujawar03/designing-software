@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import * as Y from 'yjs';
 import { decodeDesignFile } from '../../../web/src/desktop/designFile';
 import { dialogs, openPath } from './files';
+import { linkDialogs, openLink, parseLink } from './links';
+import { buildMenu, menuLabels } from './menus';
+import { settings } from './settings';
 import { createWindow, findWindow, setOpenExternal } from './windows';
 
 /** The names of the layers stored in a .design file (read straight from disk). */
@@ -206,6 +209,28 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
         check('present windows cannot write the file', /read-only/.test(String(writeBlocked)));
         presenter.close();
       } else check('present mode plays the file', false);
+
+      // ---- Native menus: the editor's commands, kept in step with the selection.
+      await js(`window.editor.select([])`);
+      await wait(600);
+      const before = menuLabels(reopened);
+      results.menus = before.map((m) => m.label);
+      const find = (labels: typeof before, menu: string, item: string) => labels.find((m) => m.label === menu)?.items.find((i) => i.startsWith(item));
+      check('editor menus are in the menu bar', ['File', 'Edit', 'Object', 'Arrange', 'Plugins', 'View', 'Help'].every((l) => results.menus && (results.menus as string[]).includes(l)));
+      check('file menu has the disk commands', !!find(before, 'File', 'Save As') && !!find(before, 'File', 'Upload to Cloud'));
+      check('items follow the selection (off with nothing selected)', find(before, 'Object', 'Group selection') === 'Group selection (off)');
+      // Click Edit > Select all in the real menu.
+      const edit = buildMenu(reopened).items.find((m) => m.label === 'Edit');
+      const selectAll = edit?.submenu?.items.find((i) => i.label === 'Select all');
+      selectAll?.click(undefined, reopened, undefined as never);
+      await wait(800);
+      const selected = await js<number>(`window.editor.ui.selection.length`);
+      check('menu clicks run editor commands', selected >= 2);
+      const after = menuLabels(reopened);
+      check('items follow the selection (on once selected)', find(after, 'Object', 'Group selection') === 'Group selection');
+      check('open recent lists the file', !!find(after, 'File', 'Open Recent') && settings().recent.includes(renamedPath));
+      const recentItems = buildMenu(reopened).items.find((m) => m.label === 'File')?.submenu?.items.find((i) => i.label === 'Open Recent')?.submenu?.items.map((i) => i.label) ?? [];
+      check('open recent shows the file name', recentItems.includes('Renamed design'));
     } else check('the file reopens with its layers', false);
 
     // A missing file gives a reason instead of an empty window.
@@ -266,6 +291,23 @@ export async function runSmokeTest(opts: { offlineUrl: (path?: string) => string
         results.upload = { clicked, cloudUrl, toast };
         check('upload to cloud opens the new cloud file', clicked && /\/file\/[\w-]+/.test(cloudUrl) && /Uploaded/.test(toast));
         const fileId = /\/file\/([\w-]+)/.exec(cloudUrl)?.[1];
+
+        // ---- design-clone:// links
+        const bad = ['design-clone://file/a%20b', 'design-clone://delete/x', 'https://example.com/file/x', 'design-clone://file/x?server=http://example.com'];
+        results.badLinks = bad.map((l) => [l, parseLink(l)]);
+        check('malformed links are refused', bad.every((l) => parseLink(l) === null));
+        let asked = '';
+        linkDialogs.confirmServer = async (s) => ((asked = s), false);
+        linkDialogs.error = () => {};
+        const other = await openLink('design-clone://file/abc?server=https://other.example', { file: () => {}, server: () => {} });
+        check('links to another server ask first (declined: nothing opens)', !other && asked === 'https://other.example' && settings().serverUrl === new URL(server).origin);
+        if (fileId) {
+          await cloud.loadURL(`${new URL(server).origin}/`);
+          await wait(1000);
+          const opened = await openLink(`design-clone://file/${fileId}`, { file: (id) => void cloud.loadURL(`${new URL(server).origin}/file/${id}`), server: () => {} });
+          await wait(1500);
+          check('a link opens the cloud file', opened && cloud.webContents.getURL().endsWith(`/file/${fileId}`));
+        }
         if (fileId) await cloud.webContents.executeJavaScript(`fetch('/api/files/${fileId}?forever=1', { method: 'DELETE' }).then(r => r.status)`, true);
       }
     }

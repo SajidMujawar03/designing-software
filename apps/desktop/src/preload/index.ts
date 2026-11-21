@@ -51,6 +51,13 @@ const desktop: DesktopBridge = {
   forgetRecent: (path) => ipcRenderer.invoke('desktop:forgetRecent', String(path)),
   uploadToCloud: (state, name) => ipcRenderer.invoke('desktop:uploadToCloud', state, String(name)),
   file: Object.freeze(file),
+  menu: Object.freeze({
+    set: (model) => ipcRenderer.send('menu:set', model),
+    onCommand: (run) => {
+      ipcRenderer.removeAllListeners('menu:command');
+      ipcRenderer.on('menu:command', (_e, id: unknown) => typeof id === 'string' && run(id));
+    },
+  }),
 };
 
 contextBridge.exposeInMainWorld('desktop', Object.freeze(desktop));

@@ -1,8 +1,9 @@
 import { libraryStatus, type PublishedComponent, type PublishedLibrary } from '@figma/document';
-import { BookOpen, Boxes, History, ChevronDown, Component, FilePlus, FileText, HardDriveDownload, RefreshCw, Trash2, X } from 'lucide-react';
+import { BookOpen, Boxes, History, ChevronDown, Component, FilePlus, FileText, HardDriveDownload, Monitor, RefreshCw, Trash2, X } from 'lucide-react';
 import * as Y from 'yjs';
 import { desktop } from '../desktop';
 import { DiskFileMenu } from '../desktop/DiskFileMenu';
+import { desktopLink } from '../desktop/links';
 import { bridgeMessage } from '../desktop/diskFile';
 import { notify } from '../plugins/host';
 import { useEffect, useRef, useState } from 'react';
@@ -151,6 +152,11 @@ function CloudFileMenu() {
             <History size={12} /> Version history
           </button>
           <SaveToDiskItem name={file?.name ?? 'Untitled'} onDone={() => setOpen(false)} />
+          {!desktop && file && (
+            <button role="menuitem" title="Opens this file in Design Clone for the desktop, if it's installed" onClick={() => (setOpen(false), location.assign(desktopLink(file.id)))}>
+              <Monitor size={12} /> Open in the desktop app
+            </button>
+          )}
           <ThemeSwitch role="menuitem" />
         </div>
       )}
