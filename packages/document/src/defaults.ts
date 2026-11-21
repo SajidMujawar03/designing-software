@@ -23,9 +23,13 @@ const NAMES: Record<NodeType, string> = {
   PAGE: 'Page',
   FRAME: 'Frame',
   GROUP: 'Group',
+  BOOLEAN: 'Boolean',
+  POLYGON: 'Polygon',
+  STAR: 'Star',
   RECTANGLE: 'Rectangle',
   ELLIPSE: 'Ellipse',
   LINE: 'Line',
+  VECTOR: 'Vector',
   TEXT: 'Text',
 };
 
@@ -39,6 +43,22 @@ export function defaultProps(type: NodeType): NodeProps {
     case 'RECTANGLE':
     case 'ELLIPSE':
       p.fills = [solid('#D9D9D9')];
+      break;
+    case 'POLYGON':
+      p.fills = [solid('#D9D9D9')];
+      p.pointCount = 3;
+      break;
+    case 'STAR':
+      p.fills = [solid('#D9D9D9')];
+      p.pointCount = 5;
+      p.innerRadius = 0.382;
+      break;
+    case 'BOOLEAN':
+      p.booleanOperation = 'UNION';
+      break;
+    case 'VECTOR':
+      p.strokes = [solid('#000000')];
+      p.vectorPaths = [];
       break;
     case 'LINE':
       p.height = 0;

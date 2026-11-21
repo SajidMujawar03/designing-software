@@ -1,4 +1,4 @@
-import { rgbaCss, worldTransform } from '@figma/document';
+import { paintColor, rgbaCss, worldTransform } from '@figma/document';
 import { multiply } from '@figma/geometry';
 import { useEffect, useRef } from 'react';
 import { editor } from '../editor';
@@ -62,7 +62,7 @@ export function TextEditor() {
         lineHeight: `${fontSize * (n.lineHeight ?? 1.2)}px`,
         letterSpacing: `${n.letterSpacing ?? 0}px`,
         textAlign: (n.textAlign ?? 'LEFT').toLowerCase() as 'left' | 'center' | 'right',
-        color: fill ? rgbaCss(fill.color, fill.opacity) : 'black',
+        color: fill ? rgbaCss(paintColor(fill).color, paintColor(fill).opacity) : 'black',
         whiteSpace: n.textAutoResize === 'WIDTH_AND_HEIGHT' ? 'pre' : 'pre-wrap',
         opacity: n.opacity,
       }}

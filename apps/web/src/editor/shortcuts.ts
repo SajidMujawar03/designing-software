@@ -1,4 +1,7 @@
+import type { BooleanOperation } from '@figma/document';
 import { editor } from './editor';
+import { importImages, pickImageFiles } from './images';
+import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import type { ToolId } from './store';
 
 const TOOL_KEYS: Record<string, ToolId> = {
@@ -8,6 +11,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
   r: 'rectangle',
   o: 'ellipse',
   l: 'line',
+  p: 'pen',
   t: 'text',
   h: 'hand',
 };
@@ -22,6 +26,10 @@ function isTyping(target: EventTarget | null): boolean {
 export function installShortcuts(): () => void {
   const onKeyDown = (e: KeyboardEvent) => {
     if (isTyping(e.target)) return;
+    if (!editor.ui.paletteOpen && editor.toolKey(e)) {
+      e.preventDefault();
+      return;
+    }
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     const ui = editor.ui;
@@ -37,10 +45,17 @@ export function installShortcuts(): () => void {
       fn();
     };
 
-    if (mod && (key === '/' || key === 'k')) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
+    if (mod && (key === '/' || (key === 'k' && !e.shiftKey))) return run(() => editor.setUI({ paletteOpen: !ui.paletteOpen }));
     if (ui.paletteOpen) return;
 
-    if (mod && e.altKey && key === 'g') return run(() => editor.frameSelection());
+    if (mod && e.altKey) {
+      const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
+      if (e.code === 'KeyG') return run(() => editor.frameSelection());
+      if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));
+      if (e.code === 'KeyO') return run(() => void outlineStrokeSelection(editor));
+      if (e.code === 'KeyM') return run(() => editor.useAsMask());
+    }
+    if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') return run(() => void flattenSelection(editor));
 
     // Alignment: Alt+A/D/H (left/right/center), Alt+W/S/V (top/bottom/middle); with Shift, H/V distribute.
     if (e.altKey && !mod) {
@@ -63,9 +78,8 @@ export function installShortcuts(): () => void {
       if (key === 'backspace') return run(() => editor.ungroupSelection());
       if (key === 'z' && !e.shiftKey) return run(() => editor.undo());
       if ((key === 'z' && e.shiftKey) || key === 'y') return run(() => editor.redo());
-      if (key === 'c') return run(() => void editor.copy());
-      if (key === 'x') return run(() => void editor.cut());
-      if (key === 'v') return run(() => void editor.paste());
+      // Copy, cut and paste arrive as clipboard events (below), which can also carry images.
+      if (e.shiftKey && key === 'k') return run(() => void placeImages());
       if (key === 'd') return run(() => editor.duplicateSelection());
       if (key === 'a') return run(() => editor.selectAll());
       if (key === ']') return run(() => editor.reorder(e.shiftKey ? 'front' : 'forward'));
@@ -82,6 +96,9 @@ export function installShortcuts(): () => void {
 
     if (e.shiftKey && !e.altKey) {
       if (e.code === 'KeyR') return run(() => editor.setUI({ showRulers: !ui.showRulers }));
+      if (e.code === 'KeyP') return run(() => editor.setTool('pencil'));
+      if (e.code === 'KeyG') return run(() => editor.setTool('polygon'));
+      if (e.code === 'KeyS') return run(() => editor.setTool('star'));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());
@@ -101,6 +118,7 @@ export function installShortcuts(): () => void {
         return run(() => {
           const sel = editor.selectedNodes();
           if (sel.length === 1 && sel[0].type === 'TEXT') editor.startTextEdit(sel[0].id);
+          else if (sel.length === 1 && sel[0].type === 'VECTOR') editor.enterVectorEdit(sel[0].id);
           else editor.selectChildren();
         });
       case 'ArrowLeft':
@@ -122,12 +140,39 @@ export function installShortcuts(): () => void {
   };
   const onBlur = () => editor.setUI({ spaceHeld: false });
 
+  const onCopy = (e: ClipboardEvent) => {
+    if (isTyping(e.target) || !e.clipboardData) return;
+    const text = editor.copyText();
+    if (!text) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', text);
+    if (e.type === 'cut') editor.deleteSelection();
+  };
+  const onPaste = (e: ClipboardEvent) => {
+    if (isTyping(e.target) || !e.clipboardData) return;
+    e.preventDefault();
+    const images = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+    if (images.length) void importImages(images);
+    else editor.pasteText(e.clipboardData.getData('text/plain'));
+  };
+  window.addEventListener('copy', onCopy);
+  window.addEventListener('cut', onCopy);
+  window.addEventListener('paste', onPaste);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', onBlur);
   return () => {
+    window.removeEventListener('copy', onCopy);
+    window.removeEventListener('cut', onCopy);
+    window.removeEventListener('paste', onPaste);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('blur', onBlur);
   };
+}
+
+/** Ctrl+Shift+K: choose image files and place them in the middle of the view. */
+export async function placeImages(): Promise<void> {
+  const files = await pickImageFiles();
+  if (files.length) await importImages(files);
 }

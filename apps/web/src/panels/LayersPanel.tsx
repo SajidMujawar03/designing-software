@@ -1,5 +1,6 @@
 import type { NodeId, NodeType, SceneNode } from '@figma/document';
-import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
+import { Combine, Contrast, Star, Triangle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import { useEffect, useState, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -13,6 +14,10 @@ const ICONS: Partial<Record<NodeType, typeof Square>> = {
   ELLIPSE: Circle,
   LINE: Minus,
   TEXT: Type,
+  VECTOR: PenTool,
+  POLYGON: Triangle,
+  STAR: Star,
+  BOOLEAN: Combine,
 };
 
 export function LayersPanel() {
@@ -195,7 +200,7 @@ function LayerRow(p: LayerRowProps) {
   const [renaming, setRenaming] = useState(false);
   const hovered = useUI((s) => s.hoverId === node.id);
   const hasKids = editor.doc.childIds(node.id).length > 0;
-  const Icon = ICONS[node.type] ?? Square;
+  const Icon = node.isMask ? Contrast : (ICONS[node.type] ?? Square);
   const parentHidden = editor.doc.ancestors(node.id).some((a) => !a.visible);
 
   return (

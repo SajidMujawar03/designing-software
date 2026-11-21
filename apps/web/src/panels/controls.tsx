@@ -1,4 +1,4 @@
-import { hexToRgb, rgbaCss, rgbToHex, type Paint } from '@figma/document';
+import { GRADIENT_LABELS, hexToRgb, paintCss, rgbToHex, type Paint } from '@figma/document';
 import { Eye, EyeOff, Minus } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { editor } from '../editor/editor';
@@ -155,35 +155,55 @@ interface PaintRowProps {
   paint: Paint;
   onChange: (p: Paint, live: boolean) => void;
   onRemove: () => void;
+  /** Opens the paint editor (anchored at the row). Without it, only solid colors can be edited. */
+  onOpen?: (anchor: DOMRect) => void;
+  open?: boolean;
 }
 
-export function PaintRow({ paint, onChange, onRemove }: PaintRowProps) {
-  const hex = rgbToHex(paint.color);
+export function PaintRow({ paint, onChange, onRemove, onOpen, open }: PaintRowProps) {
+  const solidPaint = paint.type === 'SOLID' ? paint : null;
+  const hex = solidPaint ? rgbToHex(solidPaint.color) : '';
   const [text, setText] = useState(hex);
   useEffect(() => setText(hex), [hex]);
+  const openHere = (e: React.MouseEvent) => onOpen?.((e.currentTarget.closest('.paint-row') ?? e.currentTarget).getBoundingClientRect());
+  const label = paint.type === 'IMAGE' ? 'Image' : paint.type === 'SOLID' ? '' : GRADIENT_LABELS[paint.type];
 
   return (
-    <div className={`paint-row${paint.visible ? '' : ' muted'}`}>
-      <label className="swatch" title="Pick color" onPointerDown={() => editor.doc.endGesture()}>
-        <span className="swatch-color" style={{ background: rgbaCss(paint.color, paint.opacity) }} />
+    <div className={`paint-row${paint.visible ? '' : ' muted'}${open ? ' open' : ''}`}>
+      {onOpen ? (
+        <button type="button" className="swatch" title="Edit paint" onClick={openHere}>
+          <span className="swatch-color" style={{ background: paintCss(paint, '180deg') }} />
+        </button>
+      ) : (
+        <label className="swatch" title="Pick color" onPointerDown={() => editor.doc.endGesture()}>
+          <span className="swatch-color" style={{ background: paintCss(paint) }} />
+          {solidPaint && (
+            <input
+              type="color"
+              value={`#${hex.toLowerCase()}`}
+              onChange={(e) => onChange({ ...solidPaint, color: hexToRgb(e.target.value) }, true)}
+              onBlur={() => editor.doc.endGesture()}
+            />
+          )}
+        </label>
+      )}
+      {solidPaint ? (
         <input
-          type="color"
-          value={`#${hex.toLowerCase()}`}
-          onChange={(e) => onChange({ ...paint, color: hexToRgb(e.target.value) }, true)}
-          onBlur={() => editor.doc.endGesture()}
+          className="hex-input"
+          value={text}
+          aria-label="Hex color"
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            if (/^#?[0-9a-f]{3}([0-9a-f]{3})?$/i.test(text.trim())) onChange({ ...solidPaint, color: hexToRgb(text) }, false);
+            else setText(hex);
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
         />
-      </label>
-      <input
-        className="hex-input"
-        value={text}
-        aria-label="Hex color"
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          if (/^#?[0-9a-f]{3}([0-9a-f]{3})?$/i.test(text.trim())) onChange({ ...paint, color: hexToRgb(text) }, false);
-          else setText(hex);
-        }}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      />
+      ) : (
+        <button type="button" className="paint-label" onClick={openHere}>
+          {label}
+        </button>
+      )}
       <div className="paint-opacity">
         <NumberField
           label=""

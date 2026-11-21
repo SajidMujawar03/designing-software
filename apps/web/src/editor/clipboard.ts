@@ -1,4 +1,4 @@
-import type { DesignDocument, NodeId, SceneNode } from '@figma/document';
+import { isGroupLike, type DesignDocument, type NodeId, type SceneNode } from '@figma/document';
 import type { Vec2 } from '@figma/geometry';
 import { nanoid } from 'nanoid';
 import { placementIn, worldCenter, worldRotation } from './transforms';
@@ -25,7 +25,7 @@ export function serializeNodes(doc: DesignDocument, ids: NodeId[]): ClipboardDat
   const descendants = ids.flatMap((id) => doc.descendants(id));
   const inGroup: ClipboardData['inGroup'] = {};
   for (const d of descendants) {
-    if (doc.get(d.parentId)?.type === 'GROUP') {
+    if (isGroupLike(doc.get(d.parentId))) {
       inGroup[d.id] = { center: worldCenter(doc, d.id), rotation: worldRotation(doc, d.id) };
     }
   }

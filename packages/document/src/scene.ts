@@ -17,7 +17,8 @@ import {
   type Vec2,
 } from '@figma/geometry';
 import type { DesignDocument } from './document';
-import { hasOwnTransform, type NodeId, type SceneNode } from './types';
+import { hasOwnTransform, isGroupLike, type NodeId, type SceneNode } from './types';
+import { shapePaths, vectorContainsPoint } from './vector';
 
 const DEG = Math.PI / 180;
 
@@ -53,7 +54,7 @@ export const boxOf = (n: SceneNode): Rect => ({ x: 0, y: 0, width: n.width, heig
 /** Axis-aligned bounds on the canvas. A group's bounds are its children's. */
 export function worldBounds(doc: DesignDocument, id: NodeId): Rect {
   const n = doc.get(id)!;
-  if (n.type === 'GROUP') {
+  if (isGroupLike(n)) {
     const kids = doc.childIds(id).filter((c) => doc.get(c)!.visible);
     return rectUnion(kids.map((c) => worldBounds(doc, c))) ?? { x: 0, y: 0, width: 0, height: 0 };
   }
@@ -79,7 +80,7 @@ export function isEffectivelyLocked(doc: DesignDocument, id: NodeId): boolean {
 
 /** Does the node's own shape contain the canvas-space point? */
 export function shapeContainsPoint(doc: DesignDocument, n: SceneNode, p: Vec2, tolerance: number): boolean {
-  if (n.type === 'GROUP') return doc.children(n.id).some((c) => c.visible && shapeContainsPoint(doc, c, p, tolerance));
+  if (isGroupLike(n)) return doc.children(n.id).some((c) => c.visible && shapeContainsPoint(doc, c, p, tolerance));
   const local = applyToPoint(invert(worldTransform(doc, n.id)), p);
   const grown = { x: -tolerance, y: -tolerance, width: n.width + tolerance * 2, height: n.height + tolerance * 2 };
   switch (n.type) {
@@ -87,6 +88,11 @@ export function shapeContainsPoint(doc: DesignDocument, n: SceneNode, p: Vec2, t
       return ellipseContainsPoint(grown, local);
     case 'LINE':
       return distanceToSegment(local, { x: 0, y: 0 }, { x: n.width, y: 0 }) <= Math.max(tolerance, n.strokeWeight / 2);
+    case 'VECTOR':
+      return vectorContainsPoint(n, local, tolerance);
+    case 'POLYGON':
+    case 'STAR':
+      return vectorContainsPoint(n, local, tolerance, shapePaths(n));
     default:
       return rectContainsPoint(grown, local);
   }
@@ -110,7 +116,7 @@ export function hitTest(doc: DesignDocument, pageId: NodeId, p: Vec2, opts: HitT
       const n = kids[i];
       if (!n.visible || n.locked || opts.exclude?.has(n.id)) continue;
       const inside = shapeContainsPoint(doc, n, p, n.type === 'FRAME' ? 0 : tol);
-      if (n.type === 'GROUP') {
+      if (isGroupLike(n)) {
         if (opts.framesOnly) continue;
         const child = visit(n.id);
         if (child) return child;
@@ -141,7 +147,7 @@ export function nodesInRect(doc: DesignDocument, pageId: NodeId, r: Rect, deep =
       const b = worldBounds(doc, n.id);
       if (!rectIntersects(b, r)) continue;
       const hasKids = doc.childIds(n.id).length > 0;
-      if (n.type === 'GROUP') {
+      if (isGroupLike(n)) {
         if (deep) visit(n.id, false);
         else out.push(n);
         continue;
@@ -170,7 +176,7 @@ export function selectableAncestor(doc: DesignDocument, hitId: NodeId, selection
   // Ancestors from the hit upward, stopping at the first non-group.
   const chain: NodeId[] = [];
   for (const a of doc.ancestors(hitId)) {
-    if (a.type !== 'GROUP') break;
+    if (!isGroupLike(a)) break;
     chain.push(a.id);
   }
   // Outermost group first; descend while that group is entered.

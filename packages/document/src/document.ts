@@ -2,7 +2,8 @@ import { generateKeyBetween } from 'fractional-indexing';
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { defaultProps } from './defaults';
-import type { NodeId, NodePatch, NodeType, SceneNode } from './types';
+import { isGroupLike, type NodeId, type NodePatch, type NodeType, type SceneNode } from './types';
+import { scalePaths } from './vector';
 
 export const ROOT_ID = 'root';
 
@@ -38,6 +39,8 @@ export class DesignDocument {
   readonly ydoc: Y.Doc;
   readonly yNodes: Y.Map<YNode>;
   readonly undoManager: Y.UndoManager;
+  /** Image files by content hash. Kept outside undo history; nodes refer to them by hash. */
+  readonly yImages: Y.Map<Uint8Array>;
 
   private nodes = new Map<NodeId, SceneNode>();
   private childrenCache = new Map<NodeId, NodeId[]>();
@@ -48,6 +51,7 @@ export class DesignDocument {
   constructor(ydoc: Y.Doc = new Y.Doc()) {
     this.ydoc = ydoc;
     this.yNodes = ydoc.getMap<YNode>('nodes');
+    this.yImages = ydoc.getMap<Uint8Array>('images');
     this.undoManager = new Y.UndoManager(this.yNodes, {
       trackedOrigins: new Set([LOCAL_ORIGIN]),
       captureTimeout: Number.POSITIVE_INFINITY,
@@ -146,6 +150,16 @@ export class DesignDocument {
     return out;
   }
 
+  /** Encoded bytes of a stored image, if present. */
+  getImage(hash: string): Uint8Array | undefined {
+    return this.yImages.get(hash);
+  }
+
+  /** Stores image bytes under their hash (no-op if already stored). */
+  addImage(hash: string, bytes: Uint8Array): void {
+    if (!this.yImages.has(hash)) this.ydoc.transact(() => this.yImages.set(hash, bytes));
+  }
+
   // ---------------------------------------------------------------- writing
 
   /** Runs `fn` as one transaction and (unless merging) one undo step. */
@@ -178,6 +192,7 @@ export class DesignDocument {
   updateNode(id: NodeId, patch: NodePatch): void {
     const y = this.yNodes.get(id);
     if (!y) return;
+    patch = this.withScaledPaths(id, patch);
     this.change(() => {
       for (const [k, v] of Object.entries(patch)) {
         if (v === undefined) continue;
@@ -286,11 +301,21 @@ export class DesignDocument {
 
   // ---------------------------------------------------------------- internals
 
-  /** Groups only exist to hold children: an empty group is removed (and so on upward). */
+  /** Resizing a vector's box scales its paths with it (unless new paths are given). */
+  private withScaledPaths(id: NodeId, patch: NodePatch): NodePatch {
+    const n = this.nodes.get(id);
+    if (n?.type !== 'VECTOR' || patch.vectorPaths || (patch.width === undefined && patch.height === undefined)) return patch;
+    const w1 = patch.width ?? n.width;
+    const h1 = patch.height ?? n.height;
+    if (w1 === n.width && h1 === n.height) return patch;
+    return { ...patch, vectorPaths: scalePaths(n.vectorPaths ?? [], n.width, n.height, w1, h1) };
+  }
+
+  /** Groups and booleans only exist to hold children: an empty one is removed (and so on upward). */
   private pruneEmptyGroup(id: NodeId): void {
     const n = this.nodes.get(id);
-    if (n?.type !== 'GROUP' || this.childIds(id).length > 0) return;
-    const parent = n.parentId;
+    if (!isGroupLike(n) || this.childIds(id).length > 0) return;
+    const parent = n!.parentId;
     this.yNodes.delete(id);
     this.refresh(id, true);
     if (parent) this.pruneEmptyGroup(parent);

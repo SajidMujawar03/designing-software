@@ -1,7 +1,13 @@
-import { worldBounds, worldTransform, type NodeId } from '@figma/document';
+import { isGroupLike, worldBounds, worldTransform, type NodeId } from '@figma/document';
 import { applyToPoint, multiply, type Mat2D } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { CORNERS, getSelectionFrame, handleWorldPoint } from './handles';
+import { segmentsOf, type VectorPath } from '@figma/document';
+import { traceVector } from '@figma/renderer';
+import type { PointRef } from '../store';
+import { visibleHandles } from '../tools/vector';
+import { worldPathsOf } from '../transforms';
+import { drawGradientHandles } from './gradientHandles';
 import { drawRulers } from './rulers';
 
 export const BLUE = '#0D99FF';
@@ -35,7 +41,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   const outline = (id: NodeId, width: number) => {
     const n = doc.get(id);
     if (!n) return;
-    if (n.type === 'GROUP') {
+    if (isGroupLike(n)) {
       const b = worldBounds(doc, id);
       const a = ed.worldToScreen({ x: b.x, y: b.y });
       ctx.lineWidth = width;
@@ -50,7 +56,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     else if (n.type === 'LINE') {
       ctx.moveTo(0, 0);
       ctx.lineTo(n.width, 0);
-    } else ctx.rect(0, 0, n.width, n.height);
+    } else if (n.type === 'VECTOR') traceVector(ctx, n);
+    else ctx.rect(0, 0, n.width, n.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineWidth = width;
     ctx.strokeStyle = BLUE;
@@ -147,6 +154,24 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     }
   }
 
+  const ve = ed.ui.vectorEdit;
+  if (ve && doc.has(ve.id)) drawVectorEdit(ctx, ed, worldPathsOf(doc, ve.id), ve.selected);
+  else if (ed.ui.tool === 'pen' && selection.length === 1 && doc.get(selection[0])?.type === 'VECTOR') {
+    drawVectorEdit(ctx, ed, worldPathsOf(doc, selection[0]), []);
+  }
+  const pen = ed.ui.penPreview;
+  if (pen) {
+    const a = ed.worldToScreen(pen.from);
+    const c = ed.worldToScreen(pen.c1);
+    const b = ed.worldToScreen(pen.to);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.bezierCurveTo(c.x, c.y, b.x, b.y, b.x, b.y);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = BLUE;
+    ctx.stroke();
+  }
+
   if (marquee) {
     const a = ed.worldToScreen({ x: marquee.x, y: marquee.y });
     const w = marquee.width * viewport.zoom;
@@ -158,6 +183,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(w), Math.round(h));
   }
 
+  drawGradientHandles(ctx, ed);
   if (ed.ui.showRulers) drawRulers(ctx, ed);
 
   ctx.restore();
@@ -197,4 +223,55 @@ function ellipsize(ctx: CanvasRenderingContext2D, s: string, max: number): strin
   let t = s;
   while (t.length > 1 && ctx.measureText(t + '…').width > max) t = t.slice(0, -1);
   return t + '…';
+}
+
+/** Vector edit mode: the path, its points and the handles of selected points. */
+function drawVectorEdit(ctx: CanvasRenderingContext2D, ed: Editor, paths: VectorPath[], selected: PointRef[]): void {
+  const S = (p: { x: number; y: number }) => ed.worldToScreen(p);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = BLUE;
+  ctx.beginPath();
+  for (const path of paths) {
+    if (!path.points.length) continue;
+    const f = S(path.points[0]);
+    ctx.moveTo(f.x, f.y);
+    for (const s of segmentsOf(path)) {
+      const c1 = S(s.c1);
+      const c2 = S(s.c2);
+      const p3 = S(s.p3);
+      ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, p3.x, p3.y);
+    }
+    if (path.closed) ctx.closePath();
+  }
+  ctx.stroke();
+
+  for (const h of visibleHandles(paths, selected)) {
+    const v = paths[h.ref[0]].points[h.ref[1]];
+    const off = v[h.side]!;
+    const a = S(v);
+    const b = S({ x: v.x + off.x, y: v.y + off.y });
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = BLUE;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  paths.forEach((path, pi) =>
+    path.points.forEach((v, i) => {
+      const p = S(v);
+      const sel = selected.some((r) => r[0] === pi && r[1] === i);
+      ctx.beginPath();
+      ctx.rect(Math.round(p.x) - 3.5, Math.round(p.y) - 3.5, 7, 7);
+      ctx.fillStyle = sel ? BLUE : '#FFFFFF';
+      ctx.fill();
+      ctx.strokeStyle = BLUE;
+      ctx.stroke();
+    }),
+  );
 }

@@ -214,8 +214,15 @@ button {
 }
 
 .canvas-wrap canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
   touch-action: none;
+}
+
+.scene-canvas {
+  pointer-events: none;
 }
 
 .text-editor {
@@ -704,4 +711,283 @@ button {
 
 .preset:hover {
   background: var(--hover);
+}
+
+.btn.small {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ---------- paint editor ---------- */
+
+button.swatch {
+  border: 0;
+  padding: 0;
+}
+
+.swatch.large {
+  width: 28px;
+  height: 28px;
+}
+
+.paint-row.open {
+  background: var(--blue-soft);
+  border-radius: 4px;
+}
+
+.paint-label {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--hover);
+  text-align: left;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.paint-label:hover {
+  border-color: var(--border);
+}
+
+.paint-popover {
+  position: fixed;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  z-index: 40;
+  width: 248px;
+  padding: 8px 12px 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popover-head {
+  display: flex;
+  align-items: center;
+}
+
+.color-fields {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gradient-editor,
+.image-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-editor .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gradient-bar {
+  position: relative;
+  height: 24px;
+  margin: 6px 6px 4px;
+  border-radius: 4px;
+  background: repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 8px 8px;
+  cursor: copy;
+}
+
+.gradient-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.gradient-bar .stop {
+  position: absolute;
+  top: -4px;
+  width: 12px;
+  height: 32px;
+  margin-left: -6px;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  cursor: ew-resize;
+  padding: 0;
+}
+
+.gradient-bar .stop.selected {
+  box-shadow: 0 0 0 2px var(--blue);
+}
+
+.stop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stop-pos {
+  width: 64px;
+}
+
+.paint-opacity.wide {
+  width: 100%;
+}
+
+/* ---------- color picker ---------- */
+
+.color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv-square {
+  position: relative;
+  height: 160px;
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.sv-white,
+.sv-black {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+}
+
+.sv-white {
+  background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0));
+}
+
+.sv-black {
+  background: linear-gradient(0deg, #000, rgba(0, 0, 0, 0));
+}
+
+.sv-thumb {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sliders {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slider {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.slider.hue {
+  background: linear-gradient(90deg, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00);
+}
+
+.slider.alpha {
+  background: repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 8px 8px;
+}
+
+.alpha-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
+
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.format-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.format-row > .select {
+  width: 58px;
+  flex-shrink: 0;
+}
+
+.triple {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  min-width: 0;
+}
+
+.triple .num-field input {
+  padding: 0 4px;
+}
+
+.doc-colors {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.doc-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.doc-swatch {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  padding: 0;
+}
+
+.effect-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0 6px 28px;
+}
+
+.select.grow,
+.hint.grow {
+  flex: 1;
+  min-width: 0;
 }

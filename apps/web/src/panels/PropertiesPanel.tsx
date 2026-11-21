@@ -1,5 +1,9 @@
-import { solid, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
+import { defaultEffect, isGroupLike, rgbaCss, solid, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
+  Eye,
+  EyeOff,
+  Minus,
+  SlidersHorizontal,
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignEndHorizontal,
@@ -21,13 +25,26 @@ import {
 import { useState } from 'react';
 import { editor } from '../editor/editor';
 import { exportJson, exportPng, exportSvgFile } from '../editor/export';
+import { booleanSelection, flattenSelection, outlineStrokeSelection } from '../editor/pathCommands';
+import { FONT_FAMILIES, weightsOf } from '../editor/fonts';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
 import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
+import { ColorPicker } from './ColorPicker';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 
-const FONTS = ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Playfair Display', 'Merriweather', 'Source Code Pro'];
-const WEIGHTS: Array<[number, string]> = [
+const WEIGHT_NAMES: Record<number, string> = {
+  100: 'Thin',
+  200: 'Extra Light',
+  300: 'Light',
+  400: 'Regular',
+  500: 'Medium',
+  600: 'Semi Bold',
+  700: 'Bold',
+  800: 'Extra Bold',
+  900: 'Black',
+};
+const DEFAULT_WEIGHTS: Array<[number, string]> = [
   [300, 'Light'],
   [400, 'Regular'],
   [500, 'Medium'],
@@ -76,7 +93,7 @@ export function PropertiesPanel() {
 
       <AlignBar count={editor.topLevelSelection().length} />
 
-      {nodes.some((n) => n.type === 'GROUP') ? (
+      {nodes.some((n) => isGroupLike(n)) ? (
         <BoxLayout ids={ids} />
       ) : (
       <Section title="Layout">
@@ -129,6 +146,8 @@ export function PropertiesPanel() {
       </Section>
       )}
 
+      <ShapeSection ids={ids} nodes={nodes} />
+
       <Section title="Layer">
         <div className="grid2">
           <NumberField
@@ -140,6 +159,7 @@ export function PropertiesPanel() {
             precision={0}
             onChange={(v, live) => apply(ids, { opacity: v / 100 }, live)}
           />
+          <BlendSelect ids={ids} nodes={nodes} />
         </div>
       </Section>
 
@@ -147,18 +167,9 @@ export function PropertiesPanel() {
 
       {!isLine && <PaintsSection title="Fill" ids={ids} nodes={nodes} prop="fills" />}
       <PaintsSection title="Stroke" ids={ids} nodes={nodes} prop="strokes" />
-      {nodes.some((n) => n.strokes.length > 0) && (
-        <div className="section-body tight">
-          <div className="grid2">
-            <NumberField
-              label="Weight"
-              value={num('strokeWeight')}
-              min={0}
-              onChange={(v, live) => apply(ids, { strokeWeight: v }, live)}
-            />
-          </div>
-        </div>
-      )}
+      {nodes.some((n) => n.strokes.length > 0) && <StrokeOptions ids={ids} nodes={nodes} />}
+
+      <EffectsSection ids={ids} nodes={nodes} />
 
       <ExportSection ids={ids} />
     </div>
@@ -180,7 +191,7 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
         aria-label="Font family"
       >
         {family === MIXED && <option value="">Mixed</option>}
-        {FONTS.map((f) => (
+        {FONT_FAMILIES.map((f) => (
           <option key={f}>{f}</option>
         ))}
       </select>
@@ -192,7 +203,7 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           aria-label="Font weight"
         >
           {weight === MIXED && <option value="">Mixed</option>}
-          {WEIGHTS.map(([w, label]) => (
+          {weightOptions(family ?? 'Inter').map(([w, label]) => (
             <option key={w} value={w}>
               {label}
             </option>
@@ -259,6 +270,7 @@ function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]
       return { [prop]: [...(paints === MIXED ? [] : n[prop]), solid(color)] } as NodePatch;
     });
   const set = (next: Paint[], live: boolean) => apply(ids, { [prop]: next } as NodePatch, live);
+  const paintEdit = useUI((s) => s.paintEdit);
 
   return (
     <Section
@@ -279,8 +291,13 @@ function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]
             <PaintRow
               key={i}
               paint={p}
+              open={paintEdit?.prop === prop && paintEdit.index === i}
+              onOpen={(r) => editor.setUI({ paintEdit: { ids, prop, index: i, stop: 0, anchor: { x: r.left, y: r.top } } })}
               onChange={(np, live) => set(paints.map((q, j) => (j === i ? np : q)), live)}
-              onRemove={() => set(paints.filter((_, j) => j !== i), false)}
+              onRemove={() => {
+                editor.setUI({ paintEdit: null });
+                set(paints.filter((_, j) => j !== i), false);
+              }}
             />
           ))
       )}
@@ -294,7 +311,7 @@ function ExportSection({ ids }: { ids: NodeId[] }) {
   const run = async () => {
     for (const id of ids) {
       if (format === 'PNG') await exportPng(id, scale);
-      else exportSvgFile(id);
+      else await exportSvgFile(id);
     }
   };
   return (
@@ -322,6 +339,7 @@ function ExportSection({ ids }: { ids: NodeId[] }) {
 function PageProperties() {
   const pageId = useUI((s) => s.pageId);
   const page = editor.doc.get(pageId);
+  const paintEdit = useUI((s) => s.paintEdit);
   if (!page) return null;
   const bg = page.fills[0] ?? solid('#F5F5F5');
   return (
@@ -333,6 +351,11 @@ function PageProperties() {
       <Section title="Background">
         <PaintRow
           paint={bg}
+          open={paintEdit?.ids[0] === page.id}
+          onOpen={(r) => {
+            if (!page.fills.length) apply([page.id], { fills: [bg] });
+            editor.setUI({ paintEdit: { ids: [page.id], prop: 'fills', index: 0, stop: 0, anchor: { x: r.left, y: r.top } } });
+          }}
           onChange={(p, live) => apply([page.id], { fills: [{ ...p, opacity: 1, visible: true }] }, live)}
           onRemove={() => apply([page.id], { fills: [] })}
         />
@@ -486,5 +509,306 @@ function FramePresets() {
         </Section>
       ))}
     </div>
+  );
+}
+
+/** Weights the selected family ships with (all families' defaults when mixed). */
+function weightOptions(family: string | Mixed): Array<[number, string]> {
+  const ws = family === MIXED ? [] : weightsOf(family);
+  return ws.length ? ws.map((w) => [w, WEIGHT_NAMES[w] ?? String(w)]) : DEFAULT_WEIGHTS;
+}
+
+/** Two overlapping squares showing each operation's result. */
+function BooleanIcon({ op }: { op: BooleanOperation }) {
+  const outline = { fill: 'none', stroke: 'currentColor', strokeWidth: 1, opacity: 0.45 };
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+      {op === 'UNION' && <path d="M1 1h8v4h4v8H5V9H1z" fill="currentColor" />}
+      {op === 'SUBTRACT' && (
+        <>
+          <path d="M1 1h8v4H5v4H1z" fill="currentColor" />
+          <rect x="5.5" y="5.5" width="7" height="7" {...outline} />
+        </>
+      )}
+      {op === 'INTERSECT' && (
+        <>
+          <rect x="1.5" y="1.5" width="7" height="7" {...outline} />
+          <rect x="5.5" y="5.5" width="7" height="7" {...outline} />
+          <rect x="5" y="5" width="4" height="4" fill="currentColor" />
+        </>
+      )}
+      {op === 'EXCLUDE' && <path d="M1 1h8v8H1zM5 5h8v8H5z" fill="currentColor" fillRule="evenodd" />}
+    </svg>
+  );
+}
+
+const BOOLEAN_OPS: Array<[BooleanOperation, string]> = [
+  ['UNION', 'Union (Ctrl+Alt+U)'],
+  ['SUBTRACT', 'Subtract (Ctrl+Alt+S)'],
+  ['INTERSECT', 'Intersect (Ctrl+Alt+I)'],
+  ['EXCLUDE', 'Exclude (Ctrl+Alt+X)'],
+];
+
+/** Polygon/star settings, boolean operation, and flatten / outline stroke. */
+function ShapeSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const radial = nodes.every((n) => n.type === 'POLYGON' || n.type === 'STAR');
+  const stars = nodes.every((n) => n.type === 'STAR');
+  const single = nodes.length === 1 ? nodes[0] : null;
+  const isBoolean = single?.type === 'BOOLEAN';
+  const top = editor.topLevelSelection().length;
+  const canCombine = top >= 2 || isBoolean;
+  const count = common(nodes.map((n) => n.pointCount ?? 0));
+  const ratio = common(nodes.map((n) => Math.round((n.innerRadius ?? 0) * 100)));
+  const hasStroke = nodes.some((n) => n.strokeWeight > 0 && n.strokes.some((st) => st.visible));
+  const canFlatten = nodes.some((n) => n.type !== 'TEXT');
+
+  if (!radial && !canCombine && !canFlatten) return null;
+  return (
+    <Section title={isBoolean ? 'Boolean' : 'Shape'}>
+      {radial && (
+        <div className="grid2">
+          <NumberField
+            label="Count"
+            title={stars ? 'Number of points' : 'Number of sides'}
+            value={count}
+            min={3}
+            max={60}
+            precision={0}
+            onChange={(v, live) => apply(ids, { pointCount: Math.round(v) }, live)}
+          />
+          {stars && (
+            <NumberField
+              label="Ratio"
+              title="Inner radius"
+              value={ratio}
+              suffix="%"
+              min={1}
+              max={100}
+              precision={0}
+              onChange={(v, live) => apply(ids, { innerRadius: v / 100 }, live)}
+            />
+          )}
+        </div>
+      )}
+      <div className="button-row">
+        {BOOLEAN_OPS.map(([op, label]) => (
+          <IconButton
+            key={op}
+            title={label}
+            disabled={!canCombine}
+            active={isBoolean && single?.booleanOperation === op}
+            onClick={() => booleanSelection(editor, op)}
+          >
+            <BooleanIcon op={op} />
+          </IconButton>
+        ))}
+        <span className="spacer" />
+        <button type="button" className="btn small" disabled={!canFlatten} onClick={() => void flattenSelection(editor)} title="Flatten (Ctrl+E)">
+          Flatten
+        </button>
+        <button
+          type="button"
+          className="btn small"
+          disabled={!hasStroke}
+          onClick={() => void outlineStrokeSelection(editor)}
+          title="Outline stroke (Ctrl+Alt+O)"
+        >
+          Outline
+        </button>
+      </div>
+    </Section>
+  );
+}
+
+/** Stroke weight, position (inside/center/outside), dashes, ends and corners. */
+function StrokeOptions({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const val = <T,>(f: (n: SceneNode) => T) => common(nodes.map(f));
+  const weight = val((n) => n.strokeWeight);
+  const align = val((n) => n.strokeAlign ?? 'CENTER');
+  const cap = val((n) => n.strokeCap ?? 'NONE');
+  const join = val((n) => n.strokeJoin ?? 'MITER');
+  const dash = val((n) => n.dashPattern?.[0] ?? 0);
+  const gap = val((n) => n.dashPattern?.[1] ?? n.dashPattern?.[0] ?? 0);
+  const hasOpen = nodes.some((n) => n.type === 'LINE' || (n.type === 'VECTOR' && (n.vectorPaths ?? []).some((p) => !p.closed)));
+  const setDash = (d: number, g: number, live: boolean) => apply(ids, { dashPattern: d > 0 ? [d, g > 0 ? g : d] : [] }, live);
+  const select = <T extends string>(label: string, value: T | Mixed, options: Array<[T, string]>, onPick: (v: T) => void) => (
+    <select className="select" value={value === MIXED ? '' : value} onChange={(e) => onPick(e.target.value as T)} aria-label={label} title={label}>
+      {value === MIXED && <option value="">Mixed</option>}
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>
+          {l}
+        </option>
+      ))}
+    </select>
+  );
+  return (
+    <div className="section-body tight">
+      <div className="grid2">
+        <NumberField label="Weight" value={weight} min={0} onChange={(v, live) => apply(ids, { strokeWeight: v }, live)} />
+        {select('Stroke position', align, [['INSIDE', 'Inside'], ['CENTER', 'Center'], ['OUTSIDE', 'Outside']], (v) =>
+          apply(ids, { strokeAlign: v }),
+        )}
+        <NumberField
+          label="Dash"
+          title="Dash length (0 = solid)"
+          value={dash}
+          min={0}
+          onChange={(v, live) => setDash(v, gap === MIXED ? v : gap, live)}
+        />
+        <NumberField
+          label="Gap"
+          title="Gap between dashes"
+          value={gap}
+          min={0}
+          onChange={(v, live) => setDash(dash === MIXED || dash === 0 ? v : dash, v, live)}
+        />
+        {select('Corners', join, [['MITER', 'Miter'], ['ROUND', 'Round'], ['BEVEL', 'Bevel']], (v) => apply(ids, { strokeJoin: v }))}
+        {hasOpen &&
+          select('Ends', cap, [['NONE', 'Flat ends'], ['ROUND', 'Round ends'], ['SQUARE', 'Square ends']], (v) =>
+            apply(ids, { strokeCap: v }),
+          )}
+      </div>
+    </div>
+  );
+}
+
+const BLEND_MODES: Array<[BlendMode, string]> = [
+  ['NORMAL', 'Normal'],
+  ['DARKEN', 'Darken'],
+  ['MULTIPLY', 'Multiply'],
+  ['COLOR_BURN', 'Color burn'],
+  ['LIGHTEN', 'Lighten'],
+  ['SCREEN', 'Screen'],
+  ['COLOR_DODGE', 'Color dodge'],
+  ['OVERLAY', 'Overlay'],
+  ['SOFT_LIGHT', 'Soft light'],
+  ['HARD_LIGHT', 'Hard light'],
+  ['DIFFERENCE', 'Difference'],
+  ['EXCLUSION', 'Exclusion'],
+  ['HUE', 'Hue'],
+  ['SATURATION', 'Saturation'],
+  ['COLOR', 'Color'],
+  ['LUMINOSITY', 'Luminosity'],
+];
+
+function BlendSelect({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const mode = common(nodes.map((n) => n.blendMode ?? 'NORMAL'));
+  return (
+    <select
+      className="select"
+      value={mode === MIXED ? '' : mode}
+      onChange={(e) => apply(ids, { blendMode: e.target.value as BlendMode })}
+      aria-label="Blend mode"
+      title="Blend mode"
+    >
+      {mode === MIXED && <option value="">Mixed</option>}
+      {BLEND_MODES.map(([m, label]) => (
+        <option key={m} value={m}>
+          {label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+const EFFECT_TYPES: Array<[Effect['type'], string]> = [
+  ['DROP_SHADOW', 'Drop shadow'],
+  ['INNER_SHADOW', 'Inner shadow'],
+  ['LAYER_BLUR', 'Layer blur'],
+  ['BACKGROUND_BLUR', 'Background blur'],
+];
+
+/** Shadows and blurs, each with its own settings. */
+function EffectsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const effects = common(nodes.map((n) => n.effects ?? []));
+  const [open, setOpen] = useState<number | null>(null);
+  const [colorOpen, setColorOpen] = useState(false);
+  const set = (next: Effect[], live = false) => apply(ids, { effects: next }, live);
+  const list = effects === MIXED ? [] : effects;
+  const update = (i: number, patch: Partial<Effect>, live = false) =>
+    set(list.map((e, j) => (j === i ? ({ ...e, ...patch } as Effect) : e)), live);
+
+  return (
+    <Section
+      title="Effects"
+      actions={
+        <IconButton
+          title="Add effect"
+          onClick={() => {
+            set([...(effects === MIXED ? [] : effects), defaultEffect('DROP_SHADOW')]);
+            setOpen(list.length);
+          }}
+        >
+          <Plus size={14} />
+        </IconButton>
+      }
+    >
+      {effects === MIXED ? (
+        <div className="hint">Mixed — click + to replace</div>
+      ) : (
+        list.map((e, i) => (
+          <div key={i} className="effect">
+            <div className={`paint-row${e.visible ? '' : ' muted'}`}>
+              <IconButton title="Effect settings" active={open === i} onClick={() => setOpen(open === i ? null : i)}>
+                <SlidersHorizontal size={13} />
+              </IconButton>
+              <select
+                className="select grow"
+                value={e.type}
+                aria-label="Effect type"
+                onChange={(ev) => {
+                  const type = ev.target.value as Effect['type'];
+                  const next = defaultEffect(type);
+                  set(list.map((x, j) => (j === i ? ({ ...next, radius: x.radius, visible: x.visible } as Effect) : x)));
+                }}
+              >
+                {EFFECT_TYPES.map(([t, label]) => (
+                  <option key={t} value={t}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <IconButton title={e.visible ? 'Hide' : 'Show'} onClick={() => update(i, { visible: !e.visible })}>
+                {e.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+              </IconButton>
+              <IconButton title="Remove" onClick={() => set(list.filter((_, j) => j !== i))}>
+                <Minus size={14} />
+              </IconButton>
+            </div>
+            {open === i && (
+              <div className="effect-body">
+                {e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW' ? (
+                  <>
+                    <div className="grid2">
+                      <NumberField label="X" value={e.offset.x} onChange={(v, live) => update(i, { offset: { ...e.offset, x: v } }, live)} />
+                      <NumberField label="Y" value={e.offset.y} onChange={(v, live) => update(i, { offset: { ...e.offset, y: v } }, live)} />
+                      <NumberField label="Blur" value={e.radius} min={0} onChange={(v, live) => update(i, { radius: v }, live)} />
+                      <NumberField label="Spread" value={e.spread} onChange={(v, live) => update(i, { spread: v }, live)} />
+                    </div>
+                    <div className="paint-row">
+                      <button type="button" className="swatch" title="Shadow color" onClick={() => setColorOpen(!colorOpen)}>
+                        <span className="swatch-color" style={{ background: rgbaCss(e.color, e.opacity) }} />
+                      </button>
+                      <span className="hint grow">Color · {Math.round(e.opacity * 100)}%</span>
+                    </div>
+                    {colorOpen && (
+                      <ColorPicker
+                        color={e.color}
+                        opacity={e.opacity}
+                        onChange={(color, opacity, live) => update(i, { color, opacity }, live)}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="grid2">
+                    <NumberField label="Blur" value={e.radius} min={0} onChange={(v, live) => update(i, { radius: v }, live)} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </Section>
   );
 }

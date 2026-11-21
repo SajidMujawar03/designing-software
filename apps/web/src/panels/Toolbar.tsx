@@ -1,4 +1,4 @@
-import { Circle, Frame, Hand, Minus, MousePointer2, Redo2, Square, Type, Undo2 } from 'lucide-react';
+import { Circle, Frame, Hand, Minus, MousePointer2, PenTool, Pencil, Redo2, Square, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -9,7 +9,11 @@ const TOOLS: Array<{ id: ToolId; label: string; key: string; Icon: typeof Square
   { id: 'frame', label: 'Frame', key: 'F', Icon: Frame },
   { id: 'rectangle', label: 'Rectangle', key: 'R', Icon: Square },
   { id: 'ellipse', label: 'Ellipse', key: 'O', Icon: Circle },
+  { id: 'polygon', label: 'Polygon', key: 'Shift+G', Icon: Triangle },
+  { id: 'star', label: 'Star', key: 'Shift+S', Icon: Star },
   { id: 'line', label: 'Line', key: 'L', Icon: Minus },
+  { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
+  { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   { id: 'text', label: 'Text', key: 'T', Icon: Type },
   { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
 ];

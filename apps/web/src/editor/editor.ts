@@ -1,10 +1,12 @@
 import { DesignDocument, ROOT_ID, type NodeId, type SceneNode } from '@figma/document';
 import { type Rect, type Vec2 } from '@figma/geometry';
 import { insertNodes, parseClipboard, serializeNodes, type ClipboardData } from './clipboard';
+import { importImages } from './images';
+import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
 import { useUI, type ToolId, type UIState, type Viewport } from './store';
 import { boundsOf, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
-import { worldBounds } from '@figma/document';
+import { isGroupLike, worldBounds } from '@figma/document';
 
 const LAST_PAGE_KEY = 'figma-clone:last-page';
 export const MIN_ZOOM = 0.02;
@@ -17,8 +19,14 @@ export const MAX_ZOOM = 256;
 export class Editor {
   readonly doc = new DesignDocument();
   canvasSize = { width: 800, height: 600 };
+  /** The renderer currently drawing the canvas (set by the canvas view). */
+  renderer: SceneRenderer | null = null;
   /** Aborts the in-progress pointer gesture (set by the canvas view). */
   cancelGesture: () => void = () => {};
+  /** Lets the active tool handle a key first (set by the canvas view). */
+  toolKey: (e: KeyboardEvent) => boolean = () => false;
+  /** Tells the previous tool it is no longer active (set by the canvas view). */
+  toolDeactivated: (tool: ToolId) => void = () => {};
   private internalClipboard: ClipboardData | null = null;
 
   constructor() {
@@ -54,7 +62,9 @@ export class Editor {
   // ------------------------------------------------------------ selection
 
   select(ids: NodeId[]): void {
-    this.setUI({ selection: ids });
+    const pe = this.ui.paintEdit;
+    const keep = pe && pe.ids.length === ids.length && pe.ids.every((id) => ids.includes(id));
+    this.setUI({ selection: ids, ...(keep ? {} : { paintEdit: null }) });
   }
 
   toggleSelected(id: NodeId): void {
@@ -100,6 +110,16 @@ export class Editor {
     if (hoverId && !this.doc.has(hoverId)) patch.hoverId = null;
     if (editingTextId && !this.doc.has(editingTextId)) patch.editingTextId = null;
     if (pageId && !this.doc.has(pageId)) patch.pageId = this.doc.pages()[0]?.id ?? null;
+    const ve = this.ui.vectorEdit;
+    if (ve) {
+      // Undo/redo or remote edits can remove points: drop stale references.
+      const paths = this.doc.get(ve.id)?.vectorPaths;
+      if (!paths) patch.vectorEdit = null;
+      else {
+        const valid = ve.selected.filter(([p, i]) => i < (paths[p]?.points.length ?? 0));
+        if (valid.length !== ve.selected.length) patch.vectorEdit = { ...ve, selected: valid };
+      }
+    }
     if (Object.keys(patch).length) this.setUI(patch);
   }
 
@@ -138,15 +158,22 @@ export class Editor {
   }
 
   async copy(): Promise<void> {
-    const ids = this.topLevelSelection();
-    if (!ids.length) return;
-    const data = serializeNodes(this.doc, ids);
-    this.internalClipboard = data;
+    const text = this.copyText();
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(JSON.stringify(data));
+      await navigator.clipboard.writeText(text);
     } catch {
       // Clipboard permission denied: the internal clipboard still works.
     }
+  }
+
+  /** Serializes the selection for the clipboard (and keeps an internal copy). */
+  copyText(): string | null {
+    const ids = this.topLevelSelection();
+    if (!ids.length) return null;
+    const data = serializeNodes(this.doc, ids);
+    this.internalClipboard = data;
+    return JSON.stringify(data);
   }
 
   async cut(): Promise<void> {
@@ -154,14 +181,27 @@ export class Editor {
     this.deleteSelection();
   }
 
+  /** Menu "Paste": reads the system clipboard (images first, then layers). */
   async paste(): Promise<void> {
-    let data = this.internalClipboard;
+    let text = '';
     try {
-      const text = await navigator.clipboard.readText();
-      data = parseClipboard(text) ?? data;
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith('image/'));
+        if (type) {
+          await importImages([await item.getType(type)]);
+          return;
+        }
+        if (item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+      }
     } catch {
-      // fall back to the internal clipboard
+      // No clipboard permission: fall back to the internal clipboard.
     }
+    this.pasteText(text);
+  }
+
+  /** Pastes layers from clipboard text (our format), or the internal clipboard. */
+  pasteText(text: string): void {
+    const data = parseClipboard(text) ?? this.internalClipboard;
     if (!data) return;
     const clip = data;
     const sel = this.selectedNodes();
@@ -274,7 +314,7 @@ export class Editor {
   ungroupSelection(): void {
     const containers = this.topLevelSelection().filter((id) => {
       const t = this.doc.get(id)!.type;
-      return t === 'GROUP' || t === 'FRAME';
+      return isGroupLike(this.doc.get(id)) || t === 'FRAME';
     });
     if (!containers.length) return;
     const released: NodeId[] = [];
@@ -305,6 +345,27 @@ export class Editor {
     this.setTool('select');
     this.select([id]);
     this.zoomToRect({ x, y, width, height }, 1);
+  }
+
+  /**
+   * Ctrl+Alt+M: one layer toggles being a mask; several are grouped with the
+   * bottom one masking the rest, like Figma.
+   */
+  useAsMask(): void {
+    const ids = this.sortByZ(this.topLevelSelection());
+    if (!ids.length) return;
+    if (ids.length === 1) {
+      const n = this.doc.get(ids[0])!;
+      this.doc.change(() => this.doc.updateNode(n.id, { isMask: !n.isMask }));
+      return;
+    }
+    this.groupSelection();
+    const group = this.ui.selection[0];
+    const bottom = this.doc.childIds(group)[0];
+    this.doc.change(() => {
+      this.doc.updateNode(bottom, { isMask: true });
+      this.doc.updateNode(group, { name: this.nextName('Mask group', 'GROUP') });
+    });
   }
 
   /** Ctrl+Alt+G: wraps the selection in a frame of the same size. */
@@ -406,7 +467,7 @@ export class Editor {
    */
   snapContext(exclude: NodeId[], parentId: NodeId): SnapContext {
     let ctxId = parentId;
-    while (this.doc.get(ctxId)?.type === 'GROUP') ctxId = this.doc.get(ctxId)!.parentId!;
+    while (isGroupLike(this.doc.get(ctxId))) ctxId = this.doc.get(ctxId)!.parentId!;
     const skip = new Set(exclude);
     const rects: Rect[] = [];
     const container = this.doc.get(ctxId);
@@ -455,6 +516,15 @@ export class Editor {
     this.doc.change(() => this.doc.updateNode(this.pageId, { guides: [] }));
   }
 
+  setRenderer(pref: 'canvaskit' | 'canvas2d'): void {
+    try {
+      localStorage.setItem('figma-clone:renderer', pref);
+    } catch {
+      // storage unavailable
+    }
+    this.setUI({ rendererPref: pref });
+  }
+
   // ------------------------------------------------------------ pages
 
   setPage(pageId: NodeId): void {
@@ -488,7 +558,24 @@ export class Editor {
 
   setTool(tool: ToolId): void {
     this.commitTextEdit();
+    const prev = this.ui.tool;
+    if (prev !== tool) this.toolDeactivated(prev);
+    if (this.ui.vectorEdit && tool !== 'select') this.exitVectorEdit();
     this.setUI({ tool });
+  }
+
+  /** Enter (or double-click): edit the points of the selected vector. */
+  enterVectorEdit(id: NodeId): void {
+    if (this.doc.get(id)?.type !== 'VECTOR') return;
+    this.doc.endGesture();
+    this.setUI({ vectorEdit: { id, selected: [] }, selection: [id], tool: 'select' });
+  }
+
+  exitVectorEdit(): void {
+    const ve = this.ui.vectorEdit;
+    if (!ve) return;
+    this.doc.endGesture();
+    this.setUI({ vectorEdit: null, selection: this.doc.has(ve.id) ? [ve.id] : [] });
   }
 
   /** `isNew`: the node was just created, so creation and typing undo together. */
