@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codeColorRuns, codeTextOf, CODE_THEMES, createCodeBlock, DesignDocument, highlightCodeBlock, setCodeBlockOptions, tokenize, type TokenKind } from './index';
+import { codeColorRuns, snippetTextOf, CODE_THEMES, createCodeSnippet, DesignDocument, highlightCodeSnippet, setCodeSnippetOptions, tokenize, type TokenKind } from './index';
 
 const kinds = (code: string, lang: Parameters<typeof tokenize>[1]) =>
   tokenize(code, lang).map((t) => [code.slice(t.start, t.end), t.kind] as [string, TokenKind]);
@@ -64,7 +64,7 @@ describe('syntax highlighting', () => {
   });
 });
 
-describe('code blocks', () => {
+describe('code snippets', () => {
   function setup() {
     const doc = new DesignDocument();
     doc.ensureInitialized();
@@ -73,11 +73,11 @@ describe('code blocks', () => {
 
   it('hold one monospace text layer, colored by language', () => {
     const { doc, page } = setup();
-    const id = createCodeBlock(doc, { parentId: page, x: 0, y: 0, code: 'const a = 1;' });
+    const id = createCodeSnippet(doc, { parentId: page, x: 0, y: 0, code: 'const a = 1;' });
     const block = doc.get(id)!;
-    expect(block.type).toBe('CODE_BLOCK');
+    expect(block.type).toBe('CODE_SNIPPET');
     expect(block.layoutMode).toBe('VERTICAL');
-    const text = doc.get(codeTextOf(doc, id)!)!;
+    const text = doc.get(snippetTextOf(doc, id)!)!;
     expect(text.fontFamily).toBe('Source Code Pro');
     expect(text.characters).toBe('const a = 1;');
     // "const" in the keyword color, "1" in the number color.
@@ -90,19 +90,19 @@ describe('code blocks', () => {
 
   it('recolors after the code changes, and switches theme and language', () => {
     const { doc, page } = setup();
-    const id = createCodeBlock(doc, { parentId: page, x: 0, y: 0, code: 'let x' });
-    const textId = codeTextOf(doc, id)!;
+    const id = createCodeSnippet(doc, { parentId: page, x: 0, y: 0, code: 'let x' });
+    const textId = snippetTextOf(doc, id)!;
     doc.change(() => {
       doc.deleteText(textId, 0, 5);
       doc.insertText(textId, 0, '# note', {});
     });
-    setCodeBlockOptions(doc, id, { language: 'python', theme: 'light' });
+    setCodeSnippetOptions(doc, id, { language: 'python', theme: 'light' });
     const text = doc.get(textId)!;
     expect(text.textRuns).toEqual([{ start: 0, end: 6, color: `${CODE_THEMES.light.tokens.comment.slice(1)}FF` }]);
     expect(doc.get(id)!.codeTheme).toBe('light');
     expect(doc.get(id)!.fills[0]).toMatchObject({ type: 'SOLID' });
     // Highlighting again changes nothing.
-    highlightCodeBlock(doc, id);
+    highlightCodeSnippet(doc, id);
     expect(doc.get(textId)!.textRuns).toEqual(text.textRuns);
   });
 });

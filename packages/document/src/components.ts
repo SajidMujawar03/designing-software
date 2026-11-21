@@ -335,8 +335,8 @@ export function canReparent(doc: DesignDocument, ids: NodeId[], parentId: NodeId
     const n = doc.get(id);
     if (!n) continue;
     if (n.type === 'SECTION' && !canHoldSection(doc.get(parentId))) return false;
-    // A code block holds only its own text.
-    if (doc.get(parentId)?.type === 'CODE_BLOCK' && n.parentId !== parentId) return false;
+    // A code snippet holds only its own text.
+    if (doc.get(parentId)?.type === 'CODE_SNIPPET' && n.parentId !== parentId) return false;
     const inner = [n, ...doc.descendants(id)];
     for (const x of inner) {
       if (x.type === 'INSTANCE' && x.componentId && !canHoldInstance(doc, x.componentId, parentId)) return false;

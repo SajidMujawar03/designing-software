@@ -28,7 +28,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, width: number): strin
   return out;
 }
 
-/** Spec annotations: a callout to the right of each annotated layer, joined to it by a leader line. */
+/** Annotations: a callout to the right of each annotated layer, joined to it by a leader line. */
 export function drawAnnotations(ctx: CanvasRenderingContext2D, ed: Editor): void {
   if (!prefs().showAnnotations) return;
   const doc = ed.doc;

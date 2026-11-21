@@ -343,7 +343,7 @@ export class CanvasKitRenderer implements SceneRenderer {
         return;
       case 'FRAME':
       case 'SECTION':
-      case 'CODE_BLOCK':
+      case 'CODE_SNIPPET':
       case 'COMPONENT':
       case 'COMPONENT_SET':
       case 'INSTANCE':

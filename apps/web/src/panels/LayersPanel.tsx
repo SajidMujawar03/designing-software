@@ -14,7 +14,7 @@ const ICONS: Partial<Record<NodeType, typeof Square>> = {
   FRAME: Hash,
   SECTION: PanelTop,
   SLICE: Slice,
-  CODE_BLOCK: Braces,
+  CODE_SNIPPET: Braces,
   COMPONENT: Component,
   COMPONENT_SET: Boxes,
   INSTANCE: Diamond,

@@ -2,9 +2,9 @@ import {
   addAnnotation,
   ANNOTATION_PROPERTIES,
   CODE_LANGUAGES,
-  codeTextOf,
+  snippetTextOf,
   removeAnnotation,
-  setCodeBlockOptions,
+  setCodeSnippetOptions,
   updateAnnotation,
   type Annotation,
   type AnnotationProperty,
@@ -18,11 +18,11 @@ import { editor } from '../editor/editor';
 import { useUI } from '../editor/store';
 import { IconButton, Section } from './controls';
 
-/** Language and theme of a code block, and a button to edit its code. */
-export function CodeBlockSection({ node }: { node: SceneNode }) {
-  const set = (opts: { language?: CodeLanguage; theme?: CodeTheme }) => setCodeBlockOptions(editor.doc, node.id, opts);
+/** Language and theme of a code snippet, and a button to edit its code. */
+export function CodeSnippetSection({ node }: { node: SceneNode }) {
+  const set = (opts: { language?: CodeLanguage; theme?: CodeTheme }) => setCodeSnippetOptions(editor.doc, node.id, opts);
   return (
-    <Section title="Code block">
+    <Section title="Code snippet">
       <div className="grid2">
         <select className="select" aria-label="Language" title="Language" value={node.codeLanguage ?? 'plain'} onChange={(e) => set({ language: e.target.value as CodeLanguage })}>
           {CODE_LANGUAGES.map(([v, l]) => (
@@ -40,10 +40,10 @@ export function CodeBlockSection({ node }: { node: SceneNode }) {
         type="button"
         className="btn small"
         onClick={() => {
-          const text = codeTextOf(editor.doc, node.id);
+          const text = snippetTextOf(editor.doc, node.id);
           if (text) editor.startTextEdit(text);
         }}
-        title="Edit the code (or double-click the block)"
+        title="Edit the code (or double-click the snippet)"
       >
         Edit code
       </button>
@@ -51,7 +51,7 @@ export function CodeBlockSection({ node }: { node: SceneNode }) {
   );
 }
 
-/** Spec annotations pinned to a layer: a note and the measurements to show beside it. */
+/** Annotations pinned to a layer: a note and the measurements to show beside it. */
 export function AnnotationsSection({ node }: { node: SceneNode }) {
   const list = node.annotations ?? [];
   return (
@@ -59,7 +59,7 @@ export function AnnotationsSection({ node }: { node: SceneNode }) {
       title="Annotations"
       actions={
         <IconButton
-          title="Add annotation (D)"
+          title="Add annotation"
           onClick={() => {
             const id = addAnnotation(editor.doc, node.id);
             editor.setUI({ editingAnnotation: { nodeId: node.id, id } });
@@ -78,7 +78,7 @@ function AnnotationEditor({ node, a }: { node: SceneNode; a: Annotation }) {
   const editing = useUI((s) => s.editingAnnotation);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  // A just-added annotation (from the Spec tool or the + button) gets the focus.
+  // A just-added annotation (from the Annotate tool or the + button) gets the focus.
   useEffect(() => {
     if (editing?.nodeId === node.id && editing.id === a.id) {
       ref.current?.focus();

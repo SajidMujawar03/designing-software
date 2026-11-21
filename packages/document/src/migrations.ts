@@ -63,7 +63,7 @@ export const MIGRATIONS: Migration[] = [
   },
   {
     to: 3,
-    description: 'Code blocks (a new layer type) and spec annotations. Nothing to convert.',
+    description: 'Code snippets (a new layer type) and annotations. Nothing to convert.',
     up() {},
   },
 ];

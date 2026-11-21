@@ -33,8 +33,8 @@ const T = {
   pen: { id: 'pen', label: 'Pen', key: 'P', Icon: PenTool },
   pencil: { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   text: { id: 'text', label: 'Text', key: 'T', Icon: Type },
-  code: { id: 'code', label: 'Code block', key: 'B', Icon: Braces },
-  spec: { id: 'spec', label: 'Spec', key: 'D', Icon: NotebookPen },
+  snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
+  annotate: { id: 'annotate', label: 'Annotate', key: '', Icon: NotebookPen },
   hand: { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
   comment: { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
 } satisfies Record<string, ToolDef>;
@@ -52,7 +52,7 @@ const TOOLS: ToolDef[][] = [
   [T.pen],
   [T.pencil],
   [T.text],
-  [T.code, T.spec],
+  [T.snippet, T.annotate],
   [T.hand],
   [T.comment],
 ];

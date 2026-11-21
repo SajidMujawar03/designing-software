@@ -24,7 +24,7 @@ const NAMES: Record<NodeType, string> = {
   FRAME: 'Frame',
   SECTION: 'Section',
   SLICE: 'Slice',
-  CODE_BLOCK: 'Code',
+  CODE_SNIPPET: 'Code snippet',
   COMPONENT: 'Component',
   COMPONENT_SET: 'Component set',
   INSTANCE: 'Instance',
@@ -55,7 +55,7 @@ export function defaultProps(type: NodeType): NodeProps {
       p.cornerRadius = 4;
       p.clipsContent = false;
       break;
-    case 'CODE_BLOCK':
+    case 'CODE_SNIPPET':
       // Hugs its text; colors follow the theme (dark by default).
       p.fills = [solid('#1E1E1E')];
       p.cornerRadius = 8;

@@ -4,7 +4,7 @@ import type { DesignDocument } from './document';
 import type { Annotation, AnnotationProperty, NodeId, Paint, SceneNode } from './types';
 
 /**
- * Spec annotations: notes pinned to a layer for handoff, optionally showing
+ * Annotations: notes pinned to a layer for handoff (like Figma's Dev Mode annotations), optionally showing
  * some of its measurements. Values are read from the layer when shown, so
  * they never go stale.
  */

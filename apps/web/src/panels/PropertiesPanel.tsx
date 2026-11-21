@@ -44,7 +44,7 @@ import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transform
 import { ColorPicker } from './ColorPicker';
 import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { AutoLayoutSection, ConstraintsSection, LayoutGridSection, SizingRow } from './LayoutPanels';
-import { AnnotationsSection, CodeBlockSection } from './HandoffPanels';
+import { AnnotationsSection, CodeSnippetSection } from './HandoffPanels';
 import { ComponentSection } from './ComponentPanel';
 import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
@@ -100,7 +100,7 @@ export function PropertiesPanel() {
   const hasRadius = nodes.every((n) => n.type === 'RECTANGLE' || isFrameLike(n));
   const isLine = types === 'LINE';
   // Sections and slices have no clipping, auto layout, constraints or layout grids.
-  const plainBoxes = nodes.some((n) => n.type === 'SECTION' || n.type === 'SLICE' || n.type === 'CODE_BLOCK');
+  const plainBoxes = nodes.some((n) => n.type === 'SECTION' || n.type === 'SLICE' || n.type === 'CODE_SNIPPET');
 
   return (
     <div className="props">
@@ -112,7 +112,7 @@ export function PropertiesPanel() {
       <AlignBar count={editor.topLevelSelection().length} />
 
       <ComponentSection nodes={nodes} />
-      {nodes.length === 1 && nodes[0].type === 'CODE_BLOCK' && <CodeBlockSection node={nodes[0]} />}
+      {nodes.length === 1 && nodes[0].type === 'CODE_SNIPPET' && <CodeSnippetSection node={nodes[0]} />}
       {nodes.length === 1 && <VariableModes nodeId={nodes[0].id} />}
       <VariableBindings nodes={nodes} />
 

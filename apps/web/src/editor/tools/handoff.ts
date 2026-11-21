@@ -1,10 +1,10 @@
-import { addAnnotation, codeTextOf, createCodeBlock, hitTest, worldTransform } from '@figma/document';
+import { addAnnotation, snippetTextOf, createCodeSnippet, hitTest, worldTransform } from '@figma/document';
 import { applyToPoint, invert } from '@figma/geometry';
 import type { Editor } from '../editor';
 import type { Tool, ToolEvent } from './types';
 
-/** Code block (B): click to place a code block, then type to replace its sample code. */
-export class CodeBlockTool implements Tool {
+/** Code snippet: click to place a syntax-highlighted code snippet, then type to replace its sample code. */
+export class CodeSnippetTool implements Tool {
   cursor = 'crosshair';
   constructor(private ed: Editor) {}
 
@@ -18,20 +18,20 @@ export class CodeBlockTool implements Tool {
     const doc = this.ed.doc;
     const parentId = hitTest(doc, this.ed.pageId, e.world, { framesOnly: true })?.id ?? this.ed.pageId;
     const parent = doc.get(parentId);
-    // Positions are relative to the parent (inside auto layout the block joins the flow instead).
+    // Positions are relative to the parent (inside auto layout the snippet joins the flow instead).
     const origin = parent && parent.type !== 'PAGE' ? applyToPoint(invert(worldTransform(doc, parentId)), e.px) : e.px;
-    const count = [...doc.allNodes()].filter((n) => n.type === 'CODE_BLOCK').length;
-    const id = createCodeBlock(doc, { parentId, x: Math.round(origin.x), y: Math.round(origin.y), name: `Code ${count + 1}` });
+    const count = [...doc.allNodes()].filter((n) => n.type === 'CODE_SNIPPET').length;
+    const id = createCodeSnippet(doc, { parentId, x: Math.round(origin.x), y: Math.round(origin.y), name: `Snippet ${count + 1}` });
     doc.endGesture();
     this.ed.select([id]);
     this.ed.setTool('select');
-    const text = codeTextOf(doc, id);
+    const text = snippetTextOf(doc, id);
     if (text) this.ed.startTextEdit(text);
   }
 }
 
-/** Spec (D): click a layer to pin a note to it; the note is written in the Design panel. */
-export class SpecTool implements Tool {
+/** Annotate: click a layer to pin a note to it (like Dev Mode annotations); the note is written in the Design panel. */
+export class AnnotateTool implements Tool {
   cursor = 'crosshair';
   constructor(private ed: Editor) {}
 
@@ -45,9 +45,9 @@ export class SpecTool implements Tool {
     const doc = this.ed.doc;
     let hit = hitTest(doc, this.ed.pageId, e.world, { tolerance: 4 / this.ed.ui.viewport.zoom });
     if (!hit) return;
-    // A code block's text is part of the block: annotate the block.
+    // A code snippet's text is part of the snippet: annotate the snippet.
     const parent = doc.get(hit.parentId);
-    if (parent?.type === 'CODE_BLOCK') hit = parent;
+    if (parent?.type === 'CODE_SNIPPET') hit = parent;
     const id = addAnnotation(doc, hit.id);
     doc.endGesture();
     this.ed.select([hit.id]);

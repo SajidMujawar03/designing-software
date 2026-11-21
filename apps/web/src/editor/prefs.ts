@@ -14,7 +14,7 @@ export interface Prefs {
   bigNudge: number;
   /** Small previews instead of type icons in the layers panel. */
   layerThumbnails: boolean;
-  /** Spec annotations drawn on the canvas. */
+  /** Annotations drawn on the canvas. */
   showAnnotations: boolean;
   /** Side panels shown, collapsed to narrow strips, or everything but the canvas hidden. */
   ui: 'full' | 'minimized' | 'hidden';

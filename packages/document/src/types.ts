@@ -5,7 +5,7 @@ export type { ConstraintType, Constraints, CounterAlign, GridAlignment, GridPatt
 
 export type LayoutMode = 'NONE' | 'HORIZONTAL' | 'VERTICAL';
 
-/** Measurements a spec annotation can show, read live from its layer. */
+/** Measurements an annotation can show, read live from its layer. */
 export type AnnotationProperty = 'width' | 'height' | 'fills' | 'strokes' | 'cornerRadius' | 'opacity' | 'effects' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'padding' | 'itemSpacing';
 
 /** A note pinned to a layer for handoff. */
@@ -27,7 +27,7 @@ export type NodeType =
   /** An export area: invisible, drawn only as an outline while selected. */
   | 'SLICE'
   /** Syntax-highlighted code: a box (auto layout, hugging) holding one text layer. */
-  | 'CODE_BLOCK'
+  | 'CODE_SNIPPET'
   | 'COMPONENT'
   | 'COMPONENT_SET'
   | 'INSTANCE'
@@ -232,11 +232,11 @@ export interface SceneNode {
   // PAGE: exports of its top-level layers are drawn on the page's background color.
   exportBackground?: boolean;
 
-  // CODE_BLOCK: how its text is highlighted.
+  // CODE_SNIPPET: how its text is highlighted.
   codeLanguage?: CodeLanguage;
   codeTheme?: CodeTheme;
 
-  /** Spec annotations pinned to this layer (notes and the measurements to show next to it). */
+  /** Annotations pinned to this layer (notes and the measurements to show next to it). */
   annotations?: Annotation[];
 
   // FRAME
@@ -540,7 +540,7 @@ export const hasOwnTransform = (n: SceneNode): boolean =>
 
 /** Frames, sections, main components and instances: boxes that hold (and frames clip and lay out) children. */
 export const isFrameLike = (n: SceneNode | undefined | null): n is SceneNode => !!n && FRAME_LIKE.has(n.type);
-const FRAME_LIKE = new Set<NodeType>(['FRAME', 'SECTION', 'CODE_BLOCK', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
+const FRAME_LIKE = new Set<NodeType>(['FRAME', 'SECTION', 'CODE_SNIPPET', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE']);
 
 /** Sections only sit on a page or inside another section. */
 export const canHoldSection = (n: SceneNode | undefined | null): boolean => n?.type === 'PAGE' || n?.type === 'SECTION';

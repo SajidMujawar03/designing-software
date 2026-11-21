@@ -275,7 +275,7 @@ export function codeFor(doc: DesignDocument, n: SceneNode, lang: CodeLanguage): 
   return annotationComment(n, lang === 'css' ? 'block' : 'line') + code;
 }
 
-/** The layer's spec notes as a comment above its code ("" when it has none). */
+/** The layer's annotation notes as a comment above its code ("" when it has none). */
 export function annotationComment(n: SceneNode, style: 'block' | 'line'): string {
   const notes = (n.annotations ?? []).map((a) => a.note.trim()).filter(Boolean);
   if (!notes.length) return '';

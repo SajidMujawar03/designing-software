@@ -9,7 +9,7 @@ function setup() {
   return { doc, page, make };
 }
 
-describe('spec annotations', () => {
+describe('annotations', () => {
   it('start with the measurements that suit the layer', () => {
     const { doc, make } = setup();
     const text = make({ type: 'TEXT', characters: 'Hi' });

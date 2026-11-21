@@ -9,8 +9,8 @@ export type ToolId =
   | 'section'
   | 'slice'
   | 'scale'
-  | 'code'
-  | 'spec'
+  | 'snippet'
+  | 'annotate'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'
@@ -57,7 +57,7 @@ export interface UIState {
   nudgeOpen: boolean;
   /** The find and replace panel (Ctrl+F). */
   findOpen: boolean;
-  /** A spec annotation just added, whose note field should take focus. */
+  /** An annotation just added, whose note field should take focus. */
   editingAnnotation: { nodeId: NodeId; id: string } | null;
   /** The local variables window. */
   variablesOpen: boolean;

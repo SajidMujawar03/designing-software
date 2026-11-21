@@ -127,8 +127,6 @@ export function ShortcutsSheet() {
     ['Frame', 'F'],
     ['Section', 'Shift+S'],
     ['Slice', 'S'],
-    ['Code block', 'B'],
-    ['Spec annotation', 'D'],
     ['Rectangle', 'R'],
     ['Ellipse', 'O'],
     ['Line', 'L'],

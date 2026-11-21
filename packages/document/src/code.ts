@@ -3,7 +3,7 @@ import { solid } from './color';
 import type { NodeId } from './types';
 
 /**
- * Syntax highlighting for code blocks: a small scanner per language that
+ * Syntax highlighting for code snippets: a small scanner per language that
  * splits code into tokens, and colors for each token kind in a light and a
  * dark theme. Good enough for snippets on a canvas, not a full parser.
  */
@@ -134,31 +134,31 @@ export function codeColorRuns(code: string, language: CodeLanguage, theme: CodeT
   return out;
 }
 
-// ------------------------------------------------------------ code block layers
+// ------------------------------------------------------------ code snippet layers
 
 
 export const SAMPLE_CODE = "function greet(name) {\n  // Say hello\n  return `Hello, ${name}!`;\n}";
 
-/** The text layer holding a code block's code. */
-export function codeTextOf(doc: DesignDocument, blockId: NodeId): NodeId | null {
-  return doc.children(blockId).find((c) => c.type === 'TEXT')?.id ?? null;
+/** The text layer holding a code snippet's code. */
+export function snippetTextOf(doc: DesignDocument, snippetId: NodeId): NodeId | null {
+  return doc.children(snippetId).find((c) => c.type === 'TEXT')?.id ?? null;
 }
 
-/** Colors a code block's text for its language and theme (call after its code or settings change). */
-export function highlightCodeBlock(doc: DesignDocument, blockId: NodeId): void {
-  const block = doc.get(blockId);
-  const textId = codeTextOf(doc, blockId);
-  if (block?.type !== 'CODE_BLOCK' || !textId) return;
+/** Colors a code snippet's text for its language and theme (call after its code or settings change). */
+export function highlightCodeSnippet(doc: DesignDocument, snippetId: NodeId): void {
+  const snippet = doc.get(snippetId);
+  const textId = snippetTextOf(doc, snippetId);
+  if (snippet?.type !== 'CODE_SNIPPET' || !textId) return;
   const code = doc.get(textId)!.characters ?? '';
-  const theme = CODE_THEMES[block.codeTheme ?? 'dark'];
+  const theme = CODE_THEMES[snippet.codeTheme ?? 'dark'];
   doc.change(
     () => {
-      if (block.fills[0]?.type !== 'SOLID' || block.fills.length !== 1) doc.updateNode(blockId, { fills: [solid(theme.background)] });
+      if (snippet.fills[0]?.type !== 'SOLID' || snippet.fills.length !== 1) doc.updateNode(snippetId, { fills: [solid(theme.background)] });
       doc.updateNode(textId, { fills: [solid(theme.text)] });
       if (!code) return;
       // Clear old token colors, then color each token.
       doc.formatText(textId, 0, code.length, { color: null });
-      for (const r of codeColorRuns(code, block.codeLanguage ?? 'plain', block.codeTheme ?? 'dark')) {
+      for (const r of codeColorRuns(code, snippet.codeLanguage ?? 'plain', snippet.codeTheme ?? 'dark')) {
         doc.formatText(textId, r.start, r.end - r.start, { color: `${r.color.slice(1)}FF` });
       }
     },
@@ -166,8 +166,8 @@ export function highlightCodeBlock(doc: DesignDocument, blockId: NodeId): void {
   );
 }
 
-/** Changes a code block's language or theme, recoloring it. */
-export function setCodeBlockOptions(doc: DesignDocument, blockId: NodeId, opts: { language?: CodeLanguage; theme?: CodeTheme }): void {
+/** Changes a code snippet's language or theme, recoloring it. */
+export function setCodeSnippetOptions(doc: DesignDocument, snippetId: NodeId, opts: { language?: CodeLanguage; theme?: CodeTheme }): void {
   doc.change(() => {
     const patch: { codeLanguage?: CodeLanguage; codeTheme?: CodeTheme; fills?: ReturnType<typeof solid>[] } = {};
     if (opts.language) patch.codeLanguage = opts.language;
@@ -175,22 +175,22 @@ export function setCodeBlockOptions(doc: DesignDocument, blockId: NodeId, opts: 
       patch.codeTheme = opts.theme;
       patch.fills = [solid(CODE_THEMES[opts.theme].background)];
     }
-    doc.updateNode(blockId, patch);
-    highlightCodeBlock(doc, blockId);
+    doc.updateNode(snippetId, patch);
+    highlightCodeSnippet(doc, snippetId);
   });
 }
 
-/** Creates a code block with its text layer, highlighted. Returns the block's id. */
-export function createCodeBlock(
+/** Creates a code snippet with its text layer, highlighted. Returns the snippet's id. */
+export function createCodeSnippet(
   doc: DesignDocument,
   opts: { parentId: NodeId; x: number; y: number; code?: string; language?: CodeLanguage; theme?: CodeTheme; name?: string },
 ): NodeId {
   const theme = opts.theme ?? 'dark';
   return doc.change(() => {
     const id = doc.createNode({
-      type: 'CODE_BLOCK',
+      type: 'CODE_SNIPPET',
       parentId: opts.parentId,
-      name: opts.name ?? 'Code',
+      name: opts.name ?? 'Code snippet',
       x: opts.x,
       y: opts.y,
       codeLanguage: opts.language ?? 'javascript',
@@ -207,7 +207,7 @@ export function createCodeBlock(
       lineHeight: 1.5,
       fills: [solid(CODE_THEMES[theme].text)],
     });
-    highlightCodeBlock(doc, id);
+    highlightCodeSnippet(doc, id);
     return id;
   });
 }
