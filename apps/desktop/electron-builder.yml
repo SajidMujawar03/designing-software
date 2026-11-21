@@ -63,6 +63,9 @@ mac:
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # No spaces in file names: GitHub turns them into dots on upload, and the update feed
+  # (latest-mac.yml) would then point at a file that doesn't exist.
+  artifactName: Design-Clone-${version}-${arch}-mac.${ext}
 dmg:
   artifactName: Design-Clone-${version}-${arch}.${ext}
 linux:
