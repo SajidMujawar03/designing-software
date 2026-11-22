@@ -1,6 +1,6 @@
 import { hexToRgb, rgbToHex } from './color';
 import type { DesignDocument } from './document';
-import type { Keyframe, MotionClip, MotionEasing, MotionEasingPreset, MotionPlayback, MotionPreset, MotionProperty, MotionTimeline, NodeId, NodePatch, Paint, SceneNode, SpringPreset } from './types';
+import type { ClipEffect, Keyframe, MotionClip, MotionTextUnit, TextMotion, MotionEasing, MotionEasingPreset, MotionPlayback, MotionPreset, MotionProperty, MotionTimeline, NodeId, NodePatch, Paint, SceneNode, SpringPreset } from './types';
 
 /**
  * Figma Motion: keyframed properties on the layers of a top-level frame,
@@ -364,14 +364,90 @@ export const playbackEnded = (motion: { duration: number; playback: MotionPlayba
 
 // ------------------------------------------------------------ preset animations
 
-/** What a preset does at a moment: offsets add, opacity and scale multiply. */
-interface ClipEffect {
-  dx: number;
-  dy: number;
-  opacity: number;
-  scale: number;
-  rotation: number;
-  blur: number;
+/** No effect: the identity for combining clips. */
+export const NO_EFFECT: ClipEffect = { dx: 0, dy: 0, opacity: 1, scale: 1, rotation: 0, blur: 0 };
+
+/** Several clips' effects together: offsets, rotation and blur add; opacity and scale multiply. */
+export function combineEffects(effects: Array<ClipEffect | null>): ClipEffect | null {
+  let out: ClipEffect | null = null;
+  for (const fx of effects) {
+    if (!fx) continue;
+    out ??= { ...NO_EFFECT };
+    out.dx += fx.dx;
+    out.dy += fx.dy;
+    out.opacity *= fx.opacity;
+    out.scale *= fx.scale;
+    out.rotation += fx.rotation;
+    out.blur += fx.blur;
+  }
+  return out;
+}
+
+/** Default gap (ms) between units of text animated by character, word or line. */
+export const TEXT_STAGGER: Record<MotionTextUnit, number> = { CHARACTER: 40, WORD: 120, LINE: 200 };
+
+const isSpace = (ch: string) => /\s/.test(ch);
+
+/**
+ * Which character or word each character of a text belongs to (-1 for
+ * spaces, which don't animate), and how many there are. Lines depend on
+ * layout, so renderers number those.
+ */
+export function textUnitIndices(text: string, unit: 'CHARACTER' | 'WORD'): { index: number[]; count: number } {
+  const index: number[] = [];
+  let count = 0;
+  let inWord = false;
+  for (const ch of text) {
+    // Strings iterate by code point: keep indices per UTF-16 unit, as text layout does.
+    const units = ch.length;
+    if (isSpace(ch)) {
+      inWord = false;
+      for (let k = 0; k < units; k++) index.push(-1);
+      continue;
+    }
+    if (unit === 'CHARACTER') {
+      for (let k = 0; k < units; k++) index.push(count);
+      count++;
+    } else {
+      if (!inWord) count++;
+      inWord = true;
+      for (let k = 0; k < units; k++) index.push(count - 1);
+    }
+  }
+  return { index, count };
+}
+
+/**
+ * Each drawn character's combined effect from text clips (null: none), given
+ * the characters as laid out (`index` into the text, and which line).
+ */
+export function textUnitsOf(text: string, motions: TextMotion[], chars: Array<{ index: number; line: number }>): Array<ClipEffect | null> {
+  const chIdx = motions.some((m) => m.unit === 'CHARACTER') ? textUnitIndices(text, 'CHARACTER').index : [];
+  const wdIdx = motions.some((m) => m.unit === 'WORD') ? textUnitIndices(text, 'WORD').index : [];
+  return chars.map((c) =>
+    combineEffects(
+      motions.map((m) => {
+        const i = m.unit === 'LINE' ? c.line : m.unit === 'WORD' ? wdIdx[c.index] : chIdx[c.index];
+        return i === undefined || i < 0 ? null : m.effect(i);
+      }),
+    ),
+  );
+}
+
+/** How many units a text clip animates (lines: explicit lines; wrapped lines are only known to the renderer). */
+export function textUnitCount(n: SceneNode, unit: MotionTextUnit): number {
+  const text = n.characters ?? '';
+  if (unit === 'LINE') return Math.max(1, text.split('\n').length);
+  return Math.max(1, textUnitIndices(text, unit).count);
+}
+
+/** Whether a clip animates a text layer unit by unit. */
+export const isTextClip = (n: SceneNode, c: MotionClip): boolean => n.type === 'TEXT' && !!c.textUnit;
+
+/** How long a clip runs: its length, plus the stagger for each unit after the first of text animated unit by unit. */
+export function clipSpan(n: SceneNode, c: MotionClip): number {
+  if (!isTextClip(n, c)) return c.duration;
+  return c.duration + (textUnitCount(n, c.textUnit!) - 1) * (c.stagger ?? TEXT_STAGGER[c.textUnit!]);
 }
 
 /** Presets that bring a layer in hold their starting state before they begin; ones that take it out hold their end state after. */
@@ -461,7 +537,19 @@ function applyClips(n: SceneNode, patch: NodePatch, t: number): boolean {
   if (!n.animations?.length) return false;
   let any = false;
   const total: ClipEffect = { dx: 0, dy: 0, opacity: 1, scale: 1, rotation: 0, blur: 0 };
+  // Text animated unit by unit: each unit plays the clip in turn (the renderer finds the units).
+  const textMotion: TextMotion[] = [];
   for (const c of n.animations) {
+    if (!isTextClip(n, c)) continue;
+    const stagger = c.stagger ?? TEXT_STAGGER[c.textUnit!];
+    textMotion.push({ unit: c.textUnit!, effect: (i: number) => clipEffect({ ...c, start: c.start + i * stagger }, t) });
+  }
+  if (textMotion.length) {
+    patch.textMotion = textMotion;
+    any = true;
+  }
+  for (const c of n.animations) {
+    if (isTextClip(n, c)) continue;
     const fx = clipEffect(c, t);
     if (!fx) continue;
     any = true;
@@ -473,6 +561,7 @@ function applyClips(n: SceneNode, patch: NodePatch, t: number): boolean {
     total.blur += fx.blur;
   }
   if (!any) return false;
+  if (total.dx === 0 && total.dy === 0 && total.opacity === 1 && total.scale === 1 && total.rotation === 0 && total.blur === 0) return true;
   const at = <K extends keyof SceneNode>(k: K): SceneNode[K] => ((patch as Partial<SceneNode>)[k] ?? n[k]) as SceneNode[K];
   if (total.dx) patch.x = (at('x') as number) + total.dx;
   if (total.dy) patch.y = (at('y') as number) + total.dy;

@@ -1,4 +1,4 @@
-import { animatedInstances, animatedLayers, DEFAULT_MOTION, MOTION_PROPERTIES, moveKeyframes, PRESETS, setKeyframeEasing, updateClip, type Keyframe, type KeyRef, type MotionClip, type MotionEasing, type MotionProperty, type NodeId, type SceneNode } from '@figma/document';
+import { animatedInstances, animatedLayers, clipSpan, DEFAULT_MOTION, MOTION_PROPERTIES, moveKeyframes, PRESETS, setKeyframeEasing, updateClip, type Keyframe, type KeyRef, type MotionClip, type MotionEasing, type MotionProperty, type NodeId, type SceneNode } from '@figma/document';
 import { ArrowRightLeft, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleDot, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { editor } from '../editor/editor';
@@ -478,7 +478,7 @@ function TimelinePanel() {
                 ...all.map((r) => shownTime(r, n.keyframes![r.prop]!.find((k) => k.id === r.id)!.time)),
                 ...clips.flatMap((c) => {
                   const sc = shownClip(n.id, c);
-                  return [sc.start, sc.start + sc.duration];
+                  return [sc.start, sc.start + clipSpan(n, { ...c, ...sc })];
                 }),
               ];
               const first = Math.min(...times);
@@ -580,11 +580,14 @@ function TimelinePanel() {
                           <div className="timeline-lane" style={{ width: lanesWidth }} onPointerDown={laneDown}>
                             <div
                               className={`timeline-clip${isSel ? ' selected' : ''}`}
-                              style={{ left: xOf(sc.start), width: Math.max(6, xOf(sc.start + sc.duration) - xOf(sc.start)) }}
+                              style={{ left: xOf(sc.start), width: Math.max(6, xOf(sc.start + clipSpan(n, { ...c, ...sc })) - xOf(sc.start)) }}
                               title={`${PRESETS[c.preset].label} · ${formatTime(sc.start, unit)} for ${Math.round(sc.duration)}ms (${easingLabel(c.easing)}). Drag to move, drag an edge to stretch.`}
                               onPointerDown={(e) => clipDown(e, n, c, 'move')}
                             >
-                              <span className="timeline-clip-label">{PRESETS[c.preset].label}</span>
+                              <span className="timeline-clip-label">
+                                {PRESETS[c.preset].label}
+                                {c.textUnit && n.type === 'TEXT' ? ` · by ${c.textUnit.toLowerCase()}` : ''}
+                              </span>
                               <span className="timeline-clip-edge start" onPointerDown={(e) => clipDown(e, n, c, 'start')} />
                               <span className="timeline-clip-edge end" onPointerDown={(e) => clipDown(e, n, c, 'end')} />
                             </div>

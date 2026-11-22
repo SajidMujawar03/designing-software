@@ -22,7 +22,7 @@ import { multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '
 import { renderBounds, sliceArea } from './canvaskit';
 import { imageMatrix } from './ckpaint';
 import { nodeMarkers, traceMarker } from './markers';
-import { drawText, layoutText, pathGlyphs, styleFont } from './text';
+import { drawAnimatedText, drawText, layoutText, pathGlyphs, styleFont } from './text';
 import type { SceneOptions, SceneRenderer } from './types';
 
 export interface RenderOptions {
@@ -254,7 +254,7 @@ function drawShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneN
   }
   if (n.type === 'TEXT') {
     const layout = layoutText(n, ctx);
-    for (const f of n.fills) if (f.visible) drawText(ctx, n, layout, paintStyle(f));
+    for (const f of n.fills) if (f.visible) (n.textMotion?.length ? drawAnimatedText : drawText)(ctx, n, layout, paintStyle(f));
     return;
   }
   shapePath(ctx, n);

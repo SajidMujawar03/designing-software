@@ -7,6 +7,7 @@ import {
   shapePaths,
   maxWidth,
   placeGlyphs,
+  textUnitsOf,
   textPathOutset,
   strokeWidthOutline,
   usesWidthProfile,
@@ -653,8 +654,50 @@ export class CanvasKitRenderer implements SceneRenderer {
       });
       return;
     }
+    if (n.textMotion?.length) return this.drawAnimatedText(c, n);
     const layout = this.text.layout(n, this.doc!);
     c.drawParagraph(layout.paragraph, 0, layout.offsetY);
+  }
+
+  /**
+   * Text animated by character, word or line (Motion): laid out as usual,
+   * then each character drawn on its own where layout put it, moved, turned,
+   * scaled, faded and blurred by its unit's effect.
+   */
+  private drawAnimatedText(c: Canvas, n: SceneNode): void {
+    const doc = this.doc!;
+    const glyphs = this.text.glyphs(n, doc);
+    const boxes = this.text.charBoxes(n, doc);
+    const text = n.characters ?? '';
+    const units = textUnitsOf(text, n.textMotion!, boxes);
+    const paint = new this.ck.Paint();
+    boxes.forEach((b, k) => {
+      const g = glyphs[b.index];
+      if (!g) return;
+      const fx = units[k];
+      if (fx && fx.opacity <= 0) return;
+      const cx = b.x + b.width / 2;
+      const cy = b.baseline - g.baseline / 2;
+      c.save();
+      if (fx) {
+        c.translate(fx.dx, fx.dy);
+        if (fx.rotation || fx.scale !== 1) {
+          c.translate(cx, cy);
+          if (fx.rotation) c.rotate(fx.rotation, 0, 0);
+          if (fx.scale !== 1) c.scale(fx.scale, fx.scale);
+          c.translate(-cx, -cy);
+        }
+        if (fx.opacity < 1 || fx.blur > 0) {
+          paint.setAlphaf(Math.max(0, Math.min(1, fx.opacity)));
+          paint.setImageFilter(fx.blur > 0 ? this.ck.ImageFilter.MakeBlur(fx.blur / 2, fx.blur / 2, this.ck.TileMode.Decal, null) : null);
+          c.saveLayer(paint);
+        }
+      }
+      c.drawParagraph(g.paragraph, b.x, b.baseline - g.baseline);
+      if (fx && (fx.opacity < 1 || fx.blur > 0)) c.restore();
+      c.restore();
+    });
+    paint.delete();
   }
 
   /** Frees layouts and paths of deleted nodes. */

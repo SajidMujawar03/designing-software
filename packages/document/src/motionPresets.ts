@@ -39,7 +39,7 @@ export const PRESET_ORDER: MotionPreset[] = ['FADE_IN', 'SLIDE_IN', 'SCALE_IN', 
 /** One preset of a style: what, when (from the style's start) and how. */
 type StylePart = Pick<MotionClip, 'preset'> & Partial<Omit<MotionClip, 'id' | 'preset'>>;
 
-export type MotionStyleId = 'POP_IN' | 'RISE_IN' | 'DROP_IN' | 'BLUR_REVEAL' | 'FADE_AWAY' | 'SINK_OUT' | 'ATTENTION';
+export type MotionStyleId = 'POP_IN' | 'RISE_IN' | 'DROP_IN' | 'BLUR_REVEAL' | 'FADE_AWAY' | 'SINK_OUT' | 'ATTENTION' | 'TYPEWRITER' | 'WORDS_RISE' | 'LINES_REVEAL';
 
 /** Composite animation styles: several presets applied together. */
 export const MOTION_STYLES: Record<MotionStyleId, { label: string; parts: StylePart[] }> = {
@@ -92,9 +92,31 @@ export const MOTION_STYLES: Record<MotionStyleId, { label: string; parts: StyleP
       { preset: 'SHAKE', amount: 6, start: 100, duration: 400 },
     ],
   },
+  // Text styles (on other layers they animate the whole layer).
+  TYPEWRITER: {
+    label: 'Typewriter',
+    parts: [{ preset: 'FADE_IN', duration: 40, easing: { type: 'HOLD' }, textUnit: 'CHARACTER', stagger: 50 }],
+  },
+  WORDS_RISE: {
+    label: 'Words rise',
+    parts: [
+      { preset: 'FADE_IN', duration: 300, textUnit: 'WORD', stagger: 90 },
+      { preset: 'SLIDE_IN', direction: 'DOWN', amount: 16, duration: 400, textUnit: 'WORD', stagger: 90 },
+    ],
+  },
+  LINES_REVEAL: {
+    label: 'Lines reveal',
+    parts: [
+      { preset: 'FADE_IN', duration: 400, textUnit: 'LINE', stagger: 180 },
+      { preset: 'BLUR_IN', amount: 8, duration: 500, textUnit: 'LINE', stagger: 180 },
+    ],
+  },
 };
 
 export const STYLE_ORDER: MotionStyleId[] = ['POP_IN', 'RISE_IN', 'DROP_IN', 'BLUR_REVEAL', 'FADE_AWAY', 'SINK_OUT', 'ATTENTION'];
+
+/** Styles made for text (by character, word or line). */
+export const TEXT_STYLE_ORDER: MotionStyleId[] = ['TYPEWRITER', 'WORDS_RISE', 'LINES_REVEAL'];
 
 let clipSerial = 0;
 const newClipId = () => `c${Date.now().toString(36)}${(clipSerial++).toString(36)}`;
@@ -111,6 +133,10 @@ export function makeClip(preset: MotionPreset, t: number, part: Partial<Omit<Mot
   };
   if (info.direction) clip.direction = part.direction ?? 'DOWN';
   if (info.amount) clip.amount = part.amount ?? PRESET_AMOUNT[preset];
+  if (part.textUnit) {
+    clip.textUnit = part.textUnit;
+    if (part.stagger !== undefined) clip.stagger = part.stagger;
+  }
   return clip;
 }
 
@@ -158,6 +184,12 @@ export function updateClip(doc: DesignDocument, id: NodeId, clipId: string, patc
       const next = { ...c, ...patch };
       next.start = Math.max(0, Math.round(next.start));
       next.duration = Math.max(10, Math.round(next.duration));
+      if (next.stagger !== undefined) next.stagger = Math.max(0, Math.round(next.stagger));
+      // Back to the whole layer: no stagger.
+      if ('textUnit' in patch && !patch.textUnit) {
+        delete next.textUnit;
+        delete next.stagger;
+      }
       if (patch.preset && patch.preset !== c.preset) {
         const info = PRESETS[patch.preset];
         if (info.direction) next.direction = c.direction ?? 'DOWN';

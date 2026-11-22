@@ -214,6 +214,16 @@ M1–M4 make a complete, usable Motion feature (about 3 weeks). M5–M7 follow F
   - It's one purple track, dragged to stagger copies, and its animation is locked (edits never write keyframes into it).
   - Position keyframes made on the main component are moved over to where the instance is.
 
+### M5b as built
+
+- **Model:** a preset clip on a text layer can animate by character, word or line (`textUnit`), with a `stagger` between units (defaults: 40, 120 and 200 ms). It runs its length plus a stagger for each unit after the first.
+- **Pose:** the text keeps its layout; the pose carries a per-unit effect (`textMotion`, pose-only). Spaces don't animate.
+- **Drawing:**
+  - **CanvasKit:** draws each character's own paragraph where layout placed it, moved, turned, scaled, faded and blurred by its unit.
+  - **Canvas 2D:** draws each character of the laid-out lines the same way (blur aside).
+  - Lines are numbered as laid out, so wrapped lines count. The timeline's clip length counts explicit lines only.
+- **Text styles:** Typewriter (by character), Words rise (by word) and Lines reveal (by line). The Animations section's "Animate by" switches any clip between the whole layer and units.
+
 ## 9. Testing
 
 - **Unit tests:**
