@@ -29,22 +29,22 @@ Status key: **Same** · **Different name or place** · **Missing in ours** · **
 
 ## 2. Toolbar and tools (Design mode)
 
-Figma groups the tools into seven slots with dropdowns. Ours shows most of them as separate buttons.
+Figma groups the tools into seven slots with dropdowns. Since U2, ours does too.
 
 ![Figma shape tools menu](ui-comparison/figma-shape-tools.png)
 
 | Figma slot → tools (shortcut) | Ours | Status |
 | --- | --- | --- |
-| **Move tools**: Move (V), **Hand tool** (H), Scale (K) | Move menu: Move (V), Scale (K). Hand tool (H) is a separate button at the end of the toolbar | Different name or place (Hand tool's place; U2) |
-| **Region tools**: Frame (F), Section (Shift+S), Slice (S) | Frame menu: Frame (F), Section (Shift+S), Slice (S) | Same (our menu has no "Region tools" name) |
-| **Shape tools**: Rectangle (R), Line (L), Arrow (Shift+L), Ellipse (O), Polygon, Star, **Image/video…** (Ctrl+Shift+K) | Six separate buttons: Rectangle, Ellipse, Polygon, Star, Line, Arrow (in that order). Place image… is in quick actions | Different name or place |
-| Image/video… | "Place image…" (quick actions, Ctrl+Shift+K); no video | Different name or place |
-| **Creation tools**: Pen (P), Pencil (Shift+P) | Separate Pen and Pencil buttons | Different name or place |
+| **Move tools**: Move (V), **Hand tool** (H), Scale (K) | Move tools: Move (V), Hand tool (H), Scale (K) | Same (U2) |
+| **Region tools**: Frame (F), Section (Shift+S), Slice (S) | Region tools: Frame (F), Section (Shift+S), Slice (S) | Same (U2) |
+| **Shape tools**: Rectangle (R), Line (L), Arrow (Shift+L), Ellipse (O), Polygon, Star, **Image/video…** (Ctrl+Shift+K) | Shape tools: Rectangle (R), Line (L), Arrow (Shift+L), Ellipse (O), Polygon, Star, Image/video… (Ctrl+Shift+K) | Same (U2) |
+| Image/video… | Image/video… in Shape tools and quick actions (Ctrl+Shift+K); images only | Same name and place (U2); no video yet |
+| **Creation tools**: Pen (P), Pencil (Shift+P) | Creation tools: Pen (P), Pencil (Shift+P) | Same (U2) |
 | **Type tools**: Text (T), **Text on path** | Text menu: Text (T), Text on path | Same (U1) |
-| **Code tools**: Code (B), Spec (D) | Code menu: Code (B), Spec (D), **Code snippet**, **Annotation** (Shift+T) | Extra in ours (Code snippet, Annotation in this menu; U2) |
+| **Code tools**: Code (B), Spec (D) | Code tools: Code (B), Spec (D). Code snippet and Annotation (Shift+T) are in quick actions | Same (U2) |
 | **Comment** (C) | Comment (C) *(cloud files only)* | Same |
 | **Actions** (grid icon, Ctrl+K): AI prompts plus the command list | Quick actions (Ctrl+/ and Ctrl+K), no button | Different name or place |
-| Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | Annotation (Shift+T) under the Code menu; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
+| Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | Annotation (Shift+T) in quick actions; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
 | Frame presets (right panel while the Frame tool is on) | Frame presets in the right panel (Phone, …) | Same |
 | Measurement is Shift+M in Figma *(docs)* | Shift+M is our Shape builder (vector edit bar, quick actions) | Different shortcut (clash if Measurement is added) |
 
@@ -54,7 +54,7 @@ Figma groups the tools into seven slots with dropdowns. Ours shows most of them 
 | --- | --- | --- | --- |
 | Mode switcher | Segmented icons at the **right end of the bottom toolbar**, in this order: **Draw**, **Design**, **Motion (Beta)**, **Dev Mode** | Text tabs at the left of the top bar: **Design**, **Draw**, **Motion** | Different name or place (order, position, Dev Mode) |
 | Mode name on the right panel | The tab row shows the mode: "Draw", "Motion Beta" | Design / Prototype / Inspect tabs stay the same in every mode | Different name or place |
-| Draw toolbar | Move, **Pen / Brush / Pencil** (drawn as real pens), Frame, Shape, Text, Code, Comment, Actions | Move, Pen, Brush, Pencil, Text, Hand (Comment on cloud files) | Different name or place (ours drops Frame, Shape, Code) |
+| Draw toolbar | Move, **Pen / Brush / Pencil** (drawn as real pens), Frame, Shape, Text, Code, Comment, Actions | Move tools, Pen, Brush, Pencil, Region, Shape, Type and Code tools (Comment on cloud files) | Same (U2; Actions comes in U3) |
 | Dev Mode | Mode in the toolbar (Shift+D), paid plans; its own right panel (Inspect, Plugins) | **Inspect tab** in the right panel, in every mode | Different name or place |
 
 ![Figma Draw mode](ui-comparison/figma-draw.png)
@@ -123,7 +123,7 @@ Layer selected (frame / group):
 | **Layer properties** with **Code / List** toggle | Layout (W, H, X, Y), Fill, Typography as lists | Different name or place |
 | Code: language dropdown (CSS, iOS, Android, plugins) | **Code**: CSS, SwiftUI, Compose | Same |
 | Colors, Assets (icon detection, downloads), Export | Fill colours; Export is in the Design tab | Different name or place |
-| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Annotation (Shift+T, Code menu), Spec tool; Annotations (Shift+Y) | Different name or place |
+| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Annotation (Shift+T, quick actions), Spec tool; Annotations (Shift+Y) | Different name or place |
 
 ## 8. Motion
 
@@ -187,11 +187,11 @@ Layer selected (frame / group):
 ## Prioritized fixes (smallest and most visible first)
 
 1. ~~**"Text on a path" → "Text on path"** in the Text menu.~~ Done in U1.
-2. **Rename "Hand" to "Hand tool"** (done in U1) **and move it into the Move menu** (Move, Hand tool, Scale), dropping the separate Hand button.
+2. ~~**Rename "Hand" to "Hand tool" and move it into the Move menu**~~ (done in U1 and U2) (Move, Hand tool, Scale), dropping the separate Hand button.
 3. ~~**Rename right-panel sections**~~ (done in U1): "Layer" → **Appearance**, "Layout grid" → **Layout guide** (and "Show/Hide layout grids" → **Layout guides**, Shift+G), "Background" → **Page**, "Local styles" → **Styles**.
 4. ~~**Zoom to 100% shortcut**~~ (done in U1): Ctrl+0 (Figma) instead of Shift+0; add Zoom to 50% / 200% to the zoom menu.
-5. **Group the shape buttons into one "Shape tools" slot** (Rectangle, Line, Arrow, Ellipse, Polygon, Star, Image/video…) and **Pen + Pencil into "Creation tools"**. Our toolbar then has Figma's seven slots.
-6. **Code menu**: move "Code snippet" and "Annotate" out (Figma has Code and Spec only). Rename "Annotate" to **Annotation** with Shift+T.
+5. ~~**Group the shape buttons into one "Shape tools" slot** (Rectangle, Line, Arrow, Ellipse, Polygon, Star, Image/video…) and **Pen + Pencil into "Creation tools"**. Our toolbar then has Figma's seven slots.~~ Done in U2.
+6. ~~**Code menu**~~ (done in U1 and U2): move "Code snippet" and "Annotate" out (Figma has Code and Spec only). Rename "Annotate" to **Annotation** with Shift+T.
 7. **Mode switcher order and names**: Draw, Design, Motion, Dev Mode; consider renaming the Inspect tab to Dev Mode, or keep Inspect and note the difference.
 8. **Rename "quick actions" to Actions** and add an Actions button to the toolbar.
 9. **Add Selection colors** to the Design tab (Figma shows it for any multi-colour selection).
