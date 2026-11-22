@@ -50,6 +50,10 @@ export function Keyed({ keyed, p, children }: { keyed: SceneNode | null; p: Moti
  * its aspect lock) and Rotation, each with a ◇. The rest of the animatable
  * properties get their ◇ in Layout, Appearance, Fill, Stroke and Effects.
  */
+/** Motion's Position is the layer's centre (Figma's anchor); the document and keyframes keep its top-left. */
+export const centreOf = (start: number, size: number): number => Math.round((start + size / 2) * 100) / 100;
+export const fromCentre = (centre: number, size: number): number => Math.round((centre - size / 2) * 100) / 100;
+
 export function TransformSection({ n }: { n: SceneNode }) {
   const [lockScale, setLockScale] = useState(true);
   if (!editor.doc.get(n.id)) return null;
@@ -62,13 +66,13 @@ export function TransformSection({ n }: { n: SceneNode }) {
   };
   return (
     <Section title="Transform">
-      <span className="field-caption">Position</span>
+      <span className="field-caption" title="The layer's centre, as Figma Motion shows it (keyframes store its top-left)">Position</span>
       <div className="grid2">
         <Keyed keyed={n} p="x">
-          <NumberField label="X" value={num('x')} onChange={(v, live) => set('x', v, live)} />
+          <NumberField label="X" title="Centre X" value={centreOf(num('x'), num('width'))} onChange={(v, live) => set('x', fromCentre(v, num('width')), live)} />
         </Keyed>
         <Keyed keyed={n} p="y">
-          <NumberField label="Y" value={num('y')} onChange={(v, live) => set('y', v, live)} />
+          <NumberField label="Y" title="Centre Y" value={centreOf(num('y'), num('height'))} onChange={(v, live) => set('y', fromCentre(v, num('height')), live)} />
         </Keyed>
       </div>
       <div className="field-caption caption-row">
