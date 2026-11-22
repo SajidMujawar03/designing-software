@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useCloudFile } from './cloud/cloudFile';
 import type { Route } from './cloud/route';
 import { CanvasView } from './editor/canvas/CanvasView';
@@ -30,6 +30,7 @@ import { SpecEditorLayer } from './panels/SpecEditor';
 import { CodeEditorPanel, CodeLayerOverlay } from './panels/CodeLayers';
 import { BrushBar, DrawPanel } from './panels/DrawMode';
 import { ShapeBuilderHint, VectorEditBar } from './panels/VectorEditBar';
+import { Timeline } from './panels/Timeline';
 import { VariablesModal } from './panels/VariablesPanel';
 
 let started = false;
@@ -71,6 +72,8 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
   useEffect(() => startCodeLayers(editor.doc), []);
   const uiMode = usePrefs((s) => s.ui);
   const drawMode = useUI((s) => s.drawMode);
+  const motionMode = useUI((s) => s.motionMode);
+  const timelineHeight = useUI((s) => s.motion.height);
 
   return (
     <div className={`app${uiMode === 'full' ? '' : ` ui-${uiMode}`}`}>
@@ -93,7 +96,7 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
             <LayersPanel />
           </ErrorBoundary>
         </aside>
-        <main className="canvas-area">
+        <main className="canvas-area" style={motionMode ? ({ '--timeline-h': `${timelineHeight}px` } as CSSProperties) : undefined}>
           <ErrorBoundary name="canvas" variant="panel">
             <CanvasView />
           </ErrorBoundary>
@@ -104,6 +107,7 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
           <BrushBar />
           <VectorEditBar />
           <ShapeBuilderHint />
+          <Timeline />
         </main>
         <aside className="sidebar right">
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>

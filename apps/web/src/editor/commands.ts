@@ -1,4 +1,5 @@
 import { isAutoLayout, isFrameLike, isGroupLike } from '@figma/document';
+import { setMotionMode, togglePlay } from './motion';
 import { usePlugins } from '../plugins/host';
 import { startTour, useOnboarding } from '../panels/Onboarding';
 import { setTheme } from '../theme';
@@ -134,6 +135,8 @@ export const COMMANDS: Command[] = [
   { id: 'shape-builder', label: 'Shape builder', shortcut: 'Shift+M', run: () => editor.setTool('shapes') },
   { id: 'variable-width', label: 'Variable width', shortcut: 'Shift+W', run: () => editor.setTool('width') },
   { id: 'draw-mode', label: 'Draw mode', run: () => editor.setDrawMode(!editor.ui.drawMode), checked: () => editor.ui.drawMode },
+  { id: 'motion-mode', label: 'Motion mode', run: () => setMotionMode(!editor.ui.motionMode), checked: () => editor.ui.motionMode },
+  { id: 'motion-play', label: 'Play or pause animation', shortcut: 'Space', run: togglePlay, enabled: () => editor.ui.motionMode },
   { id: 'code-snippet', label: 'Insert code snippet', run: () => editor.setTool('snippet') },
   { id: 'annotate', label: 'Annotate a layer', run: () => editor.setTool('annotate') },
   { id: 'find-replace', label: 'Find and replace…', shortcut: 'Ctrl+F', run: () => editor.setUI({ findOpen: true }) },

@@ -36,6 +36,20 @@ export interface SpecFocus {
   select?: boolean;
 }
 
+/** The Motion timeline's state: which frame it shows, the playhead (ms), and how it's displayed. */
+export interface MotionUI {
+  frameId: NodeId | null;
+  time: number;
+  playing: boolean;
+  unit: 'ms' | 's';
+  /** Timeline zoom: pixels per second. */
+  pxPerSec: number;
+  /** Layer tracks whose property rows are folded away. */
+  collapsed: NodeId[];
+  /** Height of the timeline panel (px). */
+  height: number;
+}
+
 /** Vector edit mode's actions (as in Figma): Move, Lasso, Bend, Cut, Eraser, Paint. */
 export type VectorMode = 'move' | 'lasso' | 'bend' | 'cut' | 'eraser' | 'paint';
 
@@ -79,6 +93,10 @@ export interface UIState {
   widthEdit: { selected: number[]; hoverT: number | null } | null;
   /** Draw mode: the toolbar offers Pen, Brush and Pencil, and the sidebar becomes stroke sliders. */
   drawMode: boolean;
+  /** Motion mode (Figma Motion): the timeline under the canvas, and the canvas drawn at the playhead. */
+  motionMode: boolean;
+  /** The timeline's state (per person; not saved in the file). */
+  motion: MotionUI;
   /** The code layer whose code editor panel is open. */
   codeEditorFor: NodeId | null;
   /** Code layers that are running, with a counter that restarts them when it changes. */
@@ -168,6 +186,8 @@ export const useUI = create<UIState>()(() => ({
   editingSpec: null,
   codeEditorFor: null,
   drawMode: false,
+  motionMode: false,
+  motion: { frameId: null, time: 0, playing: false, unit: 'ms', pxPerSec: 240, collapsed: [], height: 220 },
   widthEdit: null,
   runningCode: {},
   variablesOpen: false,

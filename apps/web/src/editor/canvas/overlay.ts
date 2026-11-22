@@ -14,6 +14,7 @@ import { visibleHandles } from '../tools/vector';
 import { worldPathsOf } from '../transforms';
 import { drawGradientHandles } from './gradientHandles';
 import { textEngine } from '../textEngine';
+import { drawnDocument } from '../motion';
 import { handleOwner, handleWorld } from '../textOnPath';
 import { drawRulers } from './rulers';
 
@@ -34,7 +35,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   const { viewport, selection, hoverId, marquee, editingTextId } = ed.ui;
   const view: Mat2D = [viewport.zoom, 0, 0, viewport.zoom, viewport.x, viewport.y];
   const screen: Mat2D = [dpr, 0, 0, dpr, 0, 0];
-  const doc = ed.doc;
+  // Motion mode: outlines follow the layers as drawn at the playhead.
+  const doc = drawnDocument();
   const pageId = ed.pageId;
   const selected = new Set(selection);
 

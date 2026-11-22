@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI, type ToolId } from '../editor/store';
+import { setMotionMode } from '../editor/motion';
 
 interface ToolDef {
   id: ToolId;
@@ -131,6 +132,8 @@ export function Toolbar() {
   useDocVersion();
   const tool = useUI((s) => s.tool);
   const drawMode = useUI((s) => s.drawMode);
+  const motionMode = useUI((s) => s.motionMode);
+  const mode = motionMode ? 'motion' : drawMode ? 'draw' : 'design';
   const zoom = useUI((s) => s.viewport.zoom);
   const pageId = useUI((s) => s.pageId);
   const page = editor.doc.get(pageId);
@@ -142,16 +145,20 @@ export function Toolbar() {
           ◆
         </div>
         <div className="mode-switch" role="radiogroup" aria-label="Mode">
-          {(['design', 'draw'] as const).map((m) => (
+          {(['design', 'draw', 'motion'] as const).map((m) => (
             <button
               key={m}
               type="button"
               role="radio"
-              aria-checked={(m === 'draw') === drawMode}
-              className={(m === 'draw') === drawMode ? 'active' : ''}
-              onClick={() => editor.setDrawMode(m === 'draw')}
+              aria-checked={mode === m}
+              className={mode === m ? 'active' : ''}
+              title={m === 'motion' ? 'Motion (beta): animate a frame on a timeline' : undefined}
+              onClick={() => {
+                setMotionMode(m === 'motion');
+                if (m !== 'motion') editor.setDrawMode(m === 'draw');
+              }}
             >
-              {m === 'draw' ? 'Draw' : 'Design'}
+              {m === 'draw' ? 'Draw' : m === 'motion' ? 'Motion' : 'Design'}
             </button>
           ))}
         </div>

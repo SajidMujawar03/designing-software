@@ -5,6 +5,7 @@ import type { Editor } from '../editor';
 import { insertIntoLayout, layoutDropAt } from '../layoutCommands';
 import { snapPoint, snapRect } from '../snapping';
 import { dragHandle, handleAt } from '../textOnPath';
+import { drawnDocument } from '../motion';
 import {
   boundsOf,
   fitText,
@@ -79,7 +80,8 @@ export class SelectTool implements Tool {
 
   /** Deepest layer under the pointer. */
   private hit(e: ToolEvent) {
-    return hitTest(this.doc, this.ed.pageId, e.world, { tolerance: 4 / this.ed.ui.viewport.zoom });
+    // Motion mode: layers are picked where they're drawn at the playhead.
+    return hitTest(drawnDocument(), this.ed.pageId, e.world, { tolerance: 4 / this.ed.ui.viewport.zoom });
   }
 
   /** What a click selects: the outermost group unless entered; Ctrl selects the deepest layer. */
