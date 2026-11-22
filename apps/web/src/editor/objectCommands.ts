@@ -30,6 +30,30 @@ export function rotateSelection(ed: Editor, degrees: number): void {
   });
 }
 
+/**
+ * Object > Flip horizontal (Shift+H) / Flip vertical (Shift+V): the selection
+ * is mirrored across its center. Each layer moves to its mirrored place, its
+ * rotation is reversed and its flip toggles (frames mirror their contents).
+ */
+export function flipSelection(ed: Editor, axis: 'x' | 'y'): void {
+  const ids = ed.topLevelSelection().filter((id) => !isInInstance(ed.doc, id));
+  const b = boundsOf(ed.doc, ids);
+  if (!ids.length || !b) return;
+  const pivot = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  ed.doc.change(() => {
+    for (const id of leafIds(ed.doc, ids)) {
+      const n = ed.doc.get(id)!;
+      const c = worldCenter(ed.doc, id);
+      const mirrored = axis === 'x' ? { x: 2 * pivot.x - c.x, y: c.y } : { x: c.x, y: 2 * pivot.y - c.y };
+      ed.doc.updateNode(id, {
+        ...placementIn(ed.doc, n.parentId!, mirrored, -worldRotation(ed.doc, id), n.width, n.height),
+        ...(axis === 'x' ? { flipX: !n.flipX || null } : { flipY: !n.flipY || null }),
+      } as NodePatch);
+      fitText(ed.doc, id);
+    }
+  });
+}
+
 const editable = (ed: Editor) => ed.selectedNodes().filter((n) => !isInInstance(ed.doc, n.id) || n.type === 'INSTANCE');
 
 /** Object > Remove fill (Alt+/). */

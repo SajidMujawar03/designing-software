@@ -1,6 +1,8 @@
 import { replaceSelectionColor, selectionColors, isAutoLayout, textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   FlipVertical2,
+  FlipHorizontal2,
+  RotateCwSquare,
   Blend,
   Component,
   SquareDashed,
@@ -51,6 +53,7 @@ import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { AutoLayoutFields, ConstraintsSection, FlowButtons, LayoutGridSection, SizingRow } from './LayoutPanels';
 import { addAutoLayout, removeAutoLayout } from '../editor/layoutCommands';
 import { command } from '../editor/commands';
+import { flipSelection, rotateSelection } from '../editor/objectCommands';
 import { AnnotationsSection, CodeSnippetSection, SpecSection } from './HandoffPanels';
 import { WidthProfileSelect } from './WidthProfile';
 import { ComponentSection } from './ComponentPanel';
@@ -159,6 +162,17 @@ export function PropertiesPanel() {
               suffix="°"
               onChange={(v, live) => apply(ids, { rotation: ((((v + 180) % 360) + 360) % 360) - 180 }, live)}
             />
+            <div className="button-row">
+              <IconButton title="Rotate 90° right" onClick={() => rotateSelection(editor, 90)}>
+                <RotateCwSquare size={14} />
+              </IconButton>
+              <IconButton title="Flip horizontal (Shift+H)" onClick={() => flipSelection(editor, 'x')}>
+                <FlipHorizontal2 size={14} />
+              </IconButton>
+              <IconButton title="Flip vertical (Shift+V)" onClick={() => flipSelection(editor, 'y')}>
+                <FlipVertical2 size={14} />
+              </IconButton>
+            </div>
           </div>
         )}
         {!plainBoxes && <ConstraintsSection ids={ids} nodes={nodes} />}

@@ -26,8 +26,9 @@ const DEG = Math.PI / 180;
 /** Node box to parent space. Rotation is around the box center. */
 export function localTransform(n: SceneNode): Mat2D {
   if (!hasOwnTransform(n)) return IDENTITY;
-  const sx = n.motionScaleX ?? 1;
-  const sy = n.motionScaleY ?? 1;
+  // Motion's scale, and Flip horizontal / vertical (a mirror around the box center).
+  const sx = (n.motionScaleX ?? 1) * (n.flipX ? -1 : 1);
+  const sy = (n.motionScaleY ?? 1) * (n.flipY ? -1 : 1);
   if (!n.rotation && sx === 1 && sy === 1) return translation(n.x, n.y);
   const cx = n.width / 2;
   const cy = n.height / 2;

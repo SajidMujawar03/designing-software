@@ -205,6 +205,12 @@ function transformAttr(n: SceneNode): string {
   if (isGroupLike(n)) return '';
   let t = `translate(${num(n.x)} ${num(n.y)})`;
   if (n.rotation) t += ` rotate(${num(n.rotation)} ${num(n.width / 2)} ${num(n.height / 2)})`;
+  // Flip horizontal / vertical: a mirror around the box center, after the rotation (as in localTransform).
+  if (n.flipX || n.flipY) {
+    const cx = num(n.width / 2);
+    const cy = num(n.height / 2);
+    t += ` translate(${cx} ${cy}) scale(${n.flipX ? -1 : 1} ${n.flipY ? -1 : 1}) translate(-${cx} -${cy})`;
+  }
   return ` transform="${t}"`;
 }
 
