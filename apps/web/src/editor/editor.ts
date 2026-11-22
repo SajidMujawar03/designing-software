@@ -24,6 +24,8 @@ export const MAX_ZOOM = 256;
 export class Editor {
   readonly doc = new DesignDocument();
   canvasSize = { width: 800, height: 600 };
+  /** Space was used to pan (pointer pressed while held), so releasing it is not a tap. */
+  spaceUsed = false;
   /** The renderer currently drawing the canvas (set by the canvas view). */
   renderer: SceneRenderer | null = null;
   /** Aborts the in-progress pointer gesture (set by the canvas view). */
@@ -698,7 +700,8 @@ export class Editor {
     const drawTools: ToolId[] = ['select', 'scale', 'pen', 'brush', 'pencil', 'text', 'hand', 'comment'];
     // Entering starts with the brush; leaving puts away tools Design mode doesn't show.
     const tool = on ? 'brush' : drawTools.includes(this.ui.tool) && this.ui.tool !== 'brush' ? this.ui.tool : 'select';
-    this.setUI({ drawMode: on });
+    // Draw mode and Motion mode take turns.
+    this.setUI(on ? { drawMode: true, motionMode: false, motion: { ...this.ui.motion, playing: false } } : { drawMode: false });
     this.setTool(tool);
   }
 

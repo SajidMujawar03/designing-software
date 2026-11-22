@@ -162,7 +162,8 @@ The renderers read nodes through `doc.get` and `doc.children` (about 16 call sit
 - **Undo:** every keyframe edit is one `doc.change` and undoes normally; scrubbing doesn't create undo steps.
 - **Shortcuts** (new entries in `COMMANDS`, so the desktop menus get them):
   - Space: play/pause, in Motion mode while the canvas has focus.
-  - Shift+M: toggle Motion mode. **Clash:** Shift+M is the shape builder today. Options: Shift+Alt+M, or no shortcut (Figma documents none). Decide before M2.
+  - Motion mode has no shortcut for now (Figma documents none, and Shift+M is the shape builder here). It's in the toolbar's mode switch and quick actions ("Motion mode").
+  - Space: a tap plays or pauses; holding Space and dragging still pans.
   - K: add a keyframe for the property last edited.
   - `,` and `.`: step the playhead back and forward 1 frame at 60 fps.
 

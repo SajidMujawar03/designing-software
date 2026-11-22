@@ -1,4 +1,5 @@
 import { snippetTextOf } from '@figma/document';
+import { togglePlay } from './motion';
 import type { BooleanOperation } from '@figma/document';
 import { useOnboarding } from '../panels/Onboarding';
 import { copyAsPng, exportLayers, saveFiles } from './export';
@@ -47,6 +48,7 @@ export function installShortcuts(): () => void {
     const ui = editor.ui;
 
     if (e.key === ' ' && !e.repeat) {
+      editor.spaceUsed = false;
       editor.setUI({ spaceHeld: true });
       e.preventDefault();
       return;
@@ -188,7 +190,11 @@ export function installShortcuts(): () => void {
   };
 
   const onKeyUp = (e: KeyboardEvent) => {
-    if (e.key === ' ') editor.setUI({ spaceHeld: false });
+    if (e.key === ' ') {
+      // Motion mode: a tap of Space plays or pauses (holding it and dragging still pans).
+      if (editor.ui.spaceHeld && editor.ui.motionMode && !editor.spaceUsed && !isTyping(e.target)) togglePlay();
+      editor.setUI({ spaceHeld: false });
+    }
     if (e.key === 'Alt') editor.setUI({ altHeld: false });
   };
   const onBlur = () => editor.setUI({ spaceHeld: false, altHeld: false });

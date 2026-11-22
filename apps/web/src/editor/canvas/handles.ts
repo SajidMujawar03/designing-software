@@ -2,6 +2,7 @@ import { isGroupLike, worldTransform, type NodeId } from '@figma/document';
 import { applyToPoint, translation, type Mat2D, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { boundsOf, lineEndpoints } from '../transforms';
+import { drawnDocument } from '../motion';
 
 /** The box the transform handles are attached to: one node, or the union of many. */
 export interface SelectionFrame {
@@ -18,13 +19,15 @@ export function getSelectionFrame(ed: Editor): SelectionFrame | null {
   const ids = ed.topLevelSelection();
   // Vector edit mode shows points instead of the transform box.
   if (!ids.length || ed.ui.vectorEdit) return null;
-  if (ids.length === 1 && !isGroupLike(ed.doc.get(ids[0]))) {
-    const n = ed.doc.get(ids[0])!;
-    const frame: SelectionFrame = { ids, m: worldTransform(ed.doc, n.id), width: n.width, height: n.height };
-    if (n.type === 'LINE') frame.line = lineEndpoints(ed.doc, n.id);
+  // Motion mode: around the layers as drawn at the playhead.
+  const doc = drawnDocument();
+  if (ids.length === 1 && !isGroupLike(doc.get(ids[0]))) {
+    const n = doc.get(ids[0])!;
+    const frame: SelectionFrame = { ids, m: worldTransform(doc, n.id), width: n.width, height: n.height };
+    if (n.type === 'LINE') frame.line = lineEndpoints(doc, n.id);
     return frame;
   }
-  const b = boundsOf(ed.doc, ids)!;
+  const b = boundsOf(doc, ids)!;
   return { ids, m: translation(b.x, b.y), width: b.width, height: b.height };
 }
 

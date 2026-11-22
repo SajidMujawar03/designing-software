@@ -1,4 +1,5 @@
 import { hitTest, paintColor, selectableAncestor } from '@figma/document';
+import { drawnDocument } from '../motion';
 import { recordFrame } from '../perf';
 import { ASSET_MIME, insertInstanceAt } from '../componentCommands';
 import { Canvas2DRenderer, CanvasKitRenderer, type SceneRenderer } from '@figma/renderer';
@@ -96,7 +97,8 @@ export function CanvasView() {
       const { viewport } = editor.ui;
       const { width, height } = editor.canvasSize;
       fonts.requestUsed(editor.doc);
-      renderer.render(editor.doc, editor.pageId, {
+      // Motion mode draws the timeline's frame posed at the playhead.
+      renderer.render(drawnDocument(), editor.pageId, {
         view: [viewport.zoom, 0, 0, viewport.zoom, viewport.x, viewport.y],
         visible: {
           x: -viewport.x / viewport.zoom,
@@ -231,6 +233,7 @@ export function CanvasView() {
         guide = { index, axis: gh.axis };
         return;
       }
+      if (ui.spaceHeld) editor.spaceUsed = true;
       active = e.button === 1 || ui.spaceHeld ? tools.hand : currentTool();
       active.down(toEvent(e));
     };
