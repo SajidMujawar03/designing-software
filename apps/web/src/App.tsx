@@ -29,6 +29,7 @@ import { FindReplacePanel } from './panels/FindReplace';
 import { SpecEditorLayer } from './panels/SpecEditor';
 import { CodeEditorPanel, CodeLayerOverlay } from './panels/CodeLayers';
 import { BrushBar, DrawPanel } from './panels/DrawMode';
+import { ShapeBuilderHint, VectorEditBar } from './panels/VectorEditBar';
 import { VariablesModal } from './panels/VariablesPanel';
 
 let started = false;
@@ -101,6 +102,8 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
           <CodeLayerOverlay />
           <CodeEditorPanel />
           <BrushBar />
+          <VectorEditBar />
+          <ShapeBuilderHint />
         </main>
         <aside className="sidebar right">
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>

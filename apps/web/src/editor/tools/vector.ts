@@ -1,8 +1,9 @@
-import { BRUSH_SMOOTHING, brushStrokeProps, hitTest, sampleBrush, segmentBetween, styleFor, type DrawTool, type NodeId, type NodePatch, type VectorPath, type VectorVertex } from '@figma/document';
+import { bendSegment, BRUSH_SMOOTHING, brushStrokeProps, cutPaths, erasePaths, hitTest, pointsInLasso, sampleBrush, segmentBetween, splitAtPositions, styleFor, type DrawTool, type NodeId, type NodePatch, type VectorPath, type VectorVertex } from '@figma/document';
 import { closestOnCubic, rectContainsPoint, rectFromPoints, simplifyPolyline, splitCubic, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { prefs, setBrush } from '../prefs';
-import type { PointRef } from '../store';
+import type { PointRef, VectorMode } from '../store';
+import { paintRegion } from '../vectorActions';
 import { placementIn, setVectorWorld, worldPathsOf, worldRotation } from '../transforms';
 import { snapAngle, type Tool, type ToolEvent } from './types';
 
@@ -251,6 +252,17 @@ type EditHit =
   | { kind: 'handle'; ref: PointRef; side: 'in' | 'out' }
   | { kind: 'segment'; path: number; index: number; t: number; point: Vec2 };
 
+type ActionGesture =
+  | null
+  | { kind: 'lasso'; shift: boolean }
+  | { kind: 'eraser' }
+  | { kind: 'cut'; start: Vec2; startScreen: Vec2 }
+  | { kind: 'bend'; path: number; seg: number; t: number; base: VectorPath[] }
+  | { kind: 'paint'; into: NodeId | null; busy: boolean };
+
+/** Eraser radius in screen pixels. */
+const ERASER_RADIUS = 8;
+
 type EditGesture =
   | { kind: 'none' }
   | { kind: 'points'; start: Vec2; base: VectorPath[]; refs: PointRef[] }
@@ -267,6 +279,8 @@ const sameRef = (a: PointRef, b: PointRef) => a[0] === b[0] && a[1] === b[1];
 export class VectorEditTool implements Tool {
   cursor = 'default';
   private g: EditGesture = { kind: 'none' };
+  /** The current action gesture (modes other than Move). */
+  private a: ActionGesture = null;
 
   constructor(private ed: Editor) {}
 
@@ -313,6 +327,7 @@ export class VectorEditTool implements Tool {
     const ve = this.state;
     if (!ve) return;
     this.doc.endGesture();
+    if ((ve.mode ?? 'move') !== 'move') return this.downAction(ve.mode!, e);
     const paths = worldPathsOf(this.doc, ve.id);
     const h = this.hit(e, paths);
     if (h?.kind === 'handle') {
@@ -354,6 +369,7 @@ export class VectorEditTool implements Tool {
     const ve = this.state;
     const g = this.g;
     if (!ve) return;
+    if (this.a) return this.moveAction(e);
     if (g.kind === 'points') {
       const dx = e.px.x - g.start.x;
       const dy = e.px.y - g.start.y;
@@ -388,14 +404,144 @@ export class VectorEditTool implements Tool {
     }
   }
 
-  up(): void {
+  up(e?: ToolEvent): void {
+    if (this.a) return this.upAction(e);
     if (this.g.kind === 'marquee') this.ed.setUI({ marquee: null });
     this.g = { kind: 'none' };
     this.doc.endGesture();
   }
 
   cancel(): void {
+    this.a = null;
+    this.ed.setUI({ editStroke: null });
     this.up();
+  }
+
+  // ------------------------------------------------ actions (Figma's vector edit bar)
+
+  private setMode(mode: VectorMode): void {
+    const ve = this.state;
+    if (ve) this.ed.setUI({ vectorEdit: { ...ve, mode }, editStroke: null });
+  }
+
+  private downAction(mode: VectorMode, e: ToolEvent): void {
+    const ve = this.state!;
+    const zoom = this.ed.ui.viewport.zoom;
+    switch (mode) {
+      case 'lasso':
+        this.a = { kind: 'lasso', shift: e.shift };
+        this.ed.setUI({ editStroke: { kind: 'lasso', points: [e.world] } });
+        return;
+      case 'eraser':
+        this.a = { kind: 'eraser' };
+        this.ed.setUI({ editStroke: { kind: 'eraser', points: [e.world], radius: ERASER_RADIUS / zoom } });
+        return;
+      case 'cut':
+        this.a = { kind: 'cut', start: e.world, startScreen: e.screen };
+        this.ed.setUI({ editStroke: { kind: 'cut', points: [e.world, e.world] } });
+        return;
+      case 'bend': {
+        const paths = worldPathsOf(this.doc, ve.id);
+        const h = this.hit(e, paths);
+        if (h?.kind === 'segment') this.a = { kind: 'bend', path: h.path, seg: h.index, t: h.t, base: clonePaths(paths) };
+        else if (h?.kind === 'point') {
+          // Clicking a point with Bend switches it between corner and smooth.
+          this.toggleSmooth(paths, h.ref);
+          this.doc.change(() => setVectorWorld(this.doc, ve.id, paths));
+        }
+        return;
+      }
+      case 'paint':
+        this.a = { kind: 'paint', into: null, busy: false };
+        void this.paintAt(e.world);
+        return;
+    }
+  }
+
+  private moveAction(e: ToolEvent): void {
+    const ve = this.state;
+    const a = this.a;
+    if (!ve || !a) return;
+    const stroke = this.ed.ui.editStroke;
+    if (a.kind === 'lasso' || a.kind === 'eraser') {
+      const last = stroke?.points[stroke.points.length - 1];
+      if (stroke && last && len(sub(e.world, last)) * this.ed.ui.viewport.zoom >= 2) this.ed.setUI({ editStroke: { ...stroke, points: [...stroke.points, e.world] } });
+    } else if (a.kind === 'cut') {
+      if (stroke) this.ed.setUI({ editStroke: { ...stroke, points: [a.start, e.world] } });
+    } else if (a.kind === 'bend') {
+      const paths = clonePaths(a.base);
+      paths[a.path] = bendSegment(a.base[a.path], a.seg, a.t, e.world);
+      setVectorWorld(this.doc, ve.id, paths);
+    } else if (a.kind === 'paint' && !a.busy) {
+      void this.paintAt(e.world);
+    }
+  }
+
+  private upAction(e?: ToolEvent): void {
+    const ve = this.state;
+    const a = this.a;
+    const stroke = this.ed.ui.editStroke;
+    this.a = null;
+    this.ed.setUI({ editStroke: null });
+    if (!ve || !a) return;
+    const paths = worldPathsOf(this.doc, ve.id);
+    if (a.kind === 'lasso' && stroke) {
+      const hits = pointsInLasso(paths, stroke.points) as PointRef[];
+      this.setSelected(a.shift ? [...ve.selected, ...hits.filter((h) => !ve.selected.some((s) => sameRef(s, h)))] : hits);
+    } else if (a.kind === 'eraser' && stroke) {
+      const rest = erasePaths(paths, stroke.points, stroke.radius ?? ERASER_RADIUS);
+      if (rest) {
+        this.doc.change(() => {
+          if (rest.length) setVectorWorld(this.doc, ve.id, rest);
+          else this.doc.deleteNodes([ve.id]);
+        });
+        if (rest.length) this.setSelected([]);
+        else this.ed.setUI({ vectorEdit: null });
+      }
+    } else if (a.kind === 'cut' && e) {
+      const clicked = len(sub(e.screen, a.startScreen)) < 4;
+      if (clicked) {
+        // Click: split the path there (it stays in this layer).
+        const h = this.hit(e, paths);
+        if (h?.kind === 'segment') {
+          const pieces = splitAtPositions(paths[h.path], [{ seg: h.index, t: h.t }]);
+          const next = [...paths.slice(0, h.path), ...pieces, ...paths.slice(h.path + 1)];
+          this.doc.change(() => setVectorWorld(this.doc, ve.id, next));
+          this.setSelected([]);
+        }
+      } else {
+        // Drag across: divide into separate layers.
+        const { pieces, cut } = cutPaths(paths, a.start, e.world);
+        if (cut && pieces.length) {
+          const ids = this.doc.change(() => {
+            const out = [ve.id];
+            setVectorWorld(this.doc, ve.id, [pieces[0]]);
+            for (const piece of pieces.slice(1)) {
+              const [copy] = this.ed.duplicateInPlace([ve.id]);
+              setVectorWorld(this.doc, copy, [piece]);
+              out.push(copy);
+            }
+            return out;
+          });
+          this.ed.setUI({ vectorEdit: null });
+          this.ed.select(ids);
+        }
+      }
+    }
+    this.doc.endGesture();
+  }
+
+  /** Paint the region under a point (one at a time, as each needs Skia's path operations). */
+  private async paintAt(at: Vec2): Promise<void> {
+    const ve = this.state;
+    const a = this.a;
+    if (!ve || a?.kind !== 'paint') return;
+    a.busy = true;
+    try {
+      a.into = await paintRegion(this.ed, ve.id, at, this.ed.ui.paintColor, a.into);
+    } finally {
+      a.busy = false;
+    }
   }
 
   hover(e: ToolEvent): void {
@@ -444,6 +590,20 @@ export class VectorEditTool implements Tool {
   key(e: KeyboardEvent): boolean {
     const ve = this.state;
     if (!ve) return false;
+    // The action bar's shortcuts (Figma's): V Move, Q Lasso, X Cut, Shift+E Eraser, Shift+B Paint.
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      const modes: Record<string, VectorMode> = e.shiftKey ? { KeyE: 'eraser', KeyB: 'paint' } : { KeyV: 'move', KeyQ: 'lasso', KeyX: 'cut' };
+      const mode = modes[e.code];
+      if (mode) {
+        this.setMode(mode);
+        return true;
+      }
+    }
+    // Esc leaves an action first, then the selection, then edit mode.
+    if (e.key === 'Escape' && (ve.mode ?? 'move') !== 'move') {
+      this.setMode('move');
+      return true;
+    }
     if (e.key === 'Escape' || e.key === 'Enter') {
       if (e.key === 'Escape' && ve.selected.length) this.setSelected([]);
       else this.ed.exitVectorEdit();

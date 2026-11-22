@@ -5,6 +5,7 @@ import { HandTool, ShapeTool, TextTool } from './create';
 import { SelectTool } from './select';
 import { CommentTool } from './comment';
 import { WidthTool } from './width';
+import { ShapeBuilderTool } from './shapeBuilder';
 import { AnnotateTool, CodeSnippetTool, SpecTool } from './handoff';
 import { BrushTool, PenTool, VectorEditTool } from './vector';
 import type { Tool } from './types';
@@ -30,6 +31,7 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     pencil: new BrushTool(ed, 'pencil'),
     brush: new BrushTool(ed, 'brush'),
     width: new WidthTool(ed),
+    shapes: new ShapeBuilderTool(ed),
     text: new TextTool(ed),
     hand: new HandTool(ed),
     comment: new CommentTool(),

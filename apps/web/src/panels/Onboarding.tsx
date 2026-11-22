@@ -129,6 +129,7 @@ export function ShortcutsSheet() {
     ['Slice', 'S'],
     ['Spec', 'D'],
     ['Variable width', 'Shift+W'],
+    ['Shape builder', 'Shift+M'],
     ['Code layer', 'B'],
     ['Rectangle', 'R'],
     ['Ellipse', 'O'],

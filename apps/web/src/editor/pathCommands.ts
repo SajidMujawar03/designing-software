@@ -79,7 +79,7 @@ function worldOutline(ck: CanvasKit, doc: DesignDocument, n: SceneNode): VectorP
 }
 
 /** Creates a vector above `aboveId` from canvas-space paths. */
-function createVectorFrom(
+export function createVectorFrom(
   ed: Editor,
   parentId: NodeId,
   aboveId: NodeId,
