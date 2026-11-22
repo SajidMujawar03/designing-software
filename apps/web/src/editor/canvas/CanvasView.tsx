@@ -24,6 +24,7 @@ import { hitGuide, RULER } from './rulers';
 import { TextInput } from './TextInput';
 import { textEngine } from '../textEngine';
 import * as TextEdit from '../textEditing';
+import { outlinesDocument, pixelPreviewRatio } from '../viewModes';
 
 const CANVAS_BG = { r: 245 / 255, g: 245 / 255, b: 245 / 255 };
 const pageBackground = () => {
@@ -80,6 +81,8 @@ export function CanvasView() {
     const octx = overlay.getContext('2d')!;
     let frame = 0;
     let dpr = window.devicePixelRatio || 1;
+    // The scene canvas's pixel ratio (smaller than dpr in pixel preview).
+    let sceneRatio = dpr;
 
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(draw);
@@ -97,8 +100,17 @@ export function CanvasView() {
       const { viewport } = editor.ui;
       const { width, height } = editor.canvasSize;
       fonts.requestUsed(editor.doc);
-      // Motion mode draws the timeline's frame posed at the playhead.
-      renderer.render(drawnDocument(), editor.pageId, {
+      // Pixel preview: one scene pixel per canvas unit, scaled up without smoothing.
+      const p = prefs();
+      const ratio = pixelPreviewRatio(p.pixelPreview, viewport.zoom, window.devicePixelRatio || 1);
+      if (ratio !== sceneRatio) {
+        sceneRatio = ratio;
+        renderer.resize(width, height, ratio);
+        scene.style.imageRendering = ratio < 1 ? 'pixelated' : '';
+      }
+      // Motion mode draws the timeline's frame posed at the playhead; Outlines draws every layer as an outline.
+      const drawn = drawnDocument();
+      renderer.render(p.outlines ? outlinesDocument(drawn, editor.pageId, viewport.zoom) : drawn, editor.pageId, {
         view: [viewport.zoom, 0, 0, viewport.zoom, viewport.x, viewport.y],
         visible: {
           x: -viewport.x / viewport.zoom,
@@ -130,7 +142,8 @@ export function CanvasView() {
         c.style.width = `${rect.width}px`;
         c.style.height = `${rect.height}px`;
       }
-      renderer.resize(rect.width, rect.height, dpr);
+      sceneRatio = pixelPreviewRatio(prefs().pixelPreview, editor.ui.viewport.zoom, dpr);
+      renderer.resize(rect.width, rect.height, sceneRatio);
       overlay.width = Math.round(rect.width * dpr);
       overlay.height = Math.round(rect.height * dpr);
       editor.canvasSize = { width: rect.width, height: rect.height };

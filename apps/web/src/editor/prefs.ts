@@ -27,10 +27,18 @@ export interface Prefs {
   keepToolSelected: boolean;
   /** Preferences > Highlight layers on hover: outline the layer under the pointer. */
   highlightHover: boolean;
+  /** View > Outlines: layers drawn as thin outlines (not kept after a reload). */
+  outlines: boolean;
+  /** View > Pixel preview: the canvas shows the pixels an export would have (not kept after a reload). */
+  pixelPreview: boolean;
+  /** View > Pixel grid: a grid of pixel lines when zoomed in far. */
+  pixelGrid: boolean;
+  /** View > Show slices: every slice's outline, not just the selected one's. */
+  showSlices: boolean;
 }
 
 const KEY = 'figma-clone:prefs';
-export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, showAnnotations: true, brushes: DEFAULT_BRUSHES, sampleHintClosed: false, ui: 'full', keepToolSelected: false, highlightHover: true };
+export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, showAnnotations: true, brushes: DEFAULT_BRUSHES, sampleHintClosed: false, ui: 'full', keepToolSelected: false, highlightHover: true, outlines: false, pixelPreview: false, pixelGrid: true, showSlices: false };
 
 /** Stored prefs, with anything missing or out of range set back to its default. */
 export function parsePrefs(raw: string | null): Prefs {
@@ -54,6 +62,11 @@ export function parsePrefs(raw: string | null): Prefs {
     ui: v.ui === 'minimized' ? 'minimized' : 'full',
     keepToolSelected: v.keepToolSelected === true,
     highlightHover: v.highlightHover !== false,
+    // Outlines and Pixel preview are for now: a reload shows the design as it is.
+    outlines: false,
+    pixelPreview: false,
+    pixelGrid: v.pixelGrid !== false,
+    showSlices: v.showSlices === true,
   };
 }
 

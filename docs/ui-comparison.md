@@ -168,11 +168,11 @@ Layer selected (frame / group):
 | --- | --- | --- |
 | Zoom in/out, Zoom to fit, **Zoom to 50% / 100% / 200%**, Zoom to selection | Zoom in/out, Zoom to fit, Zoom to selection, Zoom to 50% / 100% / 200%, then view toggles | Same (U1) |
 | Zoom to 100% = **Ctrl+0** | Zoom to 100% = **Ctrl+0** (Shift+0 also works) | Same (U1) |
-| Pixel grid, Snap to pixel grid, **Pixel preview** | Snap to pixel grid (quick actions) | Missing in ours (Pixel grid toggle, Pixel preview) |
+| Pixel grid, Snap to pixel grid, **Pixel preview** | View: Pixel grid (from 800%), Pixel preview (Ctrl+Shift+P), Snap to pixel grid; also in the zoom menu | Same (V3) |
 | **Layout guides** (Shift+G) | **Layout guides** (Shift+G; Ctrl+Shift+4 also works) | Same (U1) |
 | Rulers (Shift+R) | Show rulers (Shift+R) | Same |
-| **Outlines**, Mask outlines, Frame outlines | — | Missing in ours |
-| Show slices, Comments (Shift+C), Annotations (Shift+Y), Additional labels, Multiplayer cursors | Show annotations (Shift+Y), Multiplayer cursors | Missing in ours (Show slices, Additional labels) |
+| **Outlines**, Mask outlines, Frame outlines | View: **Outlines** (every layer as a 1px outline, text in black); no Mask / Frame outlines | Same (V3); no mask or frame outline options |
+| Show slices, Comments (Shift+C), Annotations (Shift+Y), Additional labels, Multiplayer cursors | Show slices (View), Annotations (Shift+Y), Multiplayer cursors | Missing in ours (Additional labels; Comments toggle) |
 | Previous/next page, Zoom to previous/next frame (N / Shift+N) | View: Previous page / Next page (Page Up / Page Down), Zoom to previous / next frame (Shift+N / N) | Same (U3) |
 | Preferences: snapping, Keep tool selected after use, Nudge amount…, etc. | Preferences: Snap to pixel grid, Keep tool selected after use, Highlight layers on hover, Nudge amount…, Theme | Missing in ours (the other preferences) |
 

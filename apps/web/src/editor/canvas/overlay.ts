@@ -45,6 +45,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   if (ed.ui.showLayoutGrids) drawLayoutGrids(ctx, ed, multiply(screen, view));
+  if (prefs().pixelGrid) drawPixelGrid(ctx, ed);
 
   // Name labels: above top-level frames (frames inside sections count as top-level), and as a chip inside sections.
   const labelled = (parentId: NodeId): SceneNode[] =>
@@ -97,6 +98,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.setLineDash([]);
   };
 
+  // View > Show slices: every slice's dashed outline.
+  if (prefs().showSlices) for (const n of doc.descendants(pageId)) if (n.type === 'SLICE' && n.visible && !selected.has(n.id)) outline(n.id, 1);
   if (hoverId && !selected.has(hoverId) && prefs().highlightHover) outline(hoverId, 1.5);
   drawPinnedMeasurements(ctx, ed, prefs().showAnnotations);
   drawMeasurements(ctx, ed);
@@ -461,4 +464,31 @@ function drawSectionLabel(ctx: CanvasRenderingContext2D, name: string, at: { x: 
   ctx.fill();
   ctx.fillStyle = active ? '#FFFFFF' : '#333333';
   ctx.fillText(text, x + pad, y + h / 2 + 0.5);
+}
+
+/** View > Pixel grid: a line between every pixel once zoomed in to 800% or more, as in Figma. */
+function drawPixelGrid(ctx: CanvasRenderingContext2D, ed: Editor): void {
+  const { zoom, x: vx, y: vy } = ed.ui.viewport;
+  if (zoom < 8) return;
+  const { width, height } = ed.canvasSize;
+  const x0 = Math.floor(-vx / zoom);
+  const y0 = Math.floor(-vy / zoom);
+  const x1 = Math.ceil((width - vx) / zoom);
+  const y1 = Math.ceil((height - vy) / zoom);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(128, 128, 128, 0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = x0; x <= x1; x++) {
+    const sx = Math.round(x * zoom + vx) + 0.5;
+    ctx.moveTo(sx, 0);
+    ctx.lineTo(sx, height);
+  }
+  for (let y = y0; y <= y1; y++) {
+    const sy = Math.round(y * zoom + vy) + 0.5;
+    ctx.moveTo(0, sy);
+    ctx.lineTo(width, sy);
+  }
+  ctx.stroke();
+  ctx.restore();
 }

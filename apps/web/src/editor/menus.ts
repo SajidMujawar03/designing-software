@@ -44,6 +44,11 @@ export const EDITOR_MENUS = (): Menu[] => [
   {
     label: 'View',
     items: [
+      'pixel-grid',
+      'pixel-preview',
+      'outlines',
+      'show-slices',
+      '-',
       'layout-grids',
       'clear-guides',
       'clear-measurements',
