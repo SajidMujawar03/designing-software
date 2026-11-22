@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
+import { useFloating } from './floating';
 import { breadcrumb } from '../errors';
 import { command, isEnabled } from '../editor/commands';
 import { EDITOR_MENUS, FILE_ITEMS, type MenuEntry } from '../editor/menus';
@@ -45,8 +46,25 @@ export function MainMenu() {
 }
 
 /** A menu panel with arrow-key navigation between its own rows. */
-function MenuList({ label, children, onClose, autoFocus, className = '' }: { label: string; children: React.ReactNode; onClose: () => void; autoFocus?: boolean; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+function MenuList({
+  label,
+  children,
+  onClose,
+  autoFocus,
+  className = '',
+  listRef,
+  style,
+}: {
+  label: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  autoFocus?: boolean;
+  className?: string;
+  listRef?: RefObject<HTMLDivElement>;
+  style?: CSSProperties;
+}) {
+  const own = useRef<HTMLDivElement>(null);
+  const ref = listRef ?? own;
   useEffect(() => {
     if (autoFocus) rows(ref.current)[0]?.focus();
   }, [autoFocus]);
@@ -64,7 +82,7 @@ function MenuList({ label, children, onClose, autoFocus, className = '' }: { lab
     }
   };
   return (
-    <div ref={ref} className={`menu main-menu-list ${className}`} role="menu" aria-label={label} onKeyDown={onKeyDown}>
+    <div ref={ref} className={`menu main-menu-list ${className}`} role="menu" aria-label={label} onKeyDown={onKeyDown} style={style}>
       {children}
     </div>
   );
@@ -77,6 +95,9 @@ function Submenu({ label, items, onDone }: { label: string; items: MenuEntry[]; 
   const [open, setOpen] = useState(false);
   const [focusFirst, setFocusFirst] = useState(false);
   const rowRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Placed in window coordinates: shifted up (and scrolling) when it's taller than the room below, flipped left at the right edge.
+  const place = useFloating(rowRef, listRef, open, 'right-start');
   const entries = trim(items);
   if (!entries.length) return null;
   return (
@@ -112,7 +133,7 @@ function Submenu({ label, items, onDone }: { label: string; items: MenuEntry[]; 
             }
           }}
         >
-          <MenuList label={label} onClose={onDone} autoFocus={focusFirst} className="submenu-list">
+          <MenuList label={label} onClose={onDone} autoFocus={focusFirst} className="submenu-list" listRef={listRef} style={place}>
             {entries.map((e, i) =>
               e === '-' ? (
                 <div key={i} className="menu-divider" />

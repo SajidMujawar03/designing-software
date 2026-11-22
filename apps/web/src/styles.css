@@ -660,8 +660,12 @@ button {
 
 .grid2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …): a wide field can't push its column wider than half the row. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 6px 8px;
+}
+.grid2 > * {
+  min-width: 0;
 }
 
 /* Start point, swap, end point for lines and open paths. */
@@ -1792,6 +1796,15 @@ button.swatch {
   display: flex;
   gap: 4px;
   align-items: center;
+  min-width: 0;
+}
+.color-input .num-field {
+  flex: 1;
+  min-width: 0;
+}
+.style-editor .select {
+  width: 100%;
+  min-width: 0;
 }
 
 .color-input input[type='color'] {
@@ -6134,7 +6147,7 @@ a.btn {
   text-overflow: ellipsis;
 }
 .grid2.with-lock {
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
 }
 
