@@ -1,4 +1,4 @@
-import { Spline, ArrowUpRight, Braces, Brush, FileText, SquareCode, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -11,16 +11,25 @@ import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI, type ToolId } from '../editor/store';
 import { setMotionMode } from '../editor/motion';
+import { placeImages } from '../editor/shortcuts';
 import { command } from '../editor/commands';
 
 /** View settings listed under the zoom levels, as in Figma's zoom/view options menu. */
 const VIEW_TOGGLES = ['snap-pixel', 'layout-grids', 'rulers', 'multiplayer-cursors', 'show-annotations'];
 
 interface ToolDef {
-  id: ToolId;
+  /** A tool, or (with `run`) a command listed in a slot's menu, like Image/video…. */
+  id: ToolId | 'image';
   label: string;
   key: string;
   Icon: typeof Square;
+  run?: () => void;
+}
+
+/** A toolbar slot: a single tool, or a named group whose menu picks which of its tools the slot shows. */
+interface Slot {
+  name?: string;
+  tools: ToolDef[];
 }
 
 const T = {
@@ -42,37 +51,30 @@ const T = {
   textPath: { id: 'textPath', label: 'Text on path', key: '', Icon: Spline },
   code: { id: 'code', label: 'Code', key: 'B', Icon: SquareCode },
   spec: { id: 'spec', label: 'Spec', key: 'D', Icon: FileText },
-  snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
-  annotate: { id: 'annotate', label: 'Annotation', key: 'Shift+T', Icon: NotebookPen },
   hand: { id: 'hand', label: 'Hand tool', key: 'H', Icon: Hand },
   comment: { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
+  image: { id: 'image', label: 'Image/video…', key: 'Ctrl+Shift+K', Icon: ImageIcon, run: () => void placeImages() },
 } satisfies Record<string, ToolDef>;
 
-/** Toolbar slots: a single tool, or a group whose menu picks which of its tools the slot shows. */
-const TOOLS: ToolDef[][] = [
-  [T.select, T.scale],
-  [T.frame, T.section, T.slice],
-  [T.rectangle],
-  [T.ellipse],
-  [T.polygon],
-  [T.star],
-  [T.line],
-  [T.arrow],
-  [T.pen],
-  [T.pencil],
-  [T.text, T.textPath],
-  [T.code, T.spec, T.snippet, T.annotate],
-  [T.hand],
-  [T.comment],
-];
+// Figma's toolbar slots, with its names for them.
+const MOVE: Slot = { name: 'Move tools', tools: [T.select, T.hand, T.scale] };
+const REGION: Slot = { name: 'Region tools', tools: [T.frame, T.section, T.slice] };
+const SHAPE: Slot = { name: 'Shape tools', tools: [T.rectangle, T.line, T.arrow, T.ellipse, T.polygon, T.star, T.image] };
+const CREATION: Slot = { name: 'Creation tools', tools: [T.pen, T.pencil] };
+const TYPE: Slot = { name: 'Type tools', tools: [T.text, T.textPath] };
+const CODE: Slot = { name: 'Code tools', tools: [T.code, T.spec] };
+const COMMENT: Slot = { tools: [T.comment] };
 
-/** Draw mode's toolbar, as in Figma Draw: Pen, Brush and Pencil (plus moving, text and panning). */
-const DRAW_TOOLS: ToolDef[][] = [[T.select, T.scale], [T.pen], [T.brush], [T.pencil], [T.text], [T.hand], [T.comment]];
+const TOOLS: Slot[] = [MOVE, REGION, SHAPE, CREATION, TYPE, CODE, COMMENT];
+
+/** Draw mode's toolbar, as in Figma Draw: Pen, Brush and Pencil after Move, then the usual slots. */
+const DRAW_TOOLS: Slot[] = [MOVE, { tools: [T.pen] }, { tools: [T.brush] }, { tools: [T.pencil] }, REGION, SHAPE, TYPE, CODE, COMMENT];
 
 const tip = (t: ToolDef) => (t.key ? `${t.label} (${t.key})` : t.label);
 
 /** One toolbar slot. A group shows its active (or last used) tool, with a caret that opens the others. */
-function ToolSlot({ tools, tool }: { tools: ToolDef[]; tool: ToolId }) {
+function ToolSlot({ slot, tool }: { slot: Slot; tool: ToolId }) {
+  const { tools, name } = slot;
   const [last, setLast] = useState(tools[0]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -93,9 +95,11 @@ function ToolSlot({ tools, tool }: { tools: ToolDef[]; tool: ToolId }) {
   }, [open]);
 
   const pick = (t: ToolDef) => {
-    setLast(t);
     setOpen(false);
-    editor.setTool(t.id);
+    // A command (Image/video…) runs without becoming the slot's tool.
+    if (t.run) return t.run();
+    setLast(t);
+    editor.setTool(t.id as ToolId);
   };
   const { Icon } = current;
   return (
@@ -106,19 +110,20 @@ function ToolSlot({ tools, tool }: { tools: ToolDef[]; tool: ToolId }) {
         title={tip(current)}
         aria-label={current.label}
         aria-pressed={active}
-        onClick={() => editor.setTool(current.id)}
+        onClick={() => pick(current)}
       >
         <Icon size={16} strokeWidth={1.75} />
       </button>
       {tools.length > 1 && (
-        <button type="button" className="tool-caret" title={`More ${current.label.toLowerCase()} tools`} aria-label={`More tools like ${current.label}`} aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button type="button" className="tool-caret" title={name} aria-label={name} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
           <ChevronDown size={10} />
         </button>
       )}
       {open && (
-        <div className="menu tool-menu" role="menu">
+        <div className="menu tool-menu" role="menu" aria-label={name}>
+          {name && <div className="tool-menu-title">{name}</div>}
           {tools.map((t) => (
-            <button key={t.id} type="button" role="menuitemradio" aria-checked={t.id === current.id} className="menu-item" onClick={() => pick(t)}>
+            <button key={t.id} type="button" role={t.run ? 'menuitem' : 'menuitemradio'} aria-checked={t.run ? undefined : t.id === current.id} className="menu-item" onClick={() => pick(t)}>
               <span className="tool-menu-label">
                 <t.Icon size={14} strokeWidth={1.75} />
                 {t.label}
@@ -166,8 +171,8 @@ export function Toolbar() {
             </button>
           ))}
         </div>
-        {(drawMode ? DRAW_TOOLS : TOOLS).filter((g) => g[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
-          <ToolSlot key={g[0].id} tools={g} tool={tool} />
+        {(drawMode ? DRAW_TOOLS : TOOLS).filter((g) => g.tools[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
+          <ToolSlot key={g.name ?? g.tools[0].id} slot={g} tool={tool} />
         ))}
         <span className="divider" />
         <button type="button" className="tool-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!editor.doc.canUndo()} onClick={() => editor.undo()}>
