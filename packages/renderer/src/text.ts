@@ -1,4 +1,4 @@
-import { applyCase, styleAt, styledSegments, type SceneNode } from '@figma/document';
+import { applyCase, styleAt, styledSegments, textUnitsOf, type SceneNode } from '@figma/document';
 
 export interface TextLine {
   text: string;
@@ -77,6 +77,54 @@ export function drawText(ctx: CanvasRenderingContext2D, n: SceneNode, layout: Te
     if (n.textAlign === 'CENTER') x = (n.width - line.width) / 2;
     else if (n.textAlign === 'RIGHT') x = n.width - line.width;
     ctx.fillText(line.text, x, i * layout.lineHeightPx + layout.lineHeightPx / 2);
+  });
+  c.letterSpacing = '0px';
+}
+
+/**
+ * Text animated by character, word or line (Motion), with Canvas 2D: each
+ * character of the laid-out lines drawn on its own, moved, turned, scaled
+ * and faded by its unit's effect.
+ */
+export function drawAnimatedText(ctx: CanvasRenderingContext2D, n: SceneNode, layout: TextLayout, style: string): void {
+  const c = ctx as CtxWithSpacing;
+  ctx.font = layout.font;
+  c.letterSpacing = `${n.letterSpacing ?? 0}px`;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = style;
+  // Units are numbered on the lines as laid out (wrapping happens at spaces, so characters and words match the text).
+  const joined = layout.lines.map((l) => l.text).join('\n');
+  const chars: Array<{ index: number; line: number; x: number; y: number; ch: string; w: number }> = [];
+  let offset = 0;
+  layout.lines.forEach((line, li) => {
+    let x0 = 0;
+    if (n.textAlign === 'CENTER') x0 = (n.width - line.width) / 2;
+    else if (n.textAlign === 'RIGHT') x0 = n.width - line.width;
+    const y = li * layout.lineHeightPx + layout.lineHeightPx / 2;
+    for (let i = 0; i < line.text.length; i++) {
+      const ch = line.text[i];
+      if (/\s/.test(ch)) continue;
+      const x = x0 + ctx.measureText(line.text.slice(0, i)).width;
+      chars.push({ index: offset + i, line: li, x, y, ch, w: ctx.measureText(ch).width });
+    }
+    offset += line.text.length + 1;
+  });
+  const effects = textUnitsOf(joined, n.textMotion ?? [], chars);
+  chars.forEach((ch, k) => {
+    const fx = effects[k];
+    if (fx && fx.opacity <= 0) return;
+    ctx.save();
+    if (fx) {
+      ctx.translate(fx.dx, fx.dy);
+      const cx = ch.x + ch.w / 2;
+      ctx.translate(cx, ch.y);
+      if (fx.rotation) ctx.rotate((fx.rotation * Math.PI) / 180);
+      if (fx.scale !== 1) ctx.scale(fx.scale, fx.scale);
+      ctx.translate(-cx, -ch.y);
+      ctx.globalAlpha *= Math.max(0, Math.min(1, fx.opacity));
+    }
+    ctx.fillText(ch.ch, ch.x, ch.y);
+    ctx.restore();
   });
   c.letterSpacing = '0px';
 }

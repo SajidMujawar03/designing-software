@@ -240,6 +240,27 @@ export class SkText {
     return glyphs;
   }
 
+  /**
+   * Where each character sits in the laid-out text (in the layer's box): its
+   * left edge, baseline and line. Spaces and line breaks are left out. For
+   * drawing text animated by character, word or line.
+   */
+  charBoxes(n: SceneNode, doc: DesignDocument): Array<{ index: number; x: number; baseline: number; width: number; line: number }> {
+    const { paragraph: p, offsetY } = this.layout(n, doc);
+    const text = n.characters ?? '';
+    const lines = p.getLineMetrics();
+    const out: Array<{ index: number; x: number; baseline: number; width: number; line: number }> = [];
+    lines.forEach((line, li) => {
+      for (let i = line.startIndex; i < line.endIncludingNewline && i < text.length; i++) {
+        if (/\s/.test(text[i])) continue;
+        const r = this.rects(p, i, i + 1)[0];
+        if (!r) continue;
+        out.push({ index: i, x: r.left, baseline: line.baseline + offsetY, width: r.right - r.left, line: li });
+      }
+    });
+    return out;
+  }
+
   /** Where each character of text on a path sits, with its width. */
   private pathPlaces(n: SceneNode, doc: DesignDocument) {
     const glyphs = this.glyphs(n, doc);
@@ -394,8 +415,9 @@ export class SkText {
         this.cache.delete(id);
       }
     }
+    // Single characters serve text on a path and text animated by character: kept while the layer exists.
     for (const [id, c] of this.glyphCache) {
-      if (!doc.get(id)?.textPath) {
+      if (!doc.has(id)) {
         for (const g of c.glyphs) g.paragraph.delete();
         this.glyphCache.delete(id);
       }

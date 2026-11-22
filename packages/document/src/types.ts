@@ -298,6 +298,8 @@ export interface SceneNode {
   /** Motion's Scale X/Y (1 = 100%), around the box center. Only ever set on posed nodes during playback, never stored. */
   motionScaleX?: number;
   motionScaleY?: number;
+  /** Text animated by character, word or line: only ever set on posed text during playback, never stored. */
+  textMotion?: TextMotion[];
 
   // CODE_LAYER: its files, and which version of them its snapshot (image fill) shows.
   codeFiles?: CodeFiles;
@@ -719,4 +721,26 @@ export interface MotionClip {
   direction?: MotionDirection;
   /** How much: distance (slide, shake, bounce), scale (scale, pulse), degrees (spin) or blur radius. */
   amount?: number;
+  /** Text layers: animate each character, word or line in turn instead of the whole layer. */
+  textUnit?: MotionTextUnit;
+  /** With `textUnit`: how long (ms) after one unit starts the next one does. */
+  stagger?: number;
+}
+
+export type MotionTextUnit = 'CHARACTER' | 'WORD' | 'LINE';
+
+/** What a preset does at a moment: offsets add, opacity and scale multiply. */
+export interface ClipEffect {
+  dx: number;
+  dy: number;
+  opacity: number;
+  scale: number;
+  rotation: number;
+  blur: number;
+}
+
+/** Posed text only: a text clip's effect on unit `i` (the i-th character, word or line). */
+export interface TextMotion {
+  unit: MotionTextUnit;
+  effect: (i: number) => ClipEffect | null;
 }

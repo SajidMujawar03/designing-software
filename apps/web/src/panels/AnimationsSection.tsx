@@ -8,10 +8,13 @@ import {
   PRESETS,
   removeClip,
   STYLE_ORDER,
+  TEXT_STAGGER,
+  TEXT_STYLE_ORDER,
   updateClip,
   type MotionClip,
   type MotionDirection,
   type MotionPreset,
+  type MotionTextUnit,
   type NodeId,
   type SceneNode,
 } from '@figma/document';
@@ -32,7 +35,7 @@ const DIRECTIONS: Array<[MotionDirection, string]> = [
 ];
 
 /** The "+" menu: presets, and styles (several presets at once). */
-function AddMenu({ onPreset, onStyle, onClose }: { onPreset: (p: MotionPreset) => void; onStyle: (s: (typeof STYLE_ORDER)[number]) => void; onClose: () => void }) {
+function AddMenu({ onPreset, onStyle, onClose, text }: { onPreset: (p: MotionPreset) => void; onStyle: (s: (typeof STYLE_ORDER)[number]) => void; onClose: () => void; text: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const down = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && onClose();
@@ -62,6 +65,18 @@ function AddMenu({ onPreset, onStyle, onClose }: { onPreset: (p: MotionPreset) =
           </button>
         ))}
       </div>
+      {text && (
+        <>
+          <div className="anim-menu-title">Text</div>
+          <div className="anim-menu-grid">
+            {TEXT_STYLE_ORDER.map((s) => (
+              <button key={s} type="button" role="menuitem" title={`${MOTION_STYLES[s].parts.map((x) => PRESETS[x.preset].label).join(' + ')}, by ${MOTION_STYLES[s].parts[0].textUnit!.toLowerCase()}`} onClick={() => onStyle(s)}>
+                {MOTION_STYLES[s].label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -106,7 +121,7 @@ export function AnimationsSection({ nodes }: { nodes: SceneNode[] }) {
           <IconButton title="Add an animation at the playhead" onClick={() => setMenu(!menu)}>
             <Plus size={12} />
           </IconButton>
-          {menu && <AddMenu onPreset={addOne} onStyle={addMany} onClose={() => setMenu(false)} />}
+          {menu && <AddMenu onPreset={addOne} onStyle={addMany} onClose={() => setMenu(false)} text={nodes.some((n) => n.type === 'TEXT')} />}
         </div>
       }
     >
@@ -117,7 +132,7 @@ export function AnimationsSection({ nodes }: { nodes: SceneNode[] }) {
       ) : (
         <div className="anim-list">
           {clips.map((c) => (
-            <ClipRow key={c.id} nodeId={single!.id} clip={c} open={selected?.id === c.id} />
+            <ClipRow key={c.id} nodeId={single!.id} clip={c} open={selected?.id === c.id} text={single!.type === 'TEXT'} />
           ))}
         </div>
       )}
@@ -125,7 +140,7 @@ export function AnimationsSection({ nodes }: { nodes: SceneNode[] }) {
   );
 }
 
-function ClipRow({ nodeId, clip, open }: { nodeId: NodeId; clip: MotionClip; open: boolean }) {
+function ClipRow({ nodeId, clip, open, text }: { nodeId: NodeId; clip: MotionClip; open: boolean; text: boolean }) {
   const [easingOpen, setEasingOpen] = useState(false);
   const info = PRESETS[clip.preset];
   const unit = useUI((s) => s.motion.unit);
@@ -186,6 +201,35 @@ function ClipRow({ nodeId, clip, open }: { nodeId: NodeId; clip: MotionClip; ope
                   max={info.amount.max}
                   precision={0}
                   onChange={(v, live) => set({ amount: percent ? v / 100 : v }, live)}
+                />
+              )}
+            </div>
+          )}
+          {text && (
+            <div className="grid2">
+              <select
+                value={clip.textUnit ?? 'LAYER'}
+                aria-label="Animate by"
+                title="Animate the whole layer, or each character, word or line in turn"
+                onChange={(e) => {
+                  const v = e.target.value as MotionTextUnit | 'LAYER';
+                  set(v === 'LAYER' ? { textUnit: undefined } : { textUnit: v, stagger: clip.stagger ?? TEXT_STAGGER[v] });
+                }}
+              >
+                <option value="LAYER">Whole layer</option>
+                <option value="CHARACTER">By character</option>
+                <option value="WORD">By word</option>
+                <option value="LINE">By line</option>
+              </select>
+              {clip.textUnit && (
+                <NumberField
+                  label="Stagger"
+                  title="Time between one unit starting and the next"
+                  value={clip.stagger ?? TEXT_STAGGER[clip.textUnit]}
+                  suffix="ms"
+                  min={0}
+                  precision={0}
+                  onChange={(v, live) => set({ stagger: v }, live)}
                 />
               )}
             </div>
