@@ -32,6 +32,8 @@ export interface SvgOptions {
   booleanPathData?: (id: NodeId) => string | null;
   /** Positioned, styled text spans (from the Skia layout) for rich text. */
   textSpans?: (n: SceneNode) => Array<{ text: string; x: number; y: number; style: ReturnType<typeof baseTextStyle> }> | null;
+  /** Extra attributes for a layer's group (e.g. a class for animated SVG), starting with a space. */
+  nodeAttrs?: (n: SceneNode) => string;
 }
 
 /** State for one export: collected <defs> and a counter for unique ids. */
@@ -343,7 +345,7 @@ function nodeToSvg(c: SvgContext, n: SceneNode): string {
       body = paintedShape(c, n, geo);
     }
   }
-  return `<g${transformAttr(n)}${opacity}>${body}</g>`;
+  return `<g${transformAttr(n)}${opacity}${c.options.nodeAttrs?.(n) ?? ''}>${body}</g>`;
 }
 
 /** Serializes a node (and its children) to a standalone SVG covering its on-canvas bounds. */
