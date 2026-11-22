@@ -196,11 +196,23 @@ The desktop app uses the same code (Electron is Chromium) and saves through the 
 | **M2** | Motion mode, the Timeline panel, playback and scrubbing, duration/playback/units, zoom, the read-only tracks | 4–5 days |
 | **M3** | Keyframe editing: diamonds, auto-keyframe, value editing rules, select/marquee/move/snap/delete/copy, easing popover with the curve and spring editors | ~1 week |
 | **M4** | Animated export: MP4, WebM, GIF, progress dialog, desktop save | 3–4 days |
-| **M5** | Preset animations and composite styles, animated component instances (purple tracks, stagger, locked timing), text by character/word/line | ~1 week |
+| **M5** | Preset animations and composite styles, animated component instances (purple tracks, stagger, locked timing) | ~4 days |
+| **M5b** | Text by character/word/line (needs per-glyph layout and drawing across lines) | 3–4 days |
 | **M6** | Inspect Motion tab (CSS/JSON code), the presenter plays timelines | 2–3 days |
 | **M7** (optional) | Lottie JSON / dotLottie and animated SVG export | ~1 week |
 
 M1–M4 make a complete, usable Motion feature (about 3 weeks). M5–M7 follow Figma's newer additions.
+
+### M5 as built
+
+- **Presets are clips** (`animations` on a layer): Fade, Slide, Scale and Blur, each in and out, plus Spin, Pulse, Shake and Bounce. Each has a start, a length, an easing, and where it applies a direction and an amount. Figma doesn't document its own list, so this one is ours.
+- **How clips combine:** they apply on top of keyframes. Offsets, rotation and blur add; opacity and scale multiply. A preset that brings a layer in holds its starting state before it begins, and one that takes it out holds its end state after it ends.
+- **Composite styles** add several presets to every selected layer: Pop in, Rise in, Drop in, Blur reveal, Fade away, Sink out and Attention.
+- **Animated instances:**
+  - Main components directly on the page hold their own timeline.
+  - An instance plays its component's animation from `motionOffset`, through the component's playback mode.
+  - It's one purple track, dragged to stagger copies, and its animation is locked (edits never write keyframes into it).
+  - Position keyframes made on the main component are moved over to where the instance is.
 
 ## 9. Testing
 

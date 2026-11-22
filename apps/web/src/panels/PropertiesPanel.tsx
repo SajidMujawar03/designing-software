@@ -51,8 +51,9 @@ import { WidthProfileSelect } from './WidthProfile';
 import { ComponentSection } from './ComponentPanel';
 import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
-import { drawnDocument, inMotionFrame, motionApply } from '../editor/motion';
+import { drawnDocument, inMotionFrame, isLockedForMotion, motionApply } from '../editor/motion';
 import { AnimateSection } from './AnimateSection';
+import { AnimationsSection, InstanceMotionSection } from './AnimationsSection';
 
 const WEIGHT_NAMES: Record<number, string> = {
   100: 'Thin',
@@ -120,7 +121,16 @@ export function PropertiesPanel() {
       </div>
 
       <AlignBar count={editor.topLevelSelection().length} />
-      {motionMode && nodes.length === 1 && inMotionFrame(nodes[0].id) && <AnimateSection n={nodes[0]} />}
+      {motionMode &&
+        nodes.every((n) => inMotionFrame(n.id)) &&
+        (nodes.length === 1 && isLockedForMotion(nodes[0].id) ? (
+          <InstanceMotionSection n={nodes[0]} />
+        ) : (
+          <>
+            {nodes.length === 1 && <AnimateSection n={nodes[0]} />}
+            {!nodes.some((n) => isLockedForMotion(n.id)) && <AnimationsSection nodes={nodes} />}
+          </>
+        ))}
 
       <ComponentSection nodes={nodes} />
       {nodes.length === 1 && nodes[0].type === 'CODE_SNIPPET' && <CodeSnippetSection node={nodes[0]} />}

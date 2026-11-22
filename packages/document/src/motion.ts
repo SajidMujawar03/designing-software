@@ -1,6 +1,6 @@
 import { hexToRgb, rgbToHex } from './color';
 import type { DesignDocument } from './document';
-import type { Keyframe, MotionEasing, MotionEasingPreset, MotionPlayback, MotionProperty, MotionTimeline, NodeId, NodePatch, Paint, SceneNode, SpringPreset } from './types';
+import type { Keyframe, MotionClip, MotionEasing, MotionEasingPreset, MotionPlayback, MotionPreset, MotionProperty, MotionTimeline, NodeId, NodePatch, Paint, SceneNode, SpringPreset } from './types';
 
 /**
  * Figma Motion: keyframed properties on the layers of a top-level frame,
@@ -230,6 +230,13 @@ function withColor(paints: Paint[], hex: string): Paint[] {
 
 /** The changes keyframes make to a layer at time `t`, or null if it has none. */
 export function layerPose(n: SceneNode, t: number): NodePatch | null {
+  const patch = keyframePose(n, t) ?? {};
+  const clips = applyClips(n, patch, t);
+  return clips || Object.keys(patch).length ? patch : null;
+}
+
+/** The changes a layer's keyframes make at time `t`, or null if it has none. */
+function keyframePose(n: SceneNode, t: number): NodePatch | null {
   const kf = n.keyframes;
   if (!kf) return null;
   const patch: NodePatch = {};
@@ -259,30 +266,79 @@ export function layerPose(n: SceneNode, t: number): NodePatch | null {
   return any ? patch : null;
 }
 
-/** The top-level frame (directly on a page) a layer belongs to: where its timeline lives. */
+/** Layers that hold a timeline: frames and main components directly on a page. */
+export const holdsTimeline = (doc: DesignDocument, n: SceneNode | undefined): n is SceneNode =>
+  !!n && (n.type === 'FRAME' || n.type === 'COMPONENT') && doc.get(n.parentId)?.type === 'PAGE';
+
+/** The top-level frame (or main component) a layer belongs to: where its timeline lives. */
 export function motionFrameOf(doc: DesignDocument, id: NodeId): SceneNode | undefined {
   const chain = [doc.get(id), ...doc.ancestors(id)];
-  for (let i = 0; i < chain.length; i++) {
-    const n = chain[i];
-    if (n && n.type === 'FRAME' && doc.get(n.parentId)?.type === 'PAGE') return n;
-  }
-  return undefined;
+  return chain.find((n) => holdsTimeline(doc, n));
 }
 
-/** Every layer of a frame that has keyframes (the frame itself included). */
+/** Whether a layer has keyframes or preset animations of its own. */
+export const hasAnimation = (n: SceneNode): boolean =>
+  !!n.animations?.length || (!!n.keyframes && Object.values(n.keyframes).some((k) => k?.length));
+
+/** A layer and its descendants, not going inside instances below it (their animation is their component's). */
+function ownLayers(doc: DesignDocument, rootId: NodeId): { layers: SceneNode[]; instances: SceneNode[] } {
+  const layers: SceneNode[] = [];
+  const instances: SceneNode[] = [];
+  const walk = (n: SceneNode, root: boolean) => {
+    if (!root && n.type === 'INSTANCE') {
+      instances.push(n);
+      return;
+    }
+    layers.push(n);
+    for (const c of doc.children(n.id)) walk(c, false);
+  };
+  const r = doc.get(rootId);
+  if (r) walk(r, true);
+  return { layers, instances };
+}
+
+/** Whether an instance's component animates anything (so the instance plays it). */
+export function isAnimatedInstance(doc: DesignDocument, n: SceneNode): boolean {
+  if (n.type !== 'INSTANCE') return false;
+  const { layers, instances } = ownLayers(doc, n.id);
+  return layers.some(hasAnimation) || instances.some((i) => isAnimatedInstance(doc, i));
+}
+
+/** Layers of a timeline's frame with animation of their own (the frame included; not inside instances). */
 export function animatedLayers(doc: DesignDocument, frameId: NodeId): SceneNode[] {
-  const f = doc.get(frameId);
-  if (!f) return [];
-  return [f, ...doc.descendants(frameId)].filter((n) => n.keyframes && Object.values(n.keyframes).some((k) => k?.length));
+  return ownLayers(doc, frameId).layers.filter(hasAnimation);
 }
 
-/** The pose of a frame's layers at time `t` (ms): what playback draws. */
+/** Instances in a timeline's frame that play their component's animation (shown as purple tracks). */
+export function animatedInstances(doc: DesignDocument, frameId: NodeId): SceneNode[] {
+  return ownLayers(doc, frameId).instances.filter((i) => isAnimatedInstance(doc, i));
+}
+
+/** An instance's own time when its timeline is at `t`: from its start, through its component's playback. */
+export function instanceTime(doc: DesignDocument, inst: SceneNode, t: number): number {
+  const main = doc.get(inst.componentId);
+  return timelineTime(main?.motion ?? DEFAULT_MOTION, Math.max(0, t - (inst.motionOffset ?? 0)));
+}
+
+/** The pose of a frame's layers at time `t` (ms): what playback draws. Instances play their component's animation. */
 export function poseAt(doc: DesignDocument, frameId: NodeId, t: number): Map<NodeId, NodePatch> {
   const pose = new Map<NodeId, NodePatch>();
-  for (const n of animatedLayers(doc, frameId)) {
-    const p = layerPose(n, t);
-    if (p) pose.set(n.id, p);
-  }
+  const visit = (rootId: NodeId, time: number) => {
+    const { layers, instances } = ownLayers(doc, rootId);
+    for (const n of layers) {
+      const p = layerPose(n, time);
+      if (!p) continue;
+      // An instance's own position keyframes were made on its main component (elsewhere on the page): move them over.
+      if (n.type === 'INSTANCE' && n.keyframes) {
+        const main = doc.get(n.componentId);
+        if (main && p.x !== undefined && n.keyframes.x?.length) p.x += n.x - main.x;
+        if (main && p.y !== undefined && n.keyframes.y?.length) p.y += n.y - main.y;
+      }
+      pose.set(n.id, p);
+    }
+    for (const inst of instances) visit(inst.id, instanceTime(doc, inst, time));
+  };
+  visit(frameId, t);
   return pose;
 }
 
@@ -305,6 +361,137 @@ export function timelineTime(motion: { duration: number; playback: MotionPlaybac
 /** Whether playback has finished (only Once ends). */
 export const playbackEnded = (motion: { duration: number; playback: MotionPlayback }, elapsed: number): boolean =>
   motion.playback === 'ONCE' && elapsed >= motion.duration;
+
+// ------------------------------------------------------------ preset animations
+
+/** What a preset does at a moment: offsets add, opacity and scale multiply. */
+interface ClipEffect {
+  dx: number;
+  dy: number;
+  opacity: number;
+  scale: number;
+  rotation: number;
+  blur: number;
+}
+
+/** Presets that bring a layer in hold their starting state before they begin; ones that take it out hold their end state after. */
+const ENTRANCES = new Set<MotionPreset>(['FADE_IN', 'SLIDE_IN', 'SCALE_IN', 'BLUR_IN']);
+const EXITS = new Set<MotionPreset>(['FADE_OUT', 'SLIDE_OUT', 'SCALE_OUT', 'BLUR_OUT', 'SPIN']);
+
+/** Each preset's default amount (distance, scale, degrees or radius). */
+export const PRESET_AMOUNT: Record<MotionPreset, number> = {
+  FADE_IN: 0,
+  FADE_OUT: 0,
+  SLIDE_IN: 48,
+  SLIDE_OUT: 48,
+  SCALE_IN: 0.5,
+  SCALE_OUT: 0.5,
+  BLUR_IN: 12,
+  BLUR_OUT: 12,
+  SPIN: 360,
+  PULSE: 1.15,
+  SHAKE: 8,
+  BOUNCE: 24,
+};
+
+const DIR: Record<NonNullable<MotionClip['direction']>, [number, number]> = { LEFT: [-1, 0], RIGHT: [1, 0], UP: [0, -1], DOWN: [0, 1] };
+
+/** A clip's effect at time `t`, or null when it does nothing then. */
+export function clipEffect(c: MotionClip, t: number): ClipEffect | null {
+  let k: number;
+  if (t < c.start) {
+    if (!ENTRANCES.has(c.preset)) return null;
+    k = 0;
+  } else if (t >= c.start + c.duration) {
+    if (!EXITS.has(c.preset)) return null;
+    k = 1;
+  } else k = c.duration > 0 ? (t - c.start) / c.duration : 1;
+  const e = easeProgress(c.easing, k, c.duration);
+  const a = c.amount ?? PRESET_AMOUNT[c.preset];
+  // Slides come in from below and leave downward unless told otherwise.
+  const [ux, uy] = DIR[c.direction ?? 'DOWN'];
+  const out: ClipEffect = { dx: 0, dy: 0, opacity: 1, scale: 1, rotation: 0, blur: 0 };
+  switch (c.preset) {
+    case 'FADE_IN':
+      out.opacity = e;
+      break;
+    case 'FADE_OUT':
+      out.opacity = 1 - e;
+      break;
+    case 'SLIDE_IN':
+      // Comes in from `direction`.
+      out.dx = ux * a * (1 - e);
+      out.dy = uy * a * (1 - e);
+      break;
+    case 'SLIDE_OUT':
+      // Leaves toward `direction`.
+      out.dx = ux * a * e;
+      out.dy = uy * a * e;
+      break;
+    case 'SCALE_IN':
+      out.scale = a + (1 - a) * e;
+      break;
+    case 'SCALE_OUT':
+      out.scale = 1 + (a - 1) * e;
+      break;
+    case 'BLUR_IN':
+      out.blur = a * (1 - e);
+      break;
+    case 'BLUR_OUT':
+      out.blur = a * e;
+      break;
+    case 'SPIN':
+      out.rotation = a * e;
+      break;
+    case 'PULSE':
+      out.scale = 1 + (a - 1) * Math.sin(Math.PI * e);
+      break;
+    case 'SHAKE':
+      out.dx = a * Math.sin(k * Math.PI * 8) * (1 - k);
+      break;
+    case 'BOUNCE':
+      out.dy = -a * Math.abs(Math.sin(Math.PI * 3 * k)) * (1 - k);
+      break;
+  }
+  return out;
+}
+
+/** Applies a layer's clips at time `t` on top of `patch` (its keyframe values). Returns whether any clip did something. */
+function applyClips(n: SceneNode, patch: NodePatch, t: number): boolean {
+  if (!n.animations?.length) return false;
+  let any = false;
+  const total: ClipEffect = { dx: 0, dy: 0, opacity: 1, scale: 1, rotation: 0, blur: 0 };
+  for (const c of n.animations) {
+    const fx = clipEffect(c, t);
+    if (!fx) continue;
+    any = true;
+    total.dx += fx.dx;
+    total.dy += fx.dy;
+    total.opacity *= fx.opacity;
+    total.scale *= fx.scale;
+    total.rotation += fx.rotation;
+    total.blur += fx.blur;
+  }
+  if (!any) return false;
+  const at = <K extends keyof SceneNode>(k: K): SceneNode[K] => ((patch as Partial<SceneNode>)[k] ?? n[k]) as SceneNode[K];
+  if (total.dx) patch.x = (at('x') as number) + total.dx;
+  if (total.dy) patch.y = (at('y') as number) + total.dy;
+  if (total.rotation) patch.rotation = (at('rotation') as number) + total.rotation;
+  if (total.opacity !== 1) patch.opacity = Math.max(0, Math.min(1, (at('opacity') as number) * total.opacity));
+  if (total.scale !== 1) {
+    patch.motionScaleX = (patch.motionScaleX ?? 1) * total.scale;
+    patch.motionScaleY = (patch.motionScaleY ?? 1) * total.scale;
+  }
+  if (total.blur > 0) {
+    const effects = (patch.effects ?? n.effects ?? []) as NonNullable<SceneNode['effects']>;
+    const i = effects.findIndex((e) => e.type === 'LAYER_BLUR');
+    patch.effects =
+      i >= 0
+        ? effects.map((e, j) => (j === i && e.type === 'LAYER_BLUR' ? { ...e, radius: e.radius + total.blur, visible: true } : e))
+        : [...effects, { type: 'LAYER_BLUR', radius: total.blur, visible: true }];
+  }
+  return true;
+}
 
 // ------------------------------------------------------------ posed document
 
@@ -536,15 +723,17 @@ const PATCH_KEYS: Record<MotionProperty, Array<keyof NodePatch>> = {
  * - auto-keyframe on, or a keyframe at the playhead: writes that keyframe;
  * - animated, no keyframe here, auto-keyframe off: nothing changes (blocked);
  * - not animated: changes the design value, as in Design mode.
+ * `locked` (layers of animated instances): never writes keyframes, so animated properties are blocked.
  * Everything else in the change applies normally. Returns the blocked properties.
  */
-export function applyMotionEdit(doc: DesignDocument, n: SceneNode, patch: NodePatch, t: number, autoKey: boolean): MotionProperty[] {
+export function applyMotionEdit(doc: DesignDocument, n: SceneNode, patch: NodePatch, t: number, autoKey: boolean, locked = false): MotionProperty[] {
   const stored = doc.get(n.id);
   if (!stored) return [];
   const base: NodePatch = { ...patch };
   const blocked: MotionProperty[] = [];
   for (const [p, value] of motionValuesOf(n, patch)) {
-    const keyed = autoKey || !!keyframeAt(stored, p, t);
+    // Locked layers (animated instances) never get keyframes: their animation is their component's.
+    const keyed = !locked && (autoKey || !!keyframeAt(stored, p, t));
     if (keyed) setKeyframe(doc, n.id, p, t, value);
     else if (isAnimated(stored, p)) blocked.push(p);
     else continue;

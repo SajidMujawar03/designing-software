@@ -52,6 +52,8 @@ export interface MotionUI {
   autoKey: boolean;
   /** Keyframes selected on the timeline. */
   selectedKeys: KeyRef[];
+  /** The preset animation (clip) selected on the timeline or in the Animations section. */
+  selectedClip: { nodeId: NodeId; id: string } | null;
   /** A short message under the timeline header (e.g. why a change didn't apply), and when it was shown. */
   hint: { text: string; at: number } | null;
 }
@@ -193,7 +195,7 @@ export const useUI = create<UIState>()(() => ({
   codeEditorFor: null,
   drawMode: false,
   motionMode: false,
-  motion: { frameId: null, time: 0, playing: false, unit: 'ms', pxPerSec: 240, collapsed: [], height: 220, autoKey: false, selectedKeys: [], hint: null },
+  motion: { frameId: null, time: 0, playing: false, unit: 'ms', pxPerSec: 240, collapsed: [], height: 220, autoKey: false, selectedKeys: [], selectedClip: null, hint: null },
   widthEdit: null,
   runningCode: {},
   variablesOpen: false,
