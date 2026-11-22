@@ -52,6 +52,16 @@ export interface Annotation {
   properties: AnnotationProperty[];
 }
 
+/** A measurement pinned between two layers in Dev Mode: the distances between their edges. */
+export interface Measurement {
+  id: string;
+  from: NodeId;
+  to: NodeId;
+}
+
+/** Dev Mode statuses: Ready for dev (Figma also has Completed on some plans). */
+export type DevStatus = 'READY_FOR_DEV' | 'COMPLETED';
+
 export type NodeId = string;
 
 export type NodeType =
@@ -271,6 +281,10 @@ export interface SceneNode {
 
   // PAGE: exports of its top-level layers are drawn on the page's background color.
   exportBackground?: boolean;
+  /** PAGE: Dev Mode measurements between layers (Figma's Measurement tool). */
+  measurements?: Measurement[] | null;
+  /** FRAME, SECTION, COMPONENT, COMPONENT_SET, INSTANCE: Dev Mode's status (Ready for dev). */
+  devStatus?: DevStatus | null;
 
   // CODE_SNIPPET: how its text is highlighted.
   codeLanguage?: CodeLanguage;

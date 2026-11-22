@@ -232,6 +232,14 @@ Branch `ui-dev-mode` · about 3 days
 
 Tests: measurement storage and rendering; ready-for-dev toggle; codegen unchanged.
 
+**Done in U7 / changed.** Built: `devStatus` and page `measurements` fields with helpers (`packages/document/src/devMode.ts`, optional, no migration); Mark as ready for dev, the Ready for dev badge and the Ready for development list; Compare changes (opens version history in account files); the Code / List toggle; the Measurement tool and pinned measurements (drawn in pink in Dev Mode, while measuring, and when annotations are shown; listed per layer in Inspect; "Remove all measurements on this page" in View); and the Dev Mode toolbar (Move tools, Annotation, Measurement, Comment). Changed from the plan:
+- **Shape builder keeps Shift+M** in Design mode; Shift+M is Measurement only in Dev Mode.
+- **Annotations stay in the Design tab** as well as Inspect (moving them would hide them from Design mode).
+- **Compare changes** opens the file's version history; there's no per-layer diff yet.
+- No Completed status, Dev resources or Code Connect.
+
+---
+
 ## 4. Order and estimates
 
 | Phase | Size | Depends on |

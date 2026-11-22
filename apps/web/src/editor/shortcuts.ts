@@ -170,7 +170,8 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyL') return run(() => editor.setTool('arrow'));
       if (e.code === 'KeyY') return run(() => setPrefs({ showAnnotations: !prefs().showAnnotations }));
       if (e.code === 'KeyW') return run(() => editor.setTool('width'));
-      if (e.code === 'KeyM') return run(() => editor.setTool('shapes'));
+      // Shift+M: Measurement in Dev Mode (the Inspect tab), as in Figma; Shape builder otherwise.
+      if (e.code === 'KeyM') return run(() => editor.setTool(ui.rightTab === 'inspect' && !ui.drawMode && !ui.motionMode ? 'measure' : 'shapes'));
       if (e.code === 'Digit0') return run(() => editor.zoomTo(1));
       if (e.code === 'Digit1') return run(() => editor.zoomToFit());
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());

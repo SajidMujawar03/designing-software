@@ -1,4 +1,4 @@
-import { isAutoLayout, isFrameLike, isGroupLike } from '@figma/document';
+import { canHaveDevStatus, isAutoLayout, isFrameLike, isGroupLike, measurementsOf, removeMeasurements, setDevStatus } from '@figma/document';
 import { setMotionMode, togglePlay } from './motion';
 import { usePlugins } from '../plugins/host';
 import { startTour, useOnboarding } from '../panels/Onboarding';
@@ -251,6 +251,26 @@ export const COMMANDS: Command[] = [
   // Preferences menu
   { id: 'keep-tool', label: 'Keep tool selected after use', run: () => setPrefs({ keepToolSelected: !prefs().keepToolSelected }), checked: () => prefs().keepToolSelected },
   { id: 'highlight-hover', label: 'Highlight layers on hover', run: () => setPrefs({ highlightHover: !prefs().highlightHover }), checked: () => prefs().highlightHover },
+
+  // Dev Mode
+  { id: 'measure', label: 'Measurement', shortcut: 'Shift+M', run: () => editor.setTool('measure') },
+  {
+    id: 'clear-measurements',
+    label: 'Remove all measurements on this page',
+    run: () => editor.doc.change(() => removeMeasurements(editor.doc, editor.pageId)),
+    enabled: () => measurementsOf(editor.doc, editor.pageId).length > 0,
+  },
+  {
+    id: 'ready-for-dev',
+    label: 'Mark as ready for dev',
+    run: () => {
+      const nodes = editor.selectedNodes().filter(canHaveDevStatus);
+      const on = !nodes.every((n) => n.devStatus === 'READY_FOR_DEV');
+      editor.doc.change(() => nodes.forEach((n) => setDevStatus(editor.doc, n.id, on ? 'READY_FOR_DEV' : null)));
+    },
+    enabled: () => editor.selectedNodes().some(canHaveDevStatus),
+    checked: () => editor.selectedNodes().some(canHaveDevStatus) && editor.selectedNodes().filter(canHaveDevStatus).every((n) => n.devStatus === 'READY_FOR_DEV'),
+  },
 
   // Right-click menu
   { id: 'paste-here', label: 'Paste here', run: () => void pasteHere(editor), enabled: () => editor.contextPoint !== null },

@@ -47,7 +47,7 @@ Figma groups the tools into seven slots with dropdowns. Since U2, ours does too.
 | **Actions** (grid icon, Ctrl+K): AI prompts plus the command list | **Actions** button (grid icon) after the tool slots; Ctrl+K (Ctrl+/ also works) | Same (U3; no AI prompts) |
 | Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | Annotation (Shift+T) in the Code tools menu; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
 | Frame presets (right panel while the Frame tool is on) | Frame presets in the right panel (Phone, …) | Same |
-| Measurement is Shift+M in Figma *(docs)* | Shift+M is our Shape builder (vector edit bar, quick actions) | Different shortcut (clash if Measurement is added) |
+| Measurement is Shift+M in Figma *(docs)* | Shift+M is Measurement in Dev Mode and Shape builder in Design mode | Same (U7) |
 
 ## 3. Modes
 
@@ -112,18 +112,19 @@ Layer selected (frame / group):
 
 ## 7. Inspect / Dev Mode
 
-![Our Inspect tab](ui-comparison/ours-inspect.png)
+![Our Inspect tab, before](ui-comparison/ours-inspect.png)
+![Our Dev Mode after U7](ui-comparison/ours-u7-dev-mode.png)
 
 | Figma (Dev Mode, paid) | Ours (Inspect tab) | Status |
 | --- | --- | --- |
 | Separate mode with Inspect and Plugins tabs | Inspect tab next to Design / Prototype | Different name or place |
-| Layer name, type, last updated; **Compare changes** *(docs)* | Name + type; no change comparison | Missing in ours (Compare changes) |
-| **Ready for dev** / Mark as ready for dev, "Ready for development" in the layers panel | — | Missing in ours |
+| Layer name, type, last updated; **Compare changes** *(docs)* | Name + type; **Compare changes** (cloud files) opens version history | Same (U7); compares the whole file, not one layer |
+| **Ready for dev** / Mark as ready for dev, "Ready for development" in the layers panel | **Mark as ready for dev** in Inspect (and Actions), a "Ready for dev" badge with Remove status, and **Ready for development** above the layers in Dev Mode | Same (U7) |
 | Dev resources, Component info, Code Connect *(docs)* | — | Missing in ours |
-| **Layer properties** with **Code / List** toggle | Layout (W, H, X, Y), Fill, Typography as lists | Different name or place |
+| **Layer properties** with **Code / List** toggle | **Layer properties** with a **Code / List** toggle (Code first, remembered) | Same (U7) |
 | Code: language dropdown (CSS, iOS, Android, plugins) | **Code**: CSS, SwiftUI, Compose | Same |
 | Colors, Assets (icon detection, downloads), Export | Fill colours; Export is in the Design tab | Different name or place |
-| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Annotation (Shift+T, Code tools menu), Spec tool; Annotations (Shift+Y) | Different name or place |
+| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Dev Mode toolbar: Move tools, **Annotation** (Shift+T), **Measurement** (Shift+M), Comment; measurements are pinned between two layers, listed in Inspect and removable | Same (U7) |
 
 ## 8. Motion
 
@@ -201,6 +202,6 @@ Layer selected (frame / group):
 12. ~~**Add a main menu** (logo button)~~ Done in U3, except Flip, Outlines and Pixel preview: with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
 13. ~~**Motion**: name the property section **Transform**~~ (done in U6) (Position, Scale, Rotation) with ◇ buttons beside the normal fields, and add **Add motion** to the right-click menu.
 14. ~~**Left navigation rail**~~ (done in U5) (File, Assets, Variables): larger change; it moves Assets out of the left-panel tabs and Variables out of the right panel.
-15. Dev Mode extras: Ready for dev, Compare changes, Measurement tool (Shift+M).
+15. ~~Dev Mode extras: Ready for dev, Compare changes, Measurement tool (Shift+M).~~ Done in U7.
 
 Not worth copying: Figma's AI entries (Agents, Prototype with Agent, Actions AI prompts, Build this with code), Widgets, Publish library / branches (plan features).

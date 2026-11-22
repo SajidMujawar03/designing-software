@@ -1,5 +1,5 @@
-import { animatedInstances, animatedLayers, annotationLines, isAutoLayout, libraryOf, mainComponentOf, MOTION_PROPERTIES, motionFrameOf, PRESETS, type Paint, type SceneNode } from '@figma/document';
-import { Check, Copy } from 'lucide-react';
+import { canHaveDevStatus, measurementsOf, removeMeasurements, setDevStatus, animatedInstances, animatedLayers, annotationLines, isAutoLayout, libraryOf, mainComponentOf, MOTION_PROPERTIES, motionFrameOf, PRESETS, type Paint, type SceneNode } from '@figma/document';
+import { Check, CircleCheck, Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { codeFor, cssColor, type CodeLanguage } from '../inspect/codegen';
 import { motionCss, motionJson } from '../inspect/motionCode';
@@ -65,11 +65,83 @@ function PaintRow({ p, n, field }: { p: Paint; n: SceneNode; field: string }) {
   return <Row label={p.type === 'IMAGE' ? 'Image' : 'Gradient'} value={p.type === 'IMAGE' ? p.scaleMode.toLowerCase() : `${p.stops.length} stops`} />;
 }
 
+const VIEW_KEY = 'figma-clone:inspect-view';
+
+/** Ready for dev (Mark as ready for dev, as in Figma's Dev Mode) and, in account files, Compare changes. */
+function DevStatusBar({ n }: { n: SceneNode }) {
+  const cloud = location.pathname.startsWith('/file/');
+  const can = canHaveDevStatus(n);
+  if (!can && !cloud) return null;
+  const ready = n.devStatus === 'READY_FOR_DEV';
+  return (
+    <div className="dev-status-bar">
+      {can &&
+        (ready ? (
+          <>
+            <span className="dev-ready-badge">
+              <CircleCheck size={13} /> Ready for dev
+            </span>
+            <button type="button" className="btn small" onClick={() => editor.doc.change(() => setDevStatus(editor.doc, n.id, null))}>
+              Remove status
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn small primary" onClick={() => editor.doc.change(() => setDevStatus(editor.doc, n.id, 'READY_FOR_DEV'))}>
+            Mark as ready for dev
+          </button>
+        ))}
+      {cloud && (
+        <button type="button" className="btn small" title="Opens version history, to compare this file with earlier versions" onClick={() => editor.setUI({ historyOpen: true })}>
+          Compare changes
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Measurements pinned to this layer with the Measurement tool (Shift+M), each removable. */
+function MeasurementsSection({ n }: { n: SceneNode }) {
+  const doc = editor.doc;
+  const list = measurementsOf(doc, editor.pageId).filter((m) => m.from === n.id || m.to === n.id);
+  if (!list.length) return null;
+  return (
+    <Section title="Measurements">
+      {list.map((m) => {
+        const other = doc.get(m.from === n.id ? m.to : m.from);
+        return (
+          <div key={m.id} className="inspect-row">
+            <span className="inspect-label">To</span>
+            <span className="inspect-value">{other?.name}</span>
+            <button type="button" className="icon-btn" title="Remove measurement" aria-label={`Remove measurement to ${other?.name ?? 'layer'}`} onClick={() => doc.change(() => removeMeasurements(doc, editor.pageId, m.id))}>
+              <X size={12} />
+            </button>
+          </div>
+        );
+      })}
+    </Section>
+  );
+}
+
 /** Right sidebar tab: what a developer needs to build the selected layer. */
 export function InspectPanel() {
   useDocVersion();
   const selection = useUI((s) => s.selection);
   const [lang, setLang] = useState<CodeLanguage>('css');
+  const [view, setView] = useState<'code' | 'list'>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'code';
+    } catch {
+      return 'code';
+    }
+  });
+  const pickView = (v: 'code' | 'list') => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // storage unavailable
+    }
+  };
   const doc = editor.doc;
   const n = selection.length === 1 ? doc.get(selection[0]) : undefined;
   if (!n)
@@ -97,6 +169,7 @@ export function InspectPanel() {
         {n.name}
         <span className="props-type">{n.type.toLowerCase().replace('_', ' ')}</span>
       </div>
+      <DevStatusBar n={n} />
       {!!n.annotations?.length && (
         <Section title="Annotations">
           {n.annotations.map((a) => {
@@ -116,12 +189,30 @@ export function InspectPanel() {
           })}
         </Section>
       )}
+      <MeasurementsSection n={n} />
       {main && (
         <Section title="Component">
           <Row label="Instance of" value={main.name} />
           {libraryOf(doc, main.id) && <Row label="Library" value={libraryOf(doc, main.id)!.name} />}
         </Section>
       )}
+      <div className="inspect-view-toggle">
+        <span className="field-caption">Layer properties</span>
+        <div className="seg code-tabs" role="tablist" aria-label="Layer properties view">
+          {(
+            [
+              ['code', 'Code'],
+              ['list', 'List'],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={view === k} className={view === k ? 'active' : ''} onClick={() => pickView(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {view === 'list' ? (
+        <>
       <Section title="Layout">
         <div className="inspect-grid">
           <Row label="W" value={`${r2(n.width)}px`} />
@@ -185,6 +276,9 @@ export function InspectPanel() {
           ))}
         </Section>
       )}
+        </>
+      ) : (
+        <>
       <Section
         title="Code"
         actions={<CopyButton text={code} label="Copy code" />}
@@ -204,6 +298,8 @@ export function InspectPanel() {
         </div>
         <pre className="inspect-code">{code}</pre>
       </Section>
+        </>
+      )}
       <MotionInspect n={n} />
       {n.exportSettings?.length ? (
         <Section title="Assets">
