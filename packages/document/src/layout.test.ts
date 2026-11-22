@@ -133,3 +133,36 @@ describe('untracked changes', () => {
     expect(doc.get(f)!.width).toBe(32);
   });
 });
+
+describe('grid auto layout in the document', () => {
+  it('places children in cells and follows column changes', () => {
+    const { doc, page } = setup();
+    const grid = doc.change(() =>
+      doc.createNode({
+        type: 'FRAME',
+        parentId: page.id,
+        layoutMode: 'GRID',
+        gridColumnCount: 2,
+        gridRowCount: 1,
+        itemSpacing: 10,
+        counterAxisSpacing: 10,
+        layoutSizingHorizontal: 'HUG',
+        layoutSizingVertical: 'HUG',
+        paddingTop: 10,
+        paddingBottom: 10,
+        paddingLeft: 10,
+        paddingRight: 10,
+      }),
+    );
+    const kids = doc.change(() => [0, 1, 2].map(() => doc.createNode({ type: 'RECTANGLE', parentId: grid, width: 40, height: 30, x: 500, y: 500 })));
+    expect(kids.map((id) => [doc.get(id)!.x, doc.get(id)!.y])).toEqual([
+      [10, 10],
+      [60, 10],
+      [10, 50],
+    ]);
+    expect([doc.get(grid)!.width, doc.get(grid)!.height]).toEqual([110, 90]);
+    doc.change(() => doc.updateNode(grid, { gridColumnCount: 3 }));
+    expect(doc.get(kids[2])!.x).toBe(110);
+    expect([doc.get(grid)!.width, doc.get(grid)!.height]).toEqual([160, 50]);
+  });
+});

@@ -72,7 +72,14 @@ export function cssFor(doc: DesignDocument, n: SceneNode): Array<[string, string
   const comment = (k: string, v: string) => out.push([k, v]);
 
   // Layout and size.
-  if (isAutoLayout(n)) {
+  if (isAutoLayout(n) && n.layoutMode === 'GRID') {
+    out.push(['display', 'grid']);
+    out.push(['grid-template-columns', `repeat(${n.gridColumnCount ?? 2}, 1fr)`]);
+    if (n.gridRowCount && n.gridRowCount > 1) out.push(['grid-template-rows', `repeat(${n.gridRowCount}, auto)`]);
+    out.push(['gap', `${px(n.counterAxisSpacing ?? 0)} ${px(n.itemSpacing ?? 0)}`]);
+    const pad = [n.paddingTop, n.paddingRight, n.paddingBottom, n.paddingLeft].map((v) => v ?? 0);
+    if (pad.some((v) => v)) out.push(['padding', pad.every((v) => v === pad[0]) ? px(pad[0]) : pad.map(px).join(' ')]);
+  } else if (isAutoLayout(n)) {
     out.push(['display', 'flex']);
     out.push(['flex-direction', n.layoutMode === 'VERTICAL' ? 'column' : 'row']);
     if (n.layoutWrap === 'WRAP') out.push(['flex-wrap', 'wrap']);
@@ -183,6 +190,12 @@ export function swiftUIText(doc: DesignDocument, n: SceneNode): string {
     if (n.textAlign === 'CENTER') mods.push('.multilineTextAlignment(.center)');
     if (n.textAlign === 'RIGHT') mods.push('.multilineTextAlignment(.trailing)');
     mods.push(`.frame(width: ${r2(n.width)}, alignment: .${n.textAlign === 'CENTER' ? 'center' : n.textAlign === 'RIGHT' ? 'trailing' : 'leading'})`);
+  } else if (isAutoLayout(n) && n.layoutMode === 'GRID') {
+    lines.push(
+      `LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: ${r2(n.itemSpacing ?? 0)}), count: ${n.gridColumnCount ?? 2}), spacing: ${r2(n.counterAxisSpacing ?? 0)}) {`,
+      '  // children',
+      '}',
+    );
   } else if (isAutoLayout(n)) {
     const stack = n.layoutMode === 'VERTICAL' ? 'VStack' : 'HStack';
     const align = n.layoutMode === 'VERTICAL'
@@ -257,6 +270,18 @@ export function composeText(doc: DesignDocument, n: SceneNode): string {
       modifier,
     ].filter(Boolean);
     body = `Text(\n  ${args.join(',\n  ')}\n)`;
+  } else if (isAutoLayout(n) && n.layoutMode === 'GRID') {
+    const cols = n.gridColumnCount ?? 2;
+    body = [
+      'LazyVerticalGrid(',
+      `  columns = GridCells.Fixed(${cols}),`,
+      `  horizontalArrangement = Arrangement.spacedBy(${r2(n.itemSpacing ?? 0)}.dp),`,
+      `  verticalArrangement = Arrangement.spacedBy(${r2(n.counterAxisSpacing ?? 0)}.dp),`,
+      `  ${modifier}`,
+      ') {',
+      '  // children',
+      '}',
+    ].join('\n');
   } else if (isAutoLayout(n)) {
     const v = n.layoutMode === 'VERTICAL';
     const arr = n.primaryAxisAlignItems === 'SPACE_BETWEEN' ? 'Arrangement.SpaceBetween' : `Arrangement.spacedBy(${r2(n.itemSpacing ?? 0)}.dp)`;

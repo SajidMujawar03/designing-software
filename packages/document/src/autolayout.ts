@@ -1,5 +1,5 @@
 import { rectUnion, transformRect, type Rect } from '@figma/geometry';
-import { applyConstraints, computeAutoLayout, DEFAULT_CONSTRAINTS, type Box, type LayoutItem, type Sizing } from '@figma/layout';
+import { applyConstraints, computeAutoLayout, computeGridLayout, DEFAULT_CONSTRAINTS, type Box, type LayoutItem, type Sizing } from '@figma/layout';
 import type { DesignDocument } from './document';
 import { boxOf, localTransform } from './scene';
 import { isAutoLayout, isGroupLike, type NodeId, type NodePatch, type SceneNode } from './types';
@@ -143,7 +143,31 @@ export function layoutFrame(doc: DesignDocument, id: NodeId, depth = 0): void {
     };
   });
   const own = layoutSizing(n, doc.get(n.parentId));
-  const res = computeAutoLayout(
+  const padding = { top: n.paddingTop ?? 0, right: n.paddingRight ?? 0, bottom: n.paddingBottom ?? 0, left: n.paddingLeft ?? 0 };
+  const cellAlign = { MIN: 'MIN', CENTER: 'CENTER', MAX: 'MAX', SPACE_BETWEEN: 'MIN' } as const;
+  const res = n.layoutMode === 'GRID'
+    ? computeGridLayout(
+        {
+          width: n.width,
+          height: n.height,
+          sizingH: own.h,
+          sizingV: own.v,
+          minWidth: n.minWidth,
+          maxWidth: n.maxWidth,
+          minHeight: n.minHeight,
+          maxHeight: n.maxHeight,
+          columns: n.gridColumnCount ?? 2,
+          rows: n.gridRowCount ?? 1,
+          padding,
+          // Grids use the gap as the column gap and the row gap as the counter-axis gap.
+          columnGap: n.itemSpacing ?? 0,
+          rowGap: n.counterAxisSpacing ?? 0,
+          alignX: cellAlign[n.primaryAxisAlignItems ?? 'MIN'],
+          alignY: n.counterAxisAlignItems ?? 'MIN',
+        },
+        items,
+      )
+    : computeAutoLayout(
     {
       width: n.width,
       height: n.height,

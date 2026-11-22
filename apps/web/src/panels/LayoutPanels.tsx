@@ -186,17 +186,31 @@ type Flow = 'FREEFORM' | 'VERTICAL' | 'HORIZONTAL' | 'GRID';
  * Layout > Flow, as in Figma: Freeform (no auto layout), Vertical,
  * Horizontal (with Wrap) or Grid. Picking Vertical or Horizontal adds auto
  * layout (wrapping non-frames in a new frame); Freeform removes it. Grid
- * auto layout isn't built yet.
+ * lays children out in columns and rows.
  */
 export function FlowButtons({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
-  const flow = common(nodes.map((n): Flow => (isAutoLayout(n) ? (n.layoutMode === 'VERTICAL' ? 'VERTICAL' : 'HORIZONTAL') : 'FREEFORM')));
+  const flow = common(nodes.map((n): Flow => (isAutoLayout(n) ? (n.layoutMode === 'VERTICAL' ? 'VERTICAL' : n.layoutMode === 'GRID' ? 'GRID' : 'HORIZONTAL') : 'FREEFORM')));
   const wrap = nodes.every((n) => isAutoLayout(n) && n.layoutMode === 'HORIZONTAL' && n.layoutWrap === 'WRAP');
   const pick = (f: Flow) => {
-    if (f === 'GRID') return;
     if (f === 'FREEFORM') return removeAutoLayout(editor);
-    const mode = f === 'VERTICAL' ? 'VERTICAL' : 'HORIZONTAL';
     if (!nodes.every((n) => isAutoLayout(n))) addAutoLayout(editor);
     // Adding auto layout may have wrapped the selection in a new frame.
+    if (f === 'GRID') {
+      // A grid starts with as many columns as fit the children in two rows (at least 2).
+      apply(editor.ui.selection, (n) =>
+        isAutoLayout(n)
+          ? {
+              layoutMode: 'GRID',
+              layoutWrap: 'NO_WRAP',
+              gridColumnCount: n.gridColumnCount ?? Math.max(2, Math.ceil(editor.doc.childIds(n.id).length / 2)),
+              gridRowCount: n.gridRowCount ?? 1,
+              counterAxisSpacing: n.counterAxisSpacing ?? n.itemSpacing ?? 10,
+            }
+          : {},
+      );
+      return;
+    }
+    const mode = f === 'VERTICAL' ? 'VERTICAL' : 'HORIZONTAL';
     apply(editor.ui.selection, (n) => (isAutoLayout(n) ? { layoutMode: mode, layoutWrap: mode === 'VERTICAL' ? 'NO_WRAP' : n.layoutWrap } : {}));
   };
   const button = (f: Flow, title: string, icon: ReactNode, disabled = false) => (
@@ -211,7 +225,7 @@ export function FlowButtons({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] 
         {button('FREEFORM', 'Freeform', <Move size={14} />)}
         {button('VERTICAL', 'Vertical layout (Shift+A)', <ArrowDown size={14} />)}
         {button('HORIZONTAL', 'Horizontal layout (Shift+A)', <ArrowRight size={14} />)}
-        {button('GRID', 'Grid (not available yet)', <Grid3x3 size={14} />, true)}
+        {button('GRID', 'Grid', <Grid3x3 size={14} />)}
         {flow === 'HORIZONTAL' && (
           <IconButton title="Wrap" active={wrap} onClick={() => apply(ids, { layoutWrap: wrap ? 'NO_WRAP' : 'WRAP' })}>
             <WrapText size={14} />
@@ -228,12 +242,37 @@ export function AutoLayoutFields({ ids, nodes }: { ids: NodeId[]; nodes: SceneNo
   if (!nodes.every((n) => isAutoLayout(n))) return null;
   const val = <T,>(f: (n: SceneNode) => T) => common(nodes.map(f));
   const wrap = nodes.every((n) => n.layoutMode === 'HORIZONTAL' && n.layoutWrap === 'WRAP');
+  const isGrid = nodes.every((n) => n.layoutMode === 'GRID');
   const gapAuto = nodes.every((n) => n.primaryAxisAlignItems === 'SPACE_BETWEEN');
   const padH = val((n) => (n.paddingLeft === n.paddingRight ? (n.paddingLeft ?? 0) : MIXED)) as number | Mixed;
   const padV = val((n) => (n.paddingTop === n.paddingBottom ? (n.paddingTop ?? 0) : MIXED)) as number | Mixed;
   const pad = (k: 'paddingLeft' | 'paddingRight' | 'paddingTop' | 'paddingBottom', label: string) => (
     <NumberField label={label} title={`Padding ${k.slice(7).toLowerCase()}`} value={val((n) => n[k] ?? 0)} min={0} onChange={(v, live) => apply(ids, { [k]: v }, live)} />
   );
+
+  if (isGrid)
+    return (
+      <>
+        <div className="grid2">
+          <NumberField label="Cols" title="Columns" value={val((n) => n.gridColumnCount ?? 2)} min={1} max={50} precision={0} onChange={(v, live) => apply(ids, { gridColumnCount: Math.max(1, Math.round(v)) }, live)} />
+          <NumberField label="Rows" title="Rows (more are added for extra layers)" value={val((n) => n.gridRowCount ?? 1)} min={1} max={50} precision={0} onChange={(v, live) => apply(ids, { gridRowCount: Math.max(1, Math.round(v)) }, live)} />
+          <NumberField label="↔" title="Column gap" value={val((n) => n.itemSpacing ?? 0)} min={0} onChange={(v, live) => apply(ids, { itemSpacing: v }, live)} />
+          <NumberField label="↕" title="Row gap" value={val((n) => n.counterAxisSpacing ?? 0)} min={0} onChange={(v, live) => apply(ids, { counterAxisSpacing: v }, live)} />
+        </div>
+        {nodes.length === 1 && (
+          <div className="al-grid">
+            <AlignPad node={nodes[0]} onPick={(p, c) => apply(ids, { primaryAxisAlignItems: p, counterAxisAlignItems: c })} />
+            <div className="hint">Where layers sit in their cells</div>
+          </div>
+        )}
+        <div className="sizing-row">
+          <div className="grid2 grow">
+            <NumberField label="↔" title="Horizontal padding" value={padH} min={0} onChange={(v, live) => apply(ids, { paddingLeft: v, paddingRight: v }, live)} />
+            <NumberField label="↕" title="Vertical padding" value={padV} min={0} onChange={(v, live) => apply(ids, { paddingTop: v, paddingBottom: v }, live)} />
+          </div>
+        </div>
+      </>
+    );
 
   return (
     <>

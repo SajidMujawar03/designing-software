@@ -114,7 +114,7 @@ export interface LayoutDrop {
 export function layoutDropAt(doc: DesignDocument, frameId: NodeId, p: Vec2, exclude: Set<NodeId>): LayoutDrop {
   const f = doc.get(frameId)!;
   const H = f.layoutMode !== 'VERTICAL';
-  const wrap = H && f.layoutWrap === 'WRAP';
+  const wrap = H && (f.layoutWrap === 'WRAP' || f.layoutMode === 'GRID');
   const order = layoutOrder(doc, frameId).filter((id) => !exclude.has(id));
   const boxes = order.map((id) => boxInParent(doc, doc.get(id)!));
   const k = boxes.findIndex((b) =>

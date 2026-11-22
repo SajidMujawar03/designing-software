@@ -3,7 +3,7 @@ import type { CodeLanguage, CodeTheme } from './code';
 
 export type { ConstraintType, Constraints, CounterAlign, GridAlignment, GridPattern, LayoutGrid, PrimaryAlign, Sizing } from '@figma/layout';
 
-export type LayoutMode = 'NONE' | 'HORIZONTAL' | 'VERTICAL';
+export type LayoutMode = 'NONE' | 'HORIZONTAL' | 'VERTICAL' | 'GRID';
 
 /** Measurements an annotation can show, read live from its layer. */
 export type AnnotationProperty = 'width' | 'height' | 'fills' | 'strokes' | 'cornerRadius' | 'opacity' | 'effects' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'padding' | 'itemSpacing';
@@ -334,6 +334,9 @@ export interface SceneNode {
   // FRAME: auto layout
   layoutMode?: LayoutMode;
   layoutWrap?: 'NO_WRAP' | 'WRAP';
+  /** Grid auto layout: columns, and the least number of rows (more are added for extra children). */
+  gridColumnCount?: number;
+  gridRowCount?: number;
   /** Gap between items. */
   itemSpacing?: number;
   /** Gap between wrapped lines. */
@@ -638,7 +641,7 @@ export const canHoldSection = (n: SceneNode | undefined | null): boolean => n?.t
 
 /** A frame that lays out its children (auto layout). Sections never do. */
 export const isAutoLayout = (n: SceneNode | undefined | null): boolean =>
-  isFrameLike(n) && n.type !== 'SECTION' && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL');
+  isFrameLike(n) && n.type !== 'SECTION' && (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL' || n.layoutMode === 'GRID');
 
 /** A child placed by its auto layout parent (rather than positioned freely). */
 export const isLayoutChild = (n: SceneNode, parent: SceneNode | undefined | null): boolean =>
