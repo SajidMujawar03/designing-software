@@ -6013,3 +6013,56 @@ a.btn {
 .ui-hidden .sidebar {
   display: none;
 }
+
+/* ---------- Motion: keyed fields and the timeline header ---------- */
+
+/* The timeline is a light panel: its buttons use the text color (they were white). */
+.timeline .tool-btn {
+  color: var(--text);
+}
+.timeline .tool-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+.timeline .tool-btn.active {
+  color: #fff;
+}
+.timeline-addkey .key-diamond {
+  margin: 0;
+  pointer-events: none;
+}
+.keyed-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.keyed-field > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.keyed-field {
+  gap: 1px;
+}
+.keyed-field .key-diamond {
+  margin: 0 2px;
+}
+.section-actions {
+  align-items: center;
+}
+.section-actions .key-diamond {
+  margin: 0 7px;
+}
+.caption-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 8px;
+}
+.keyed-field .num-label {
+  min-width: 18px;
+  padding: 0 3px;
+}
+.keyed-field .num-field input {
+  padding-left: 2px;
+  padding-right: 2px;
+}

@@ -130,16 +130,17 @@ Layer selected (frame / group):
 | Figma | Ours | Status |
 | --- | --- | --- |
 | "Motion Beta" mode; timeline at the bottom across the left panel too | Motion mode; timeline at the bottom, under the canvas only | Same (layout differs slightly) |
-| Timeline header: Play ▷, keyframe ◇, time `00:00:000 ms`, auto-keyframe toggle, zoom − / + on timeline, ruler `0s, 200ms … 1s … 2s` | Play (Space), auto-keyframe toggle, current time `0ms` / duration `2000ms`, `ms`/`s` unit toggle, selected layer name, zoom slider, ruler `0ms … 2500ms` | Different name or place (ours shows the duration and uses a slider for zoom; Figma has a keyframe ◇ button and − / + zoom) |
-| Right panel **Animations** (+) at the top | **Animations** (+) under Animate | Same |
-| **Transform**: Position, Scale, Rotation, each with a ◇ keyframe button beside the field | **Animate** section: a list of ◇ X, Y, Width, Height, Rotation, Scale X, Scale Y, Opacity, Corner radius, Fill, Stroke, Stroke weight, Blur, shown **above** the normal Design sections | Different name or place |
-| Keyframe ◇ on Layout (W/H) and Appearance fields | Keyframes only in the Animate list | Different name or place |
+| Timeline header: Play ▷, keyframe ◇, time `00:00:000 ms`, auto-keyframe toggle, zoom − / + on timeline, ruler `0s, 200ms … 1s … 2s` | Play (Space), Add keyframe ◇, auto-keyframe toggle, current time / duration, `ms`/`s` toggle, playback, layer name, collapse, zoom − / slider / + | Same (U6; ours also shows the duration). The header icons were white on white before U6 |
+| Right panel **Animations** (+) at the top | **Animations** (+) at the top | Same (U6) |
+| **Transform**: Position, Scale, Rotation, each with a ◇ keyframe button beside the field | **Transform**: Position (X, Y), Scale (with aspect lock), Rotation, each with a ◇; replaces Position in Motion mode | Same (U6); Position is the top-left, not Figma's centre |
+| Keyframe ◇ on Layout (W/H) and Appearance fields | ◇ beside W/H, Opacity, Corner radius and Stroke weight, and in the Fill, Stroke and Effects (blur) headers | Same (U6) |
 | **Audio** section, Add audio | — | Missing in ours |
-| Right-click → **Add motion** (Design mode) | Motion mode in quick actions | Missing in ours (context menu item) |
+| Right-click → **Add motion** (Design mode) | Right-click → **Add motion** | Same (U3) |
 
 | Figma Motion | Our Motion |
 | --- | --- |
-| ![Figma Motion](ui-comparison/figma-motion.png) | ![Our Motion](ui-comparison/ours-motion.png) |
+| ![Figma Motion](ui-comparison/figma-motion.png) | ![Our Motion, before](ui-comparison/ours-motion.png) |
+|  | ![Our Motion after U6](ui-comparison/ours-u6-motion.png) |
 
 ## 9. Menus and quick actions
 
@@ -198,7 +199,7 @@ Layer selected (frame / group):
 10. ~~**Restructure Position / Layout**~~ (done in U4): split X/Y/rotation and alignment into a **Position** section; put auto layout's Flow (Freeform / Vertical / Horizontal / Grid) and Dimensions into **Layout**.
 11. ~~**Move the toolbar to the bottom centre**~~ (done in U5) with the mode switcher at its right end, and put Present / Share / zoom at the top of the right panel. This is the biggest visual difference.
 12. ~~**Add a main menu** (logo button)~~ Done in U3, except Flip, Outlines and Pixel preview: with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
-13. **Motion**: name the property section **Transform** (Position, Scale, Rotation) with ◇ buttons beside the normal fields, and add **Add motion** to the right-click menu.
+13. ~~**Motion**: name the property section **Transform**~~ (done in U6) (Position, Scale, Rotation) with ◇ buttons beside the normal fields, and add **Add motion** to the right-click menu.
 14. ~~**Left navigation rail**~~ (done in U5) (File, Assets, Variables): larger change; it moves Assets out of the left-panel tabs and Variables out of the right panel.
 15. Dev Mode extras: Ready for dev, Compare changes, Measurement tool (Shift+M).
 

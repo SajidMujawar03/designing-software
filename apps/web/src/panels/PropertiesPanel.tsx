@@ -1,6 +1,7 @@
 import { replaceSelectionColor, selectionColors, isAutoLayout, textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   FlipVertical2,
+  Blend,
   Component,
   SquareDashed,
   PenTool,
@@ -56,7 +57,7 @@ import { ComponentSection } from './ComponentPanel';
 import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
 import { drawnDocument, inMotionFrame, isLockedForMotion, motionApply } from '../editor/motion';
-import { AnimateSection } from './AnimateSection';
+import { Keyed, KeyframeButton, TransformSection } from './AnimateSection';
 import { AnimationsSection, InstanceMotionSection } from './AnimationsSection';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -118,6 +119,8 @@ export function PropertiesPanel() {
   const plainBoxes = nodes.some((n) => n.type === 'SECTION' || n.type === 'SLICE' || n.type === 'CODE_SNIPPET' || n.type === 'SPEC');
   // Groups have no box of their own: position and size come from their bounds.
   const groups = nodes.some((n) => isGroupLike(n));
+  // Motion mode, one layer: fields get a ◇ keyframe button and Transform replaces Position.
+  const keyed = motionMode && nodes.length === 1 && inMotionFrame(nodes[0].id) && !isLockedForMotion(nodes[0].id) ? nodes[0] : null;
 
   return (
     <div className="props">
@@ -129,8 +132,8 @@ export function PropertiesPanel() {
           <InstanceMotionSection n={nodes[0]} />
         ) : (
           <>
-            {nodes.length === 1 && <AnimateSection n={nodes[0]} />}
             {!nodes.some((n) => isLockedForMotion(n.id)) && <AnimationsSection nodes={nodes} />}
+            {keyed && <TransformSection n={keyed} />}
           </>
         ))}
 
@@ -140,6 +143,7 @@ export function PropertiesPanel() {
       {nodes.length === 1 && <VariableModes nodeId={nodes[0].id} />}
       <VariableBindings nodes={nodes} />
 
+      {!keyed && (
       <Section title="Position">
         <AlignBar count={editor.topLevelSelection().length} />
         {groups ? (
@@ -159,6 +163,7 @@ export function PropertiesPanel() {
         )}
         {!plainBoxes && <ConstraintsSection ids={ids} nodes={nodes} />}
       </Section>
+      )}
 
       <Section
         title="Layout"
@@ -181,6 +186,7 @@ export function PropertiesPanel() {
           <BoxFields ids={ids} part="size" />
         ) : (
           <div className="grid2">
+            <Keyed keyed={keyed} p="width">
             <NumberField
               label="W"
               value={num('width')}
@@ -197,7 +203,9 @@ export function PropertiesPanel() {
                 )
               }
             />
+            </Keyed>
             {!isLine && (
+              <Keyed keyed={keyed} p="height">
               <NumberField
                 label="H"
                 value={num('height')}
@@ -214,6 +222,7 @@ export function PropertiesPanel() {
                   )
                 }
               />
+              </Keyed>
             )}
           </div>
         )}
@@ -240,8 +249,10 @@ export function PropertiesPanel() {
         }
       >
         <div className="grid2">
+          <Keyed keyed={keyed} p="opacity">
           <NumberField
-            label="Opacity"
+            label={keyed ? <Blend size={12} /> : 'Opacity'}
+            title="Opacity"
             value={num('opacity') === MIXED ? MIXED : Math.round((num('opacity') as number) * 100)}
             suffix="%"
             min={0}
@@ -249,7 +260,9 @@ export function PropertiesPanel() {
             precision={0}
             onChange={(v, live) => apply(ids, { opacity: v / 100 }, live)}
           />
+          </Keyed>
           {hasRadius && (
+            <Keyed keyed={keyed} p="cornerRadius">
             <NumberField
               label={<Scan size={12} />}
               title="Corner radius"
@@ -257,6 +270,7 @@ export function PropertiesPanel() {
               min={0}
               onChange={(v, live) => apply(ids, { cornerRadius: v }, live)}
             />
+            </Keyed>
           )}
           <BlendSelect ids={ids} nodes={nodes} />
         </div>
@@ -265,11 +279,11 @@ export function PropertiesPanel() {
 
       {allText && <TextSection ids={ids} nodes={nodes} />}
 
-      {!isLine && <PaintsSection title="Fill" ids={ids} nodes={nodes} prop="fills" />}
-      <PaintsSection title="Stroke" ids={ids} nodes={nodes} prop="strokes" />
-      {nodes.some((n) => n.strokes.length > 0) && <StrokeOptions ids={ids} nodes={nodes} />}
+      {!isLine && <PaintsSection title="Fill" ids={ids} nodes={nodes} prop="fills" keyed={keyed} />}
+      <PaintsSection title="Stroke" ids={ids} nodes={nodes} prop="strokes" keyed={keyed} />
+      {nodes.some((n) => n.strokes.length > 0) && <StrokeOptions ids={ids} nodes={nodes} keyed={keyed} />}
 
-      <EffectsSection ids={ids} nodes={nodes} />
+      <EffectsSection ids={ids} nodes={nodes} keyed={keyed} />
       {!motionMode && <SelectionColorsSection ids={ids} nodes={nodes} />}
       {!plainBoxes && <LayoutGridSection ids={ids} nodes={nodes} />}
 
@@ -559,8 +573,8 @@ function SelectionColor() {
   );
 }
 
-function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]; prop: 'fills' | 'strokes' }) {
-  const { title, ids, nodes, prop } = props;
+function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]; prop: 'fills' | 'strokes'; keyed?: SceneNode | null }) {
+  const { title, ids, nodes, prop, keyed = null } = props;
   const paints = common(nodes.map((n) => n[prop]));
   const add = () =>
     apply(ids, (n) => {
@@ -597,6 +611,7 @@ function PaintsSection(props: { title: string; ids: NodeId[]; nodes: SceneNode[]
               <Plus size={14} />
             </IconButton>
           )}
+          {keyed && <KeyframeButton n={keyed} p={prop === 'fills' ? 'fillColor' : 'strokeColor'} />}
         </>
       }
     >
@@ -1039,7 +1054,7 @@ function SelectionColorsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNod
 }
 
 /** Stroke weight, position (inside/center/outside), dashes, ends and corners. */
-function StrokeOptions({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+function StrokeOptions({ ids, nodes, keyed = null }: { ids: NodeId[]; nodes: SceneNode[]; keyed?: SceneNode | null }) {
   const val = <T,>(f: (n: SceneNode) => T) => common(nodes.map(f));
   const weight = val((n) => n.strokeWeight);
   const align = val((n) => n.strokeAlign ?? 'CENTER');
@@ -1067,7 +1082,9 @@ function StrokeOptions({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   return (
     <div className="section-body tight">
       <div className="grid2">
-        <NumberField label="Weight" value={weight} min={0} onChange={(v, live) => apply(ids, { strokeWeight: v }, live)} />
+        <Keyed keyed={keyed} p="strokeWeight">
+          <NumberField label="Weight" value={weight} min={0} onChange={(v, live) => apply(ids, { strokeWeight: v }, live)} />
+        </Keyed>
         {select('Stroke position', align, [['INSIDE', 'Inside'], ['CENTER', 'Center'], ['OUTSIDE', 'Outside']], (v) =>
           apply(ids, { strokeAlign: v }),
         )}
@@ -1169,7 +1186,7 @@ const EFFECT_TYPES: Array<[Effect['type'], string]> = [
 ];
 
 /** Shadows and blurs, each with its own settings. */
-function EffectsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+function EffectsSection({ ids, nodes, keyed = null }: { ids: NodeId[]; nodes: SceneNode[]; keyed?: SceneNode | null }) {
   const effects = common(nodes.map((n) => n.effects ?? []));
   const [open, setOpen] = useState<number | null>(null);
   const [colorOpen, setColorOpen] = useState(false);
@@ -1210,6 +1227,7 @@ function EffectsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
               <Plus size={14} />
             </IconButton>
           )}
+          {keyed && <KeyframeButton n={keyed} p="blur" />}
         </>
       }
     >

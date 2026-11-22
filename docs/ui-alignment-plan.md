@@ -216,6 +216,13 @@ Tests: keyframe button adds/removes keys for each property; the existing motion 
 
 ---
 
+**Done in U6 / changed.** Built: `KeyframeButton` and `Keyed` (`panels/AnimateSection.tsx`), the Transform section (Position, Scale with aspect lock, Rotation) in place of Position and the old Animate list, ◇ on W/H, Opacity, Corner radius, Stroke weight and in the Fill, Stroke and Effects headers, and the timeline's Add keyframe ◇ and − / + zoom (the slider stays). Also fixed: the timeline header buttons were white on the light timeline, so Play and the others were hard to see. Not done:
+- **Position as the centre** (Figma's anchor): ours still shows the top-left, as the keyframes store it.
+- **The timeline spanning under the left panel**, and Figma's `00:00:000 ms` time format.
+- **Audio**.
+
+---
+
 ### Phase U7: Dev Mode pieces (Inspect)
 Branch `ui-dev-mode` · about 3 days
 

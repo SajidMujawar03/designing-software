@@ -1,9 +1,9 @@
-import { animatedInstances, animatedLayers, clipSpan, DEFAULT_MOTION, MOTION_PROPERTIES, moveKeyframes, PRESETS, setKeyframeEasing, updateClip, type Keyframe, type KeyRef, type MotionClip, type MotionEasing, type MotionProperty, type NodeId, type SceneNode } from '@figma/document';
-import { ArrowRightLeft, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleDot, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
+import { animatableProperties, isAnimated, keyframeAt, toggleKeyframe, animatedInstances, animatedLayers, clipSpan, DEFAULT_MOTION, MOTION_PROPERTIES, moveKeyframes, PRESETS, setKeyframeEasing, updateClip, type Keyframe, type KeyRef, type MotionClip, type MotionEasing, type MotionProperty, type NodeId, type SceneNode } from '@figma/document';
+import { Minus, Plus, ArrowRightLeft, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleDot, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
-import { followSelection, formatTime, motionFrame, parseTime, PLAYBACK_ORDER, seek, selectClip, selectKeys, setTimeline, timelineOf, toggleAutoKey, togglePlay } from '../editor/motion';
+import { followSelection, formatTime, motionFrame, motionHint, parseTime, PLAYBACK_ORDER, seek, selectClip, selectKeys, setTimeline, timelineOf, toggleAutoKey, togglePlay } from '../editor/motion';
 import { useUI, type MotionUI } from '../editor/store';
 import { EasingEditor } from './EasingEditor';
 
@@ -32,6 +32,22 @@ const PAD = 12;
 /** Width of the names column. */
 const NAMES_W = 180;
 const ROW_H = 24;
+/**
+ * The timeline's ◇: keys the selected layer at the playhead, on every
+ * property it already animates (Figma Motion's Add keyframe).
+ */
+function addKeyframes(): void {
+  const doc = editor.doc;
+  const time = editor.ui.motion.time;
+  const n = editor.ui.selection.length === 1 ? doc.get(editor.ui.selection[0]) : undefined;
+  const props = n ? animatableProperties(n).filter((p) => isAnimated(n, p) && !keyframeAt(n, p, time)) : [];
+  if (!n || !animatableProperties(n).some((p) => isAnimated(n, p))) {
+    motionHint('Click a ◇ next to a property in the right panel to start animating it.');
+    return;
+  }
+  if (props.length) doc.change(() => props.forEach((p) => toggleKeyframe(doc, n.id, p, time)));
+}
+
 const MIN_PX_PER_SEC = 40;
 const MAX_PX_PER_SEC = 2400;
 /** Snapping distance (px) for keyframes dragged near the playhead or other keyframes. */
@@ -381,6 +397,9 @@ function TimelinePanel() {
         <button type="button" className="tool-btn" onClick={togglePlay} disabled={!frame} title={playing ? 'Pause (Space)' : 'Play (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
           {playing ? <Pause size={15} /> : <Play size={15} />}
         </button>
+        <button type="button" className="tool-btn timeline-addkey" onClick={addKeyframes} disabled={!frame} title="Add keyframe at the playhead (to the selected layer's animated properties)" aria-label="Add keyframe">
+          <span className="key-diamond none" aria-hidden />
+        </button>
         <button
           type="button"
           className={`tool-btn timeline-autokey${autoKey ? ' active' : ''}`}
@@ -425,6 +444,9 @@ function TimelinePanel() {
         >
           {allCollapsed ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />}
         </button>
+        <button type="button" className="tool-btn" onClick={() => setMotion({ pxPerSec: Math.max(MIN_PX_PER_SEC, pxPerSec / 1.5) })} title="Zoom out on timeline" aria-label="Zoom out on timeline">
+          <Minus size={15} />
+        </button>
         <input
           type="range"
           className="timeline-zoom"
@@ -436,6 +458,9 @@ function TimelinePanel() {
           value={Math.log(pxPerSec)}
           onChange={(e) => setMotion({ pxPerSec: Math.exp(Number(e.target.value)) })}
         />
+        <button type="button" className="tool-btn" onClick={() => setMotion({ pxPerSec: Math.min(MAX_PX_PER_SEC, pxPerSec * 1.5) })} title="Zoom in on timeline" aria-label="Zoom in on timeline">
+          <Plus size={15} />
+        </button>
       </header>
 
       {!frame ? (
@@ -464,7 +489,7 @@ function TimelinePanel() {
               <div className="timeline-row">
                 <div className="timeline-name" />
                 <div className="timeline-lane timeline-hint" style={{ width: lanesWidth }} onPointerDown={laneDown}>
-                  Select a layer, then click a diamond in the Animate section (or turn on auto-keyframe), or add a preset in Animations.
+                  Select a layer, then click a ◇ next to a property in the right panel (Transform, Layout, Appearance…), turn on auto-keyframe, or add a preset in Animations.
                 </div>
               </div>
             )}
