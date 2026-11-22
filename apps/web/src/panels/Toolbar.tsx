@@ -180,7 +180,7 @@ function ModeSwitch() {
     setMotionMode(m === 'motion');
     if (m !== 'motion') editor.setDrawMode(m === 'draw');
     if (m === 'dev') editor.setUI({ rightTab: 'inspect' });
-    // Leaving Dev Mode goes back to the Design tab (Motion's Animate section is there).
+    // Leaving Dev Mode goes back to the Design tab (Motion's Transform section and ◇ buttons are there).
     else if (rightTab === 'inspect') editor.setUI({ rightTab: 'design' });
   };
   return (
