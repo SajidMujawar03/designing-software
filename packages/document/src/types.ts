@@ -654,6 +654,22 @@ export interface MotionTimeline {
   /** Milliseconds (Figma's default: 2000). */
   duration: number;
   playback: MotionPlayback;
+  /** A sound played with the timeline (Figma Motion's Audio). */
+  audio?: MotionAudio | null;
+}
+
+/** Audio on a Motion timeline: the file's bytes are kept with the file's images, under `hash`. */
+export interface MotionAudio {
+  hash: string;
+  /** The uploaded file's name and type. */
+  name: string;
+  mime: string;
+  /** When it starts on the timeline (ms; negative skips the sound's beginning). */
+  start: number;
+  /** 0–1. */
+  volume: number;
+  /** The sound's own length (ms). */
+  length: number;
 }
 
 export type MotionPlayback = 'LOOP' | 'ONCE' | 'PING_PONG';

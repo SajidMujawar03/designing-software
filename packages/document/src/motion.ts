@@ -851,3 +851,28 @@ export function currentValue(n: SceneNode, p: MotionProperty): number | string {
   if (p === 'scaleY') return n.motionScaleY ?? 1;
   return restValue(n, p);
 }
+
+// ------------------------------------------------------------ audio
+
+/**
+ * Where in its sound file (seconds) a timeline's audio should be playing,
+ * `elapsed` ms after playback started, or null when it's silent: before its
+ * start, after its end, or on the way back of a ping-pong timeline (sound
+ * only plays forwards).
+ */
+export function audioOffsetAt(tl: MotionTimeline, elapsed: number): number | null {
+  const a = tl.audio;
+  if (!a || tl.duration <= 0) return null;
+  let t: number;
+  if (tl.playback === 'ONCE') {
+    if (elapsed >= tl.duration) return null;
+    t = elapsed;
+  } else {
+    const pass = Math.floor(elapsed / tl.duration);
+    if (tl.playback === 'PING_PONG' && pass % 2 === 1) return null;
+    t = elapsed - pass * tl.duration;
+  }
+  const local = t - a.start;
+  if (local < 0 || local >= a.length) return null;
+  return local / 1000;
+}

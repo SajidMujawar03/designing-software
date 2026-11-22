@@ -6207,3 +6207,38 @@ a.btn {
     transform: translateX(-50%) scale(0.7);
   }
 }
+
+/* ---------- Motion audio ---------- */
+.timeline-bar.audio {
+  background: rgba(20, 174, 92, 0.25);
+  border: 1px solid #14ae5c;
+  cursor: ew-resize;
+}
+.timeline-audio .timeline-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #14ae5c;
+}
+.audio-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 32px);
+  margin: 0 16px 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.audio-file .grow {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -93,6 +93,9 @@ export function play(): void {
   if (!raf) raf = requestAnimationFrame(tick);
 }
 
+/** How long (ms) playback has been running, for things that follow it (the timeline's audio). */
+export const playbackElapsed = (): number => performance.now() - origin;
+
 export function pause(): void {
   if (raf) cancelAnimationFrame(raf);
   raf = 0;

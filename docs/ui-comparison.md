@@ -135,7 +135,7 @@ Layer selected (frame / group):
 | Right panel **Animations** (+) at the top | **Animations** (+) at the top | Same (U6) |
 | **Transform**: Position, Scale, Rotation, each with a ◇ keyframe button beside the field | **Transform**: Position (X, Y), Scale (with aspect lock), Rotation, each with a ◇; replaces Position in Motion mode | Same (U6, V5: Position shows and edits the centre) |
 | Keyframe ◇ on Layout (W/H) and Appearance fields | ◇ beside W/H, Opacity, Corner radius and Stroke weight, and in the Fill, Stroke and Effects (blur) headers | Same (U6) |
-| **Audio** section, Add audio | — | Missing in ours |
+| **Audio** section, Add audio | **Audio** section (on the timeline frame): add a sound, Start, Volume, remove; a green Audio track on the timeline; played with the timeline and mixed into MP4 / WebM | Same (V8) |
 | Right-click → **Add motion** (Design mode) | Right-click → **Add motion** | Same (U3) |
 
 | Figma Motion | Our Motion |

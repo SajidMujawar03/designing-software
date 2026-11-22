@@ -62,8 +62,8 @@ import { WidthProfileSelect } from './WidthProfile';
 import { ComponentSection } from './ComponentPanel';
 import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
-import { drawnDocument, inMotionFrame, isLockedForMotion, motionApply } from '../editor/motion';
-import { Keyed, KeyframeButton, TransformSection } from './AnimateSection';
+import { drawnDocument, inMotionFrame, isLockedForMotion, motionApply, motionFrame } from '../editor/motion';
+import { AudioSection, Keyed, KeyframeButton, TransformSection } from './AnimateSection';
 import { AnimationsSection, InstanceMotionSection } from './AnimationsSection';
 
 const WEIGHT_NAMES: Record<number, string> = {
@@ -141,6 +141,7 @@ export function PropertiesPanel() {
           <>
             {!nodes.some((n) => isLockedForMotion(n.id)) && <AnimationsSection nodes={nodes} />}
             {keyed && <TransformSection n={keyed} />}
+            {nodes.length === 1 && motionFrame()?.id === nodes[0].id && <AudioSection />}
           </>
         ))}
 

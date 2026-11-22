@@ -1,8 +1,9 @@
 import { animatableProperties, currentValue, isAnimated, keyframeAt, motionPatch, toggleKeyframe, type MotionProperty, type SceneNode } from '@figma/document';
-import { Link2, Unlink2 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { Link2, Minus, Music, Plus, Unlink2, Volume2 } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
 import { editor } from '../editor/editor';
-import { motionApply } from '../editor/motion';
+import { motionApply, motionFrame, timelineOf } from '../editor/motion';
+import { removeTimelineAudio, setTimelineAudio, updateTimelineAudio } from '../editor/motionAudio';
 import { useUI } from '../editor/store';
 import { IconButton, NumberField, Section } from './controls';
 import { PROPERTY_LABELS } from './Timeline';
@@ -99,3 +100,64 @@ export function TransformSection({ n }: { n: SceneNode }) {
   );
 }
 
+
+/**
+ * Motion mode, the timeline's frame selected: Figma Motion's Audio section.
+ * Add a sound (it plays with the timeline and goes into video exports), set
+ * when it starts and its volume, or remove it.
+ */
+export function AudioSection() {
+  const time = useUI((s) => s.motion.time);
+  const input = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const audio = timelineOf(motionFrame()).audio;
+  const pick = () => input.current?.click();
+  return (
+    <Section
+      title="Audio"
+      actions={
+        audio ? (
+          <IconButton title="Remove audio" onClick={removeTimelineAudio}>
+            <Minus size={14} />
+          </IconButton>
+        ) : (
+          <IconButton title="Add audio" onClick={pick}>
+            <Plus size={14} />
+          </IconButton>
+        )
+      }
+    >
+      <input
+        ref={input}
+        type="file"
+        accept="audio/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (!f) return;
+          setError(null);
+          setTimelineAudio(f).catch(() => setError("That file couldn't be read as audio."));
+        }}
+      />
+      {error && <div className="hint error-text">{error}</div>}
+      {!audio && !error && <div className="hint">Add a sound to play with the timeline. It's included in MP4 and WebM exports.</div>}
+      {audio && (
+        <>
+          <button type="button" className="audio-file" title="Replace the sound" onClick={pick}>
+            <Music size={13} />
+            <span className="grow">{audio.name}</span>
+            <span className="hint">{(audio.length / 1000).toFixed(1)}s</span>
+          </button>
+          <div className="grid2">
+            <NumberField label="Start" title="When the sound starts on the timeline (ms)" value={audio.start} suffix="ms" precision={0} onChange={(v) => updateTimelineAudio({ start: Math.round(v) })} />
+            <NumberField label={<Volume2 size={12} />} title="Volume" value={Math.round(audio.volume * 100)} suffix="%" min={0} max={100} precision={0} onChange={(v) => updateTimelineAudio({ volume: v / 100 })} />
+          </div>
+          <button type="button" className="btn small" onClick={() => updateTimelineAudio({ start: Math.round(time) })}>
+            Start at the playhead
+          </button>
+        </>
+      )}
+    </Section>
+  );
+}

@@ -5,6 +5,7 @@ import { editor } from './editor';
 import { animatedSvg } from './animatedSvg';
 import { svgExportOptions } from './export';
 import { buildLottie, dotLottie, type Rasterize } from './lottieExport';
+import { renderTimelineAudio } from './motionAudio';
 
 /**
  * Animated export of a top-level frame (as in Figma Motion's Animated tab):
@@ -148,6 +149,11 @@ export async function exportAnimation(frameId: NodeId, opts: AnimatedExportOptio
   const output = new mb.Output({ format: opts.format === 'MP4' ? new mb.Mp4OutputFormat() : new mb.WebMOutputFormat(), target });
   const source = new mb.CanvasSource(canvas, { codec: opts.format === 'MP4' ? 'avc' : 'vp9', quality });
   output.addVideoTrack(source, { frameRate: fps });
+  // The timeline's audio, mixed for the video's length (AAC in MP4, Opus in WebM).
+  const audioCodec = opts.format === 'MP4' ? 'aac' : 'opus';
+  const audio = tl.audio && (await mb.canEncodeAudio(audioCodec).catch(() => false)) ? await renderTimelineAudio(tl, times.length / fps) : null;
+  const audioSource = audio ? new mb.AudioBufferSource({ codec: audioCodec, quality }) : null;
+  if (audioSource) output.addAudioTrack(audioSource);
   await output.start();
   try {
     for (let i = 0; i < times.length; i++) {
@@ -156,6 +162,7 @@ export async function exportAnimation(frameId: NodeId, opts: AnimatedExportOptio
       await source.add(i / fps, 1 / fps);
       onProgress((i + 1) / times.length);
     }
+    if (audioSource && audio) await audioSource.add(audio);
     await output.finalize();
   } catch (e) {
     await output.cancel().catch(() => undefined);
