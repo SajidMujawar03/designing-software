@@ -118,7 +118,7 @@ Layer selected (frame / group):
 | Figma (Dev Mode, paid) | Ours (Inspect tab) | Status |
 | --- | --- | --- |
 | Separate mode with Inspect and Plugins tabs | Inspect tab next to Design / Prototype | Different name or place |
-| Layer name, type, last updated; **Compare changes** *(docs)* | Name + type; **Compare changes** (cloud files) opens version history | Same (U7); compares the whole file, not one layer |
+| Layer name, type, last updated; **Compare changes** *(docs)* | Name + type; **Compare changes** (cloud files) opens version history | Same (U7, V7: Compare changes lists this layer's property changes against a chosen version, and the layers added, removed or changed inside it) |
 | **Ready for dev** / Mark as ready for dev, "Ready for development" in the layers panel | **Mark as ready for dev** in Inspect (and Actions), a "Ready for dev" badge with Remove status, and **Ready for development** above the layers in Dev Mode | Same (U7) |
 | Dev resources, Component info, Code Connect *(docs)* | — | Missing in ours |
 | **Layer properties** with **Code / List** toggle | **Layer properties** with a **Code / List** toggle (Code first, remembered) | Same (U7) |
