@@ -133,7 +133,7 @@ Layer selected (frame / group):
 | "Motion Beta" mode; timeline at the bottom across the left panel too | Motion mode; timeline at the bottom, under the canvas only | Same (layout differs slightly) |
 | Timeline header: Play ▷, keyframe ◇, time `00:00:000 ms`, auto-keyframe toggle, zoom − / + on timeline, ruler `0s, 200ms … 1s … 2s` | Play (Space), Add keyframe ◇, auto-keyframe toggle, current time / duration, `ms`/`s` toggle, playback, layer name, collapse, zoom − / slider / + | Same (U6; ours also shows the duration). The header icons were white on white before U6 |
 | Right panel **Animations** (+) at the top | **Animations** (+) at the top | Same (U6) |
-| **Transform**: Position, Scale, Rotation, each with a ◇ keyframe button beside the field | **Transform**: Position (X, Y), Scale (with aspect lock), Rotation, each with a ◇; replaces Position in Motion mode | Same (U6); Position is the top-left, not Figma's centre |
+| **Transform**: Position, Scale, Rotation, each with a ◇ keyframe button beside the field | **Transform**: Position (X, Y), Scale (with aspect lock), Rotation, each with a ◇; replaces Position in Motion mode | Same (U6, V5: Position shows and edits the centre) |
 | Keyframe ◇ on Layout (W/H) and Appearance fields | ◇ beside W/H, Opacity, Corner radius and Stroke weight, and in the Fill, Stroke and Effects (blur) headers | Same (U6) |
 | **Audio** section, Add audio | — | Missing in ours |
 | Right-click → **Add motion** (Design mode) | Right-click → **Add motion** | Same (U3) |
