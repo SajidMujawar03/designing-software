@@ -19,4 +19,5 @@ export * from './codeLayer';
 export * from './brush';
 export * from './width';
 export * from './pathEdit';
+export * from './textPath';
 export { computeAutoLayout, defaultGrid, gridSpans, gridLines, gridSnapEdges, DEFAULT_CONSTRAINTS } from '@figma/layout';

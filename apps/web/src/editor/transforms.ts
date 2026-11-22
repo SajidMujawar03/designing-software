@@ -171,11 +171,12 @@ export function scaleBounds(doc: DesignDocument, ids: NodeId[], from: Rect, to: 
   }
 }
 
-/** A vector's paths in canvas coordinates. */
+/** A vector's paths (or the path of text on a path) in canvas coordinates. */
 export function worldPathsOf(doc: DesignDocument, id: NodeId): VectorPath[] {
   const n = doc.get(id);
-  if (!n?.vectorPaths) return [];
-  return mapPaths(n.vectorPaths, worldTransform(doc, id));
+  const paths = n?.textPath ? [n.textPath.path] : n?.vectorPaths;
+  if (!paths) return [];
+  return mapPaths(paths, worldTransform(doc, id));
 }
 
 /**
@@ -194,7 +195,9 @@ export function setVectorWorld(doc: DesignDocument, id: NodeId, world: VectorPat
   }));
   const center = applyToPoint(m, { x: b.x + b.width / 2, y: b.y + b.height / 2 });
   const place = placementIn(doc, n.parentId, center, worldRotation(doc, id), b.width, b.height);
-  doc.updateNode(id, { ...place, width: b.width, height: b.height, vectorPaths: shifted });
+  // Text on a path keeps one path: the first.
+  const paths = n.textPath ? { textPath: { ...n.textPath, path: shifted[0] ?? n.textPath.path } } : { vectorPaths: shifted };
+  doc.updateNode(id, { ...place, width: b.width, height: b.height, ...paths });
 }
 
 export { mapPaths };

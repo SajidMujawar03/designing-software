@@ -33,6 +33,7 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     width: new WidthTool(ed),
     shapes: new ShapeBuilderTool(ed),
     text: new TextTool(ed),
+    textPath: new TextTool(ed, true),
     hand: new HandTool(ed),
     comment: new CommentTool(),
   };

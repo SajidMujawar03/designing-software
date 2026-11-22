@@ -1,5 +1,7 @@
 import {
   isFrameLike,
+  placeGlyphs,
+  hexToRgb,
   strokeWidthOutline,
   effectOutset,
   gradientMatrix,
@@ -20,7 +22,7 @@ import { multiply, rectIntersects, transformRect, type Mat2D, type Rect } from '
 import { renderBounds, sliceArea } from './canvaskit';
 import { imageMatrix } from './ckpaint';
 import { nodeMarkers, traceMarker } from './markers';
-import { drawText, layoutText } from './text';
+import { drawText, layoutText, pathGlyphs, styleFont } from './text';
 import type { SceneOptions, SceneRenderer } from './types';
 
 export interface RenderOptions {
@@ -229,6 +231,27 @@ export function traceVector(ctx: CanvasRenderingContext2D | Path2D, n: SceneNode
 }
 
 function drawShape(ctx: CanvasRenderingContext2D, doc: DesignDocument, n: SceneNode, scale = 1): void {
+  if (n.type === 'TEXT' && n.textPath) {
+    // Text on a path: each character placed and turned along the path.
+    const glyphs = pathGlyphs(n, ctx);
+    const places = placeGlyphs(n.textPath, glyphs.map((g) => g.width), n.textAlign);
+    const fill = n.fills.find((f) => f.visible);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    glyphs.forEach((g, i) => {
+      const p = places[i];
+      if (!p.visible || g.ch === ' ') return;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.font = styleFont(g.style);
+      ctx.fillStyle = g.style.color ? hexCss(g.style.color) : fill ? paintStyle(fill) : 'transparent';
+      ctx.fillText(g.ch, 0, 0);
+      ctx.restore();
+    });
+    ctx.textAlign = 'start';
+    return;
+  }
   if (n.type === 'TEXT') {
     const layout = layoutText(n, ctx);
     for (const f of n.fills) if (f.visible) drawText(ctx, n, layout, paintStyle(f));
@@ -472,4 +495,11 @@ function drawChildren(
     ctx.restore();
     return;
   }
+}
+
+/** An 8- or 6-digit hex color (RRGGBB[AA]) as CSS. */
+function hexCss(hex: string): string {
+  const c = hexToRgb(hex.slice(0, 6));
+  const a = hex.length >= 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+  return `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`;
 }

@@ -4,6 +4,7 @@ import { getSelectionFrame, handleCursor, hitHandle, HANDLES, type HandleId, typ
 import type { Editor } from '../editor';
 import { insertIntoLayout, layoutDropAt } from '../layoutCommands';
 import { snapPoint, snapRect } from '../snapping';
+import { dragHandle, handleAt } from '../textOnPath';
 import {
   boundsOf,
   fitText,
@@ -42,6 +43,7 @@ type Gesture =
     }
   | { kind: 'rotate'; center: Vec2; startAngle: number; items: ItemSnapshot[]; single: boolean }
   | { kind: 'endpoint'; id: NodeId; index: 0 | 1; other: Vec2 }
+  | { kind: 'pathStart'; id: NodeId }
   | { kind: 'marquee'; start: Vec2; base: NodeId[] };
 
 const DRAG_THRESHOLD = 3;
@@ -91,6 +93,13 @@ export class SelectTool implements Tool {
   }
 
   down(e: ToolEvent): void {
+    // Text on a path's start handle (it can be dragged while editing the text too).
+    const onPath = handleAt(this.ed, e.screen);
+    if (onPath) {
+      this.doc.endGesture();
+      this.g = { kind: 'pathStart', id: onPath.id };
+      return;
+    }
     this.ed.commitTextEdit();
     this.doc.endGesture();
     const frame = getSelectionFrame(this.ed);
@@ -201,6 +210,9 @@ export class SelectTool implements Tool {
         setLineEndpoints(this.doc, g.id, a, b);
         return;
       }
+      case 'pathStart':
+        dragHandle(this.ed, g.id, e.world);
+        return;
       case 'marquee': {
         const r = rectFromPoints(g.start, e.world);
         const hits = nodesInRect(this.doc, this.ed.pageId, r, e.mod).map((n) => n.id);
@@ -385,6 +397,10 @@ export class SelectTool implements Tool {
   }
 
   hover(e: ToolEvent): void {
+    if (handleAt(this.ed, e.screen)) {
+      this.ed.setUI({ cursor: 'grab', hoverId: null });
+      return;
+    }
     const frame = getSelectionFrame(this.ed);
     const h = frame && hitHandle(this.ed, frame, e.screen);
     if (frame && h) {

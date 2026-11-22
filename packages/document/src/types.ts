@@ -284,6 +284,9 @@ export interface SceneNode {
   /** Lines and open paths: stroke width along the path (empty or missing: uniform). */
   widthProfile?: WidthPoint[];
 
+  /** TEXT on a path: the path it runs along (in its box), where it starts (0–1) and which side it's on. */
+  textPath?: { path: VectorPath; offset: number; flipped: boolean } | null;
+
   // CODE_LAYER: its files, and which version of them its snapshot (image fill) shows.
   codeFiles?: CodeFiles;
   codeSnapshotKey?: string;

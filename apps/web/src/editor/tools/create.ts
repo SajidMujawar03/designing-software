@@ -3,6 +3,7 @@ import { rectContainsRect, type Vec2 } from '@figma/geometry';
 import type { Editor } from '../editor';
 import { fitText, placementIn, reparentKeepingPosition, setLineEndpoints, worldRotation } from '../transforms';
 import { snapPoint } from '../snapping';
+import { convertToTextPath, pathTargetAt } from '../textOnPath';
 import { snapAngle, type Tool, type ToolEvent } from './types';
 
 const DEFAULT_SIZE = 100;
@@ -176,7 +177,21 @@ export class TextTool implements Tool {
   private start: ToolEvent | null = null;
   private last: ToolEvent | null = null;
 
-  constructor(private ed: Editor) {}
+  /**
+   * `onPath` is the Text on a path tool: clicking anywhere on a shape puts text
+   * on it. The plain Text tool does that too when the click is on a shape's
+   * outline (as in Figma, it switches to text on a path over a path).
+   */
+  constructor(
+    private ed: Editor,
+    private onPath = false,
+  ) {}
+
+  hover(e: ToolEvent): void {
+    const target = pathTargetAt(this.ed, e.world, !this.onPath);
+    const hoverId = target?.node.id ?? null;
+    if (hoverId !== this.ed.ui.hoverId) this.ed.setUI({ hoverId });
+  }
 
   down(e: ToolEvent): void {
     this.ed.commitTextEdit();
@@ -207,6 +222,12 @@ export class TextTool implements Tool {
     }
 
     const dragged = Math.hypot(last.screen.x - s.screen.x, last.screen.y - s.screen.y) > 4;
+    const target = dragged ? null : pathTargetAt(this.ed, s.world, !this.onPath);
+    if (target) {
+      this.ed.setUI({ hoverId: null });
+      convertToTextPath(this.ed, target);
+      return;
+    }
     const parentId = hitTest(doc, this.ed.pageId, s.world, { framesOnly: true })?.id ?? this.ed.pageId;
     doc.endGesture();
     const width = dragged ? Math.max(10, Math.abs(last.px.x - s.px.x)) : 10;

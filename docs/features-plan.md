@@ -193,11 +193,19 @@ From Figma's [Edit vector layers](https://help.figma.com/hc/en-us/articles/36003
 ### Phase F8: Text on path
 Branch `features-text-on-path` · about 1 week
 
-- Model: a `path` field on TEXT nodes (a reference to a vector or shape id, or its own copy of the path), plus `pathOffset` and `pathSide`.
-- Layout: lay the text out on a single line, then place each glyph along the path by arc length, rotated to the tangent (`packages/renderer/src/textlayout.ts`). It is drawn glyph by glyph in canvaskit and canvas2d, and as `<textPath>` in SVG.
-- Tool: "Text on path" in the Text menu. Clicking a shape's outline starts typing along it.
-- Editing: the caret and selection follow the path. Hit testing maps a click to the nearest glyph.
-- Tests: glyph placement on a line, a circle and a curve.
+Matches Figma's "Type text on a path" ([Guide to text](https://help.figma.com/hc/en-us/articles/360039956434-Guide-to-text-in-Figma-Design), [orange illustration tutorial](https://help.figma.com/hc/en-us/articles/32588834922391)).
+
+- **Tool:** **Text on a path** in the Text slot's menu. The Text tool also switches to it over a path, with a text-on-path cursor.
+- **Creating:** click a vector or shape (an open or closed path, ellipse, rectangle, polygon, star or brush stroke). The shape becomes the text's path: it stops drawing, and its fill and effects move to the text, as in Figma. The text layer keeps its own copy of the path.
+- **Model:** `textPath: { path, offset, flipped }` on TEXT layers. `offset` is where the text starts, as 0–1 along the path.
+- **Layout:** the text is laid out on one line, then each character is placed along the path by distance, rotated to the curve. The existing left/center/right alignment applies along the path. Text past the path's end is cut off. Drawn in CanvasKit and Canvas 2D, and exported to SVG (one positioned glyph per character, so it looks the same everywhere).
+- **Editing:**
+  - A **blue start handle** you drag along the path, plus an offset field.
+  - **Flip text orientation** in the Typography section puts the text on the other side of the path.
+  - Typing in place, with the caret following the curve.
+  - **Edit object** (Enter on the text, or the panel button) edits the path's points.
+- **Outline text** follows the curve.
+- **Tests:** placement on a line, a circle and a curve; flipping; alignment; cut-off; bounds.
 
 ---
 

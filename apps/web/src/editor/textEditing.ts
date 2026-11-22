@@ -130,6 +130,12 @@ export function moveVertical(dir: -1 | 1, extend: boolean): void {
   const eng = textEngine();
   if (!n || !eng) return;
   const s = editor.ui.textSelection ?? { anchor: 0, focus: 0 };
+  // Text on a path has one line: up goes to the start, down to the end.
+  if (n.textPath) {
+    const to = dir < 0 ? 0 : text().length;
+    setSelection(extend ? s.anchor : to, to);
+    return;
+  }
   const c = eng.caret(n, doc(), s.focus);
   const x = goalX ?? c.x;
   const y = dir < 0 ? c.y - 1 : c.y + c.height + 1;

@@ -1,4 +1,4 @@
-import { gridLines, gridSpans, isFrameLike, isGroupLike, worldBounds, worldTransform, type NodeId, type SceneNode } from '@figma/document';
+import { gridLines, gridSpans, pathTrack, isFrameLike, isGroupLike, worldBounds, worldTransform, type NodeId, type SceneNode } from '@figma/document';
 import { drawMeasurements } from './measure';
 import { drawPrototype } from './prototypeOverlay';
 import { drawAnnotations } from './annotationsOverlay';
@@ -14,6 +14,7 @@ import { visibleHandles } from '../tools/vector';
 import { worldPathsOf } from '../transforms';
 import { drawGradientHandles } from './gradientHandles';
 import { textEngine } from '../textEngine';
+import { handleOwner, handleWorld } from '../textOnPath';
 import { drawRulers } from './rulers';
 
 export const BLUE = '#0D99FF';
@@ -230,6 +231,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   }
 
   drawTextEditing(ctx, ed, dpr);
+  drawTextPath(ctx, ed);
   drawGradientHandles(ctx, ed);
   if (ed.ui.showRulers) drawRulers(ctx, ed);
 
@@ -323,6 +325,31 @@ function drawVectorEdit(ctx: CanvasRenderingContext2D, ed: Editor, paths: Vector
   );
 }
 
+/** Text on a path: its path (thin blue) and the blue start handle, as in Figma. */
+function drawTextPath(ctx: CanvasRenderingContext2D, ed: Editor): void {
+  const n = handleOwner(ed);
+  if (!n?.textPath) return;
+  const m = worldTransform(ed.doc, n.id);
+  const pts = pathTrack(n.textPath.path).points.map((p) => ed.worldToScreen(applyToPoint(m, p)));
+  ctx.save();
+  ctx.beginPath();
+  pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.strokeStyle = BLUE;
+  ctx.globalAlpha = 0.6;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  const h = ed.worldToScreen(handleWorld(ed, n));
+  ctx.beginPath();
+  ctx.arc(h.x, h.y, 5, 0, Math.PI * 2);
+  ctx.fillStyle = BLUE;
+  ctx.fill();
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** Selection highlight and blinking caret for the text being edited. */
 function drawTextEditing(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number): void {
   const id = ed.ui.editingTextId;
@@ -338,7 +365,16 @@ function drawTextEditing(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number)
   const end = Math.max(sel.anchor, sel.focus);
   if (end > start) {
     ctx.fillStyle = 'rgba(13, 153, 255, 0.3)';
-    for (const r of eng.selectionRects(n, ed.doc, start, end)) ctx.fillRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
+    for (const r of eng.selectionRects(n, ed.doc, start, end)) {
+      ctx.save();
+      // Text on a path: each character's box is turned to follow the path.
+      if (r.origin) {
+        ctx.translate(r.origin.x, r.origin.y);
+        ctx.rotate(r.angle ?? 0);
+      }
+      ctx.fillRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
+      ctx.restore();
+    }
   } else {
     // Solid right after a move, then blinking.
     const solid = Date.now() - ed.ui.caretTick < 500;
@@ -346,7 +382,9 @@ function drawTextEditing(ctx: CanvasRenderingContext2D, ed: Editor, dpr: number)
       const c = eng.caret(n, ed.doc, sel.focus);
       const w = 1.5 / (v.zoom * dpr) * dpr;
       ctx.fillStyle = '#1E1E1E';
-      ctx.fillRect(c.x - w / 2, c.y, w, c.height);
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.angle ?? 0);
+      ctx.fillRect(-w / 2, 0, w, c.height);
     }
   }
   ctx.restore();
