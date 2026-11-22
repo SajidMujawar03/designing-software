@@ -48,7 +48,7 @@ export function convertToTextPath(ed: Editor, target: PathTarget): NodeId {
     type: 'TEXT',
     parentId: s.parentId!,
     aboveId: s.id,
-    name: 'Text on a path',
+    name: 'Text on path',
     characters: '',
     textAutoResize: 'NONE',
     fontSize: 16,

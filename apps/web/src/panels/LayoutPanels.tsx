@@ -383,7 +383,7 @@ export function LayoutGridSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneN
   const update = (i: number, patch: Partial<LayoutGrid>, live = false) => set(list.map((g, j) => (j === i ? { ...g, ...patch } : g)), live);
   return (
     <Section
-      title="Layout grid"
+      title="Layout guide"
       actions={
         <IconButton
           title="Add layout grid"
@@ -411,7 +411,7 @@ export function LayoutGridSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneN
               <IconButton title={g.visible ? 'Hide grid' : 'Show grid'} onClick={() => update(i, { visible: !g.visible })}>
                 {g.visible ? <Eye size={13} /> : <EyeOff size={13} />}
               </IconButton>
-              <IconButton title="Remove grid" onClick={() => set(list.filter((_, j) => j !== i))}>
+              <IconButton title="Remove layout guide" onClick={() => set(list.filter((_, j) => j !== i))}>
                 <Minus size={13} />
               </IconButton>
             </div>

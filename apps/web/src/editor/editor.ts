@@ -382,7 +382,7 @@ export class Editor {
     this.select([groupId]);
   }
 
-  /** Ctrl+Shift+G: replaces selected groups (and frames) with their children. */
+  /** Ctrl+Backspace (or Ctrl+Shift+G): replaces selected groups (and frames) with their children. */
   ungroupSelection(): void {
     const containers = this.topLevelSelection().filter((id) => {
       if (isInInstance(this.doc, id)) return false;

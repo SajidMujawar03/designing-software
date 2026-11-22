@@ -283,6 +283,18 @@ button {
   color: var(--muted);
 }
 
+/* The zoom/view options menu: zoom levels, then view toggles with checkboxes. */
+.zoom .menu {
+  min-width: 260px;
+}
+
+.zoom .menu-item {
+  align-items: center;
+  gap: 16px;
+  min-height: 30px;
+  white-space: nowrap;
+}
+
 /* ---------- layout ---------- */
 
 .workspace {
