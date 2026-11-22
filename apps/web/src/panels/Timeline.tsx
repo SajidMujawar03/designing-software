@@ -1,11 +1,12 @@
 import { animatableProperties, isAnimated, keyframeAt, toggleKeyframe, animatedInstances, animatedLayers, clipSpan, DEFAULT_MOTION, MOTION_PROPERTIES, moveKeyframes, PRESETS, setKeyframeEasing, updateClip, type Keyframe, type KeyRef, type MotionClip, type MotionEasing, type MotionProperty, type NodeId, type SceneNode } from '@figma/document';
-import { Minus, Plus, ArrowRightLeft, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleDot, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
+import { Music, Minus, Plus, ArrowRightLeft, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleDot, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { followSelection, formatTime, motionFrame, motionHint, parseTime, PLAYBACK_ORDER, seek, selectClip, selectKeys, setTimeline, timelineOf, toggleAutoKey, togglePlay } from '../editor/motion';
 import { useUI, type MotionUI } from '../editor/store';
 import { EasingEditor } from './EasingEditor';
+import { updateTimelineAudio } from '../editor/motionAudio';
 
 /** Names of Motion properties as the timeline lists them. */
 export const PROPERTY_LABELS: Record<MotionProperty, string> = {
@@ -149,6 +150,7 @@ function TimelinePanel() {
   /** A clip being moved or stretched, or an instance's start being dragged: shown live, saved on release. */
   const [clipDrag, setClipDrag] = useState<{ nodeId: NodeId; id: string; start: number; duration: number } | null>(null);
   const [offsetDrag, setOffsetDrag] = useState<{ id: NodeId; offset: number } | null>(null);
+  const [audioDrag, setAudioDrag] = useState<number | null>(null);
 
   // The timeline follows the frame holding the selection.
   useEffect(() => followSelection(), [selection]);
@@ -373,6 +375,26 @@ function TimelinePanel() {
       () => {
         setOffsetDrag(null);
         if (offset !== from) editor.doc.change(() => editor.doc.updateNode(inst.id, { motionOffset: offset || (null as never) }));
+      },
+    );
+  };
+
+  /** The audio bar: drag it to change when the sound starts. */
+  const audioDown = (e: ReactPointerEvent) => {
+    const audio = tl.audio;
+    if (e.button !== 0 || !audio) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const x0 = e.clientX;
+    let start = audio.start;
+    track(
+      (ev) => {
+        start = Math.round(snapTime(audio.start + ((ev.clientX - x0) / pxPerSec) * 1000, [], ev.shiftKey));
+        setAudioDrag(start);
+      },
+      () => {
+        setAudioDrag(null);
+        if (start !== audio.start) updateTimelineAudio({ start });
       },
     );
   };
@@ -646,6 +668,24 @@ function TimelinePanel() {
                 </div>
               );
             })}
+
+            {/* The timeline's audio: a green track, dragged to change when it starts. */}
+            {tl.audio && (
+              <div className="timeline-row timeline-track timeline-audio">
+                <div className="timeline-name" title="Audio: set it up in the right panel's Audio section">
+                  <Music size={11} />
+                  <span className="timeline-label">{tl.audio.name}</span>
+                </div>
+                <div className="timeline-lane" style={{ width: lanesWidth }} onPointerDown={laneDown}>
+                  <div
+                    className="timeline-bar audio"
+                    style={{ left: xOf(Math.max(0, audioDrag ?? tl.audio.start)), width: Math.max(4, xOf((audioDrag ?? tl.audio.start) + tl.audio.length) - xOf(Math.max(0, audioDrag ?? tl.audio.start))) }}
+                    title={`Starts at ${formatTime(audioDrag ?? tl.audio.start, unit)} · ${formatTime(tl.audio.length, unit)}. Drag to change when it starts.`}
+                    onPointerDown={audioDown}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Past the end of the timeline, the marquee, and the playhead over everything. */}
             <div className="timeline-after" style={{ left: NAMES_W + xOf(tl.duration), width: Math.max(0, lanesWidth - xOf(tl.duration)), top: ROW_H }} />

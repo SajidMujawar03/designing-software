@@ -33,6 +33,7 @@ import { BrushBar, DrawPanel } from './panels/DrawMode';
 import { ShapeBuilderHint, VectorEditBar } from './panels/VectorEditBar';
 import { Timeline } from './panels/Timeline';
 import { VariablesModal } from './panels/VariablesPanel';
+import { startTimelineAudio } from './editor/motionAudio';
 
 let started = false;
 
@@ -71,6 +72,8 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
   useEffect(() => startDesktopMenus(), []);
   useEffect(() => startLayerThumbs(editor.doc), []);
   useEffect(() => startCodeLayers(editor.doc), []);
+  // Motion: the timeline's audio follows playback.
+  useEffect(() => startTimelineAudio(), []);
   const uiMode = usePrefs((s) => s.ui);
   const drawMode = useUI((s) => s.drawMode);
   const motionMode = useUI((s) => s.motionMode);
