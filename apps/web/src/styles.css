@@ -5704,3 +5704,59 @@ a.btn {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Design tab (Figma's Position / Layout / Appearance layout) ---------- */
+
+.panel-header {
+  align-items: center;
+  overflow: visible;
+  padding: 8px 12px 8px 16px;
+}
+.panel-header-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.panel-header-menu {
+  position: relative;
+}
+.panel-header-menu .tool-menu {
+  left: auto;
+  right: 0;
+  top: 30px;
+}
+.section .align-bar {
+  padding: 2px 12px 6px;
+}
+.field-caption {
+  display: block;
+  padding: 4px 16px 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.flow-row .button-row {
+  padding: 0 12px 4px;
+}
+.constraints-block {
+  margin-top: 6px;
+}
+.selection-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 16px 4px;
+}
+.selection-colors .swatch.active {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}

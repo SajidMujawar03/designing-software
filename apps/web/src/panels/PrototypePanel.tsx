@@ -253,6 +253,49 @@ function InteractionEditor({ node, index, r, open, onToggle }: { node: SceneNode
   );
 }
 
+/** Figma's "Show prototype settings": the device the prototype is presented on, behind a link. */
+function PrototypeSettings() {
+  useDocVersion();
+  const [open, setOpen] = useState(false);
+  const doc = editor.doc;
+  const page = doc.get(editor.pageId);
+  if (!page) return null;
+  const device = page.prototypeDevice ?? { type: 'NONE', rotation: 0 as const };
+  if (!open)
+    return (
+      <button type="button" className="link-btn pad" onClick={() => setOpen(true)}>
+        Show prototype settings
+      </button>
+    );
+  return (
+    <>
+        <Section title="Device">
+        <select value={device.type} onChange={(e) => doc.change(() => doc.updateNode(page.id, { prototypeDevice: { ...device, type: e.target.value } }))}>
+          {DEVICES.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+              {d.width ? ` · ${d.width}×${d.height}` : ''}
+            </option>
+          ))}
+        </select>
+        {device.type !== 'NONE' && (
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={device.rotation === 90}
+              onChange={(e) => doc.change(() => doc.updateNode(page.id, { prototypeDevice: { ...device, rotation: e.target.checked ? 90 : 0 } }))}
+            />
+            Landscape
+          </label>
+        )}
+      </Section>
+      <button type="button" className="link-btn pad" onClick={() => setOpen(false)}>
+        Hide prototype settings
+      </button>
+    </>
+  );
+}
+
 /** Right sidebar tab: interactions, scrolling, flows and the device. */
 export function PrototypePanel() {
   useDocVersion();
@@ -263,30 +306,9 @@ export function PrototypePanel() {
   const page = doc.get(editor.pageId)!;
 
   if (!n) {
-    const device = page.prototypeDevice ?? { type: 'NONE', rotation: 0 as const };
     const flows = flowsOf(doc, page.id);
     return (
       <div className="props">
-        <Section title="Device">
-          <select value={device.type} onChange={(e) => doc.change(() => doc.updateNode(page.id, { prototypeDevice: { ...device, type: e.target.value } }))}>
-            {DEVICES.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-                {d.width ? ` · ${d.width}×${d.height}` : ''}
-              </option>
-            ))}
-          </select>
-          {device.type !== 'NONE' && (
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={device.rotation === 90}
-                onChange={(e) => doc.change(() => doc.updateNode(page.id, { prototypeDevice: { ...device, rotation: e.target.checked ? 90 : 0 } }))}
-              />
-              Landscape
-            </label>
-          )}
-        </Section>
         <Section title="Flows">
           {!flows.length && <div className="hint">Select a frame and turn on “Flow starting point”, or connect layers to frames: the first frame is where the prototype starts.</div>}
           {flows.map((f) => (
@@ -298,6 +320,7 @@ export function PrototypePanel() {
           ))}
         </Section>
         <div className="hint pad">Select a layer and drag the blue handle onto a frame to connect them.</div>
+        <PrototypeSettings />
       </div>
     );
   }
@@ -359,6 +382,7 @@ export function PrototypePanel() {
           </label>
         </Section>
       )}
+      <PrototypeSettings />
     </div>
   );
 }

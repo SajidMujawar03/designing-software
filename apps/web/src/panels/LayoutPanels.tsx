@@ -29,12 +29,13 @@ import {
   EyeOff,
   Grid3x3,
   Minus,
+  Move,
   Plus,
   Rows3,
   SlidersHorizontal,
   WrapText,
 } from 'lucide-react';
-import { useState, type MouseEvent } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { editor } from '../editor/editor';
 import { addAutoLayout, removeAutoLayout } from '../editor/layoutCommands';
 import { fitText } from '../editor/transforms';
@@ -179,53 +180,64 @@ function AlignPad({ node, onPick }: { node: SceneNode; onPick: (primary: Primary
   );
 }
 
-export function AutoLayoutSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
-  const [individual, setIndividual] = useState(false);
-  // Plain frames get auto layout; any other selection is wrapped in a new auto layout frame.
-  if (!nodes.every((n) => isAutoLayout(n))) {
-    return (
-      <Section
-        title="Auto layout"
-        actions={
-          <IconButton title="Add auto layout (Shift+A)" onClick={() => addAutoLayout(editor)}>
-            <Plus size={14} />
+type Flow = 'FREEFORM' | 'VERTICAL' | 'HORIZONTAL' | 'GRID';
+
+/**
+ * Layout > Flow, as in Figma: Freeform (no auto layout), Vertical,
+ * Horizontal (with Wrap) or Grid. Picking Vertical or Horizontal adds auto
+ * layout (wrapping non-frames in a new frame); Freeform removes it. Grid
+ * auto layout isn't built yet.
+ */
+export function FlowButtons({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const flow = common(nodes.map((n): Flow => (isAutoLayout(n) ? (n.layoutMode === 'VERTICAL' ? 'VERTICAL' : 'HORIZONTAL') : 'FREEFORM')));
+  const wrap = nodes.every((n) => isAutoLayout(n) && n.layoutMode === 'HORIZONTAL' && n.layoutWrap === 'WRAP');
+  const pick = (f: Flow) => {
+    if (f === 'GRID') return;
+    if (f === 'FREEFORM') return removeAutoLayout(editor);
+    const mode = f === 'VERTICAL' ? 'VERTICAL' : 'HORIZONTAL';
+    if (!nodes.every((n) => isAutoLayout(n))) addAutoLayout(editor);
+    // Adding auto layout may have wrapped the selection in a new frame.
+    apply(editor.ui.selection, (n) => (isAutoLayout(n) ? { layoutMode: mode, layoutWrap: mode === 'VERTICAL' ? 'NO_WRAP' : n.layoutWrap } : {}));
+  };
+  const button = (f: Flow, title: string, icon: ReactNode, disabled = false) => (
+    <IconButton title={title} active={flow === f} disabled={disabled} onClick={() => pick(f)}>
+      {icon}
+    </IconButton>
+  );
+  return (
+    <div className="flow-row">
+      <span className="field-caption">Flow</span>
+      <div className="button-row seg">
+        {button('FREEFORM', 'Freeform', <Move size={14} />)}
+        {button('VERTICAL', 'Vertical layout (Shift+A)', <ArrowDown size={14} />)}
+        {button('HORIZONTAL', 'Horizontal layout (Shift+A)', <ArrowRight size={14} />)}
+        {button('GRID', 'Grid (not available yet)', <Grid3x3 size={14} />, true)}
+        {flow === 'HORIZONTAL' && (
+          <IconButton title="Wrap" active={wrap} onClick={() => apply(ids, { layoutWrap: wrap ? 'NO_WRAP' : 'WRAP' })}>
+            <WrapText size={14} />
           </IconButton>
-        }
-      />
-    );
-  }
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Auto layout's alignment, gap and padding (shown in Layout once auto layout is on). */
+export function AutoLayoutFields({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const [individual, setIndividual] = useState(false);
+  if (!nodes.every((n) => isAutoLayout(n))) return null;
   const val = <T,>(f: (n: SceneNode) => T) => common(nodes.map(f));
-  const dir = val((n) => (n.layoutWrap === 'WRAP' && n.layoutMode === 'HORIZONTAL' ? 'WRAP' : n.layoutMode));
+  const wrap = nodes.every((n) => n.layoutMode === 'HORIZONTAL' && n.layoutWrap === 'WRAP');
   const gapAuto = nodes.every((n) => n.primaryAxisAlignItems === 'SPACE_BETWEEN');
   const padH = val((n) => (n.paddingLeft === n.paddingRight ? (n.paddingLeft ?? 0) : MIXED)) as number | Mixed;
   const padV = val((n) => (n.paddingTop === n.paddingBottom ? (n.paddingTop ?? 0) : MIXED)) as number | Mixed;
-  const setDir = (d: 'HORIZONTAL' | 'VERTICAL' | 'WRAP') =>
-    apply(ids, { layoutMode: d === 'VERTICAL' ? 'VERTICAL' : 'HORIZONTAL', layoutWrap: d === 'WRAP' ? 'WRAP' : 'NO_WRAP' });
   const pad = (k: 'paddingLeft' | 'paddingRight' | 'paddingTop' | 'paddingBottom', label: string) => (
     <NumberField label={label} title={`Padding ${k.slice(7).toLowerCase()}`} value={val((n) => n[k] ?? 0)} min={0} onChange={(v, live) => apply(ids, { [k]: v }, live)} />
   );
 
   return (
-    <Section
-      title="Auto layout"
-      actions={
-        <IconButton title="Remove auto layout (Shift+Alt+A)" onClick={() => removeAutoLayout(editor)}>
-          <Minus size={14} />
-        </IconButton>
-      }
-    >
+    <>
       <div className="al-grid">
-        <div className="button-row seg">
-          <IconButton title="Horizontal" active={dir === 'HORIZONTAL'} onClick={() => setDir('HORIZONTAL')}>
-            <ArrowRight size={14} />
-          </IconButton>
-          <IconButton title="Vertical" active={dir === 'VERTICAL'} onClick={() => setDir('VERTICAL')}>
-            <ArrowDown size={14} />
-          </IconButton>
-          <IconButton title="Wrap" active={dir === 'WRAP'} onClick={() => setDir('WRAP')}>
-            <WrapText size={14} />
-          </IconButton>
-        </div>
         {nodes.length === 1 && (
           <AlignPad
             node={nodes[0]}
@@ -260,7 +272,7 @@ export function AutoLayoutSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneN
           </label>
         </div>
       </div>
-      {dir === 'WRAP' && (
+      {wrap && (
         <NumberField
           label="Row gap"
           title="Gap between wrapped rows"
@@ -298,7 +310,7 @@ export function AutoLayoutSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneN
           <SlidersHorizontal size={13} />
         </IconButton>
       </div>
-    </Section>
+    </>
   );
 }
 
@@ -328,7 +340,7 @@ function toggleSide(cur: ConstraintType, side: 'MIN' | 'MAX', shift: boolean): C
   return side;
 }
 
-/** Shown for layers inside a frame that does not lay them out. */
+/** Constraints, in the Position section: for layers inside a frame that does not lay them out. */
 export function ConstraintsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const applies = nodes.every((n) => {
     const p = parentOf(n);
@@ -344,7 +356,8 @@ export function ConstraintsSection({ ids, nodes }: { ids: NodeId[]; nodes: Scene
     <button type="button" className={`cbar ${cls}${active ? ' on' : ''}`} title={title} onClick={onClick} />
   );
   return (
-    <Section title="Constraints">
+    <div className="constraints-block">
+      <span className="field-caption">Constraints</span>
       <div className="constraints">
         <div className="cbox" aria-label="Constraints">
           {bar('left', on(h, 'MIN'), 'Left (Shift: add)', (e) => set({ horizontal: toggleSide(h === MIXED ? 'MIN' : h, 'MIN', e.shiftKey) }))}
@@ -361,7 +374,7 @@ export function ConstraintsSection({ ids, nodes }: { ids: NodeId[]; nodes: Scene
           <Select label="Vertical constraint" value={v} options={V_OPTIONS} onPick={(x) => set({ vertical: x })} />
         </div>
       </div>
-    </Section>
+    </div>
   );
 }
 
