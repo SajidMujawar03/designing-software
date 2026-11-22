@@ -1,7 +1,8 @@
-import { annotationLines, isAutoLayout, libraryOf, mainComponentOf, type Paint, type SceneNode } from '@figma/document';
+import { animatedInstances, animatedLayers, annotationLines, isAutoLayout, libraryOf, mainComponentOf, MOTION_PROPERTIES, motionFrameOf, PRESETS, type Paint, type SceneNode } from '@figma/document';
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 import { codeFor, cssColor, type CodeLanguage } from '../inspect/codegen';
+import { motionCss, motionJson } from '../inspect/motionCode';
 import { editor } from '../editor/editor';
 import { exportLayers, saveFiles, constraintLabel } from '../editor/export';
 import { useDocVersion } from '../editor/hooks';
@@ -203,6 +204,7 @@ export function InspectPanel() {
         </div>
         <pre className="inspect-code">{code}</pre>
       </Section>
+      <MotionInspect n={n} />
       {n.exportSettings?.length ? (
         <Section title="Assets">
           {n.exportSettings.map((s, i) => (
@@ -234,5 +236,72 @@ export function RightTabs() {
         </button>
       ))}
     </div>
+  );
+}
+
+/** Inspect → Motion: the timeline of the frame holding the layer, read-only, and its code (CSS or JSON). */
+function MotionInspect({ n }: { n: SceneNode }) {
+  const doc = editor.doc;
+  const [format, setFormat] = useState<'css' | 'json'>('css');
+  const frame = motionFrameOf(doc, n.id);
+  if (!frame?.motion) return null;
+  const layers = animatedLayers(doc, frame.id);
+  const instances = animatedInstances(doc, frame.id);
+  if (!layers.length && !instances.length) return null;
+  const code = format === 'css' ? motionCss(doc, frame.id) : motionJson(doc, frame.id);
+  const playback = { LOOP: 'Loop', ONCE: 'Once', PING_PONG: 'Ping-pong' }[frame.motion.playback];
+  return (
+    <Section title="Motion" actions={<CopyButton text={code} label={`Copy ${format.toUpperCase()}`} />}>
+      <Row label="Frame" value={frame.name} />
+      <Row label="Duration" value={`${frame.motion.duration}ms · ${playback}`} />
+      <div className="inspect-motion">
+        {layers.map((l) => (
+          <div key={l.id} className="inspect-motion-layer">
+            <div className="inspect-motion-name">{l.name}</div>
+            {MOTION_PROPERTIES.filter((p) => l.keyframes?.[p]?.length).map((p) => {
+              const ks = [...l.keyframes![p]!].sort((a, b) => a.time - b.time);
+              return (
+                <div key={p} className="inspect-motion-row" title={ks.map((k) => `${k.time}ms: ${typeof k.value === 'number' ? r2(k.value) : `#${k.value}`}`).join(' · ')}>
+                  <span>{p}</span>
+                  <span>
+                    {ks.length} keys · {ks[0].time}–{ks[ks.length - 1].time}ms
+                  </span>
+                </div>
+              );
+            })}
+            {(l.animations ?? []).map((c) => (
+              <div key={c.id} className="inspect-motion-row">
+                <span>{PRESETS[c.preset].label}</span>
+                <span>
+                  {c.start}ms · {c.duration}ms{c.textUnit && l.type === 'TEXT' ? ` · by ${c.textUnit.toLowerCase()}` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+        {instances.map((i) => (
+          <div key={i.id} className="inspect-motion-layer">
+            <div className="inspect-motion-name instance">{i.name}</div>
+            <div className="inspect-motion-row">
+              <span>Animated instance</span>
+              <span>starts at {i.motionOffset ?? 0}ms</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="seg code-tabs">
+        {(
+          [
+            ['css', 'CSS'],
+            ['json', 'JSON'],
+          ] as const
+        ).map(([k, label]) => (
+          <button key={k} className={format === k ? 'active' : ''} onClick={() => setFormat(k)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <pre className="inspect-code">{code}</pre>
+    </Section>
   );
 }

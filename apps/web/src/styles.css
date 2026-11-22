@@ -5617,3 +5617,25 @@ a.btn {
 .anim-clip-body .curve-editor {
   flex-direction: column;
 }
+
+/* Inspect: Motion */
+.inspect-motion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.inspect-motion-name {
+  font-weight: 600;
+}
+.inspect-motion-name.instance {
+  color: var(--component);
+}
+.inspect-motion-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

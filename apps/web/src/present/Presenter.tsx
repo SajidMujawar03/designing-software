@@ -1,4 +1,10 @@
 import {
+  animatedInstances,
+  animatedLayers,
+  playbackEnded,
+  poseAt,
+  posedDocument,
+  timelineTime,
   deviceOf,
   flowsOf,
   screensOf,
@@ -213,6 +219,31 @@ export function Presenter({ route }: { route: Extract<Route, { kind: 'present' }
   const landscape = page?.prototypeDevice?.rotation === 90;
   const frame = doc.get(current);
 
+  // A screen with a Motion timeline plays it while it's showing (from the start each time it opens).
+  const [motionClock, setMotionClock] = useState<{ id: NodeId; t: number } | null>(null);
+  const isAnimatedScreen = (id: NodeId | null) => {
+    const f = id ? doc.get(id) : undefined;
+    return !!f?.motion && (animatedLayers(doc, f.id).length > 0 || animatedInstances(doc, f.id).length > 0);
+  };
+  useEffect(() => {
+    const f = current ? doc.get(current) : undefined;
+    if (!f || !isAnimatedScreen(f.id)) {
+      setMotionClock(null);
+      return;
+    }
+    const tl = f.motion!;
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const elapsed = now - t0;
+      setMotionClock({ id: f.id, t: timelineTime(tl, elapsed) });
+      if (!playbackEnded(tl, elapsed)) raf = requestAnimationFrame(step);
+    };
+    setMotionClock({ id: f.id, t: 0 });
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [current]);
+
   // Layout: a device screen (frame scaled to its width), or the frame fitted to the window.
   const barH = 44;
   const screenW = device.width ? (landscape ? device.height : device.width) : 0;
@@ -225,6 +256,13 @@ export function Presenter({ route }: { route: Extract<Route, { kind: 'present' }
 
   const screenOf = useCallback(
     (id: NodeId): RenderedScreen | null => {
+      // The playing screen is drawn posed at its timeline's moment (not cached).
+      // Until its clock starts, an animated screen that just opened shows its first moment (not its design state).
+      const t = motionClock?.id === id ? motionClock.t : id === current && isAnimatedScreen(id) ? 0 : null;
+      if (t !== null) {
+        fonts.requestUsed(doc);
+        return renderScreen(posedDocument(doc, poseAt(doc, id, t)), id, scale * dpr * deviceFit);
+      }
       const key = `${id}@${scale * dpr * deviceFit}`;
       let s = cache.current.get(key);
       if (!s) {
@@ -234,7 +272,7 @@ export function Presenter({ route }: { route: Extract<Route, { kind: 'present' }
       }
       return s ?? null;
     },
-    [scale, dpr, deviceFit, version],
+    [scale, dpr, deviceFit, version, motionClock, current],
   );
 
   const scrollOf = (id: NodeId) => scroll[id] ?? { x: 0, y: 0 };

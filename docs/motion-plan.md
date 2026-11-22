@@ -224,6 +224,18 @@ M1–M4 make a complete, usable Motion feature (about 3 weeks). M5–M7 follow F
   - Lines are numbered as laid out, so wrapped lines count. The timeline's clip length counts explicit lines only.
 - **Text styles:** Typewriter (by character), Words rise (by word) and Lines reveal (by line). The Animations section's "Animate by" switches any clip between the whole layer and units.
 
+### M6 as built
+
+- **Inspect → Motion** (any layer in a frame with a timeline): the frame's duration and playback, each animated layer's keyframes and presets (read-only), and animated instances with their start. Code comes as **CSS** or **JSON**, with a copy button.
+- **CSS:**
+  - It's written by sampling the frame's pose over one pass (60 per second) and dropping samples a straight line between their neighbours reproduces. So keyframes, presets, springs and staggered instances all come out right, in one `@keyframes` per layer.
+  - Movement and rotation are relative to the layer at rest.
+  - Playback maps to `infinite`, `1 forwards` or `infinite alternate`.
+  - Text animated by unit gets a comment saying to split it into spans.
+- **JSON:** the timeline, keyframes, presets and instance starts, as stored.
+- **Presenter:** a screen with a timeline plays it from the start each time it opens (Once stops at the end). It shows its first moment straight away rather than its design state.
+- **Not included:** React output, which Figma offers alongside CSS and JSON.
+
 ## 9. Testing
 
 - **Unit tests:**
