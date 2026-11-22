@@ -1,5 +1,5 @@
 import { snippetTextOf } from '@figma/document';
-import { copySelectedKeys, deleteSelectedKeys, KEYFRAMES_CLIPBOARD, pasteKeys, selectKeys, togglePlay } from './motion';
+import { copySelectedKeys, deleteSelectedClip, deleteSelectedKeys, KEYFRAMES_CLIPBOARD, pasteKeys, selectKeys, togglePlay } from './motion';
 import type { BooleanOperation } from '@figma/document';
 import { useOnboarding } from '../panels/Onboarding';
 import { copyAsPng, exportLayers, saveFiles } from './export';
@@ -154,6 +154,7 @@ export function installShortcuts(): () => void {
     }
 
     // Motion mode: keyframes selected on the timeline come first.
+    if (ui.motionMode && ui.motion.selectedClip && (e.key === 'Delete' || e.key === 'Backspace')) return run(() => void deleteSelectedClip());
     if (ui.motionMode && ui.motion.selectedKeys.length) {
       if (e.key === 'Delete' || e.key === 'Backspace') return run(() => void deleteSelectedKeys());
       if (e.key === 'Escape') return run(() => selectKeys([]));

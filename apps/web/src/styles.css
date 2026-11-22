@@ -5461,3 +5461,159 @@ a.btn {
 .hint.error {
   color: var(--danger);
 }
+
+/* Motion: preset animation clips and animated instance tracks on the timeline. */
+.timeline-clip {
+  position: absolute;
+  top: 4px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue-text);
+  font-size: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: grab;
+}
+.timeline-clip.selected {
+  background: var(--blue);
+  color: #fff;
+}
+.timeline-clip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.timeline-clip-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+.timeline-clip-edge.start {
+  left: 0;
+}
+.timeline-clip-edge.end {
+  right: 0;
+}
+.timeline-bar.instance {
+  border-color: var(--component);
+  background: var(--component-soft);
+  cursor: grab;
+}
+.timeline-instance .timeline-name {
+  color: var(--component);
+}
+.timeline-instance-dot {
+  width: 8px;
+  height: 8px;
+  margin: 0 4px 0 6px;
+  border-radius: 2px;
+  background: var(--component);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+/* Animations section */
+.anim-add {
+  position: relative;
+}
+.anim-menu {
+  position: absolute;
+  right: 0;
+  top: 22px;
+  z-index: 40;
+  width: 232px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.anim-menu-title {
+  margin: 4px 2px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.anim-menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.anim-menu-grid button {
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.anim-menu-grid button:hover {
+  background: var(--hover);
+}
+.anim-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.anim-clip {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.anim-clip.open {
+  border-color: var(--blue);
+}
+.anim-clip-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 2px 0 6px;
+  cursor: pointer;
+}
+.anim-clip-name {
+  font-weight: 500;
+}
+.anim-clip-time {
+  flex: 1;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.anim-clip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--border);
+}
+.anim-easing-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.anim-easing-toggle span {
+  flex: 1;
+  text-align: left;
+}
+.anim-clip-body .easing-editor .easing-presets {
+  grid-template-columns: repeat(2, 1fr);
+}
+.anim-clip-body .curve-editor {
+  flex-direction: column;
+}

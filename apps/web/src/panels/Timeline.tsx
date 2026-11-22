@@ -1,9 +1,9 @@
-import { animatedLayers, MOTION_PROPERTIES, moveKeyframes, setKeyframeEasing, type Keyframe, type KeyRef, type MotionEasing, type MotionProperty, type SceneNode } from '@figma/document';
+import { animatedInstances, animatedLayers, DEFAULT_MOTION, MOTION_PROPERTIES, moveKeyframes, PRESETS, setKeyframeEasing, updateClip, type Keyframe, type KeyRef, type MotionClip, type MotionEasing, type MotionProperty, type NodeId, type SceneNode } from '@figma/document';
 import { ArrowRightLeft, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleDot, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
-import { followSelection, formatTime, motionFrame, parseTime, PLAYBACK_ORDER, seek, selectKeys, setTimeline, timelineOf, toggleAutoKey, togglePlay } from '../editor/motion';
+import { followSelection, formatTime, motionFrame, parseTime, PLAYBACK_ORDER, seek, selectClip, selectKeys, setTimeline, timelineOf, toggleAutoKey, togglePlay } from '../editor/motion';
 import { useUI, type MotionUI } from '../editor/store';
 import { EasingEditor } from './EasingEditor';
 
@@ -130,6 +130,9 @@ function TimelinePanel() {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [marquee, setMarquee] = useState<Marquee | null>(null);
   const [easingAt, setEasingAt] = useState<EasingAt | null>(null);
+  /** A clip being moved or stretched, or an instance's start being dragged: shown live, saved on release. */
+  const [clipDrag, setClipDrag] = useState<{ nodeId: NodeId; id: string; start: number; duration: number } | null>(null);
+  const [offsetDrag, setOffsetDrag] = useState<{ id: NodeId; offset: number } | null>(null);
 
   // The timeline follows the frame holding the selection.
   useEffect(() => followSelection(), [selection]);
@@ -145,7 +148,7 @@ function TimelinePanel() {
 
   const frame = motionFrame();
   const tl = timelineOf(frame);
-  const { unit, pxPerSec, time, playing, collapsed, height, autoKey, selectedKeys } = motion;
+  const { unit, pxPerSec, time, playing, collapsed, height, autoKey, selectedKeys, selectedClip } = motion;
   const xOf = (ms: number) => PAD + (ms / 1000) * pxPerSec;
   /** Time (ms) under a screen x. */
   const msAt = (clientX: number) => {
@@ -159,6 +162,7 @@ function TimelinePanel() {
     return { x: clientX - r.left, y: clientY - r.top };
   };
   const layers = frame ? animatedLayers(editor.doc, frame.id) : [];
+  const instances = frame ? animatedInstances(editor.doc, frame.id) : [];
   const allCollapsed = layers.length > 0 && layers.every((l) => collapsed.includes(l.id));
   const PlaybackIcon = PLAYBACK_ICON[tl.playback];
   const lanesWidth = xOf(tl.duration) + 48;
@@ -260,6 +264,7 @@ function TimelinePanel() {
     const tol = (SNAP_PX / pxPerSec) * 1000;
     const targets = [time, 0, tl.duration];
     for (const n of layers) for (const r of keysOf(n)) if (!keys.some((k) => sameKey(k, r))) targets.push(n.keyframes![r.prop]!.find((k) => k.id === r.id)!.time);
+    for (const n of layers) for (const c of n.animations ?? []) if (!keys.length || c.id !== clipDrag?.id) targets.push(c.start, c.start + c.duration);
     let best = t;
     let dist = tol;
     for (const s of targets) if (Math.abs(s - t) < dist) [best, dist] = [s, Math.abs(s - t)];
@@ -305,6 +310,59 @@ function TimelinePanel() {
     editor.doc.endGesture();
     setEasingAt({ key, segmentMs, x: Math.min(e.clientX - body.left, body.width - 380), y: e.clientY - body.top });
   };
+
+  /** Press a clip: select it; drag its middle to move it, or an edge to stretch it. */
+  const clipDown = (e: ReactPointerEvent, n: SceneNode, c: MotionClip, edge: 'move' | 'start' | 'end') => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setEasingAt(null);
+    selectKeys([]);
+    selectClip({ nodeId: n.id, id: c.id });
+    editor.select([n.id]);
+    const x0 = e.clientX;
+    let next = { start: c.start, duration: c.duration };
+    track(
+      (ev) => {
+        if (Math.abs(ev.clientX - x0) < 3 && next.start === c.start && next.duration === c.duration) return;
+        const d = ((ev.clientX - x0) / pxPerSec) * 1000;
+        if (edge === 'move') next = { start: Math.max(0, snapTime(c.start + d, [], ev.shiftKey)), duration: c.duration };
+        else if (edge === 'start') {
+          const start = Math.max(0, Math.min(c.start + c.duration - 10, snapTime(c.start + d, [], ev.shiftKey)));
+          next = { start, duration: c.start + c.duration - start };
+        } else next = { start: c.start, duration: Math.max(10, snapTime(c.start + c.duration + d, [], ev.shiftKey) - c.start) };
+        setClipDrag({ nodeId: n.id, id: c.id, ...next });
+      },
+      () => {
+        setClipDrag(null);
+        if (next.start !== c.start || next.duration !== c.duration) editor.doc.change(() => updateClip(editor.doc, n.id, c.id, next));
+      },
+    );
+  };
+
+  /** Drag an instance's purple track to change when its animation starts (to stagger copies). */
+  const instanceDown = (e: ReactPointerEvent, inst: SceneNode) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    editor.select([inst.id]);
+    const x0 = e.clientX;
+    const from = inst.motionOffset ?? 0;
+    let offset = from;
+    track(
+      (ev) => {
+        offset = Math.max(0, snapTime(from + ((ev.clientX - x0) / pxPerSec) * 1000, [], ev.shiftKey));
+        setOffsetDrag({ id: inst.id, offset });
+      },
+      () => {
+        setOffsetDrag(null);
+        if (offset !== from) editor.doc.change(() => editor.doc.updateNode(inst.id, { motionOffset: offset || (null as never) }));
+      },
+    );
+  };
+
+  /** A clip as drawn: where it's being dragged to, if it is. */
+  const shownClip = (nodeId: NodeId, c: MotionClip) => (clipDrag && clipDrag.nodeId === nodeId && clipDrag.id === c.id ? { start: clipDrag.start, duration: clipDrag.duration } : c);
 
   const toggleCollapsed = (id: string) => setMotion({ collapsed: collapsed.includes(id) ? collapsed.filter((c) => c !== id) : [...collapsed, id] });
 
@@ -402,11 +460,11 @@ function TimelinePanel() {
               </div>
             </div>
 
-            {layers.length === 0 && (
+            {layers.length === 0 && instances.length === 0 && (
               <div className="timeline-row">
                 <div className="timeline-name" />
                 <div className="timeline-lane timeline-hint" style={{ width: lanesWidth }} onPointerDown={laneDown}>
-                  Select a layer and click a diamond in the Animate section (or turn on auto-keyframe) to add keyframes.
+                  Select a layer, then click a diamond in the Animate section (or turn on auto-keyframe), or add a preset in Animations.
                 </div>
               </div>
             )}
@@ -415,7 +473,14 @@ function TimelinePanel() {
               const open = !collapsed.includes(n.id);
               const props = MOTION_PROPERTIES.filter((p) => n.keyframes?.[p]?.length);
               const all = keysOf(n);
-              const times = all.map((r) => shownTime(r, n.keyframes![r.prop]!.find((k) => k.id === r.id)!.time));
+              const clips = n.animations ?? [];
+              const times = [
+                ...all.map((r) => shownTime(r, n.keyframes![r.prop]!.find((k) => k.id === r.id)!.time)),
+                ...clips.flatMap((c) => {
+                  const sc = shownClip(n.id, c);
+                  return [sc.start, sc.start + sc.duration];
+                }),
+              ];
               const first = Math.min(...times);
               const last = Math.max(...times);
               const layerSelected = selection.includes(n.id);
@@ -447,8 +512,8 @@ function TimelinePanel() {
                       <div
                         className={`timeline-bar${all.every(isSelected) ? ' selected' : ''}`}
                         style={{ left: xOf(first), width: Math.max(2, xOf(last) - xOf(first)) }}
-                        title="Drag to move all of this layer's keyframes"
-                        onPointerDown={(e) => keyDown(e, all, first)}
+                        title={all.length ? "Drag to move all of this layer's keyframes" : undefined}
+                        onPointerDown={(e) => (all.length ? keyDown(e, all, first) : laneDown(e))}
                       />
                     </div>
                   </div>
@@ -503,7 +568,54 @@ function TimelinePanel() {
                         </div>
                       );
                     })}
+                  {open &&
+                    clips.map((c) => {
+                      const sc = shownClip(n.id, c);
+                      const isSel = selectedClip?.nodeId === n.id && selectedClip.id === c.id;
+                      return (
+                        <div key={c.id} className="timeline-row timeline-prop">
+                          <div className={`timeline-name timeline-prop-name${isSel ? ' selected' : ''}`} onClick={() => selectClip({ nodeId: n.id, id: c.id })}>
+                            {PRESETS[c.preset].label}
+                          </div>
+                          <div className="timeline-lane" style={{ width: lanesWidth }} onPointerDown={laneDown}>
+                            <div
+                              className={`timeline-clip${isSel ? ' selected' : ''}`}
+                              style={{ left: xOf(sc.start), width: Math.max(6, xOf(sc.start + sc.duration) - xOf(sc.start)) }}
+                              title={`${PRESETS[c.preset].label} · ${formatTime(sc.start, unit)} for ${Math.round(sc.duration)}ms (${easingLabel(c.easing)}). Drag to move, drag an edge to stretch.`}
+                              onPointerDown={(e) => clipDown(e, n, c, 'move')}
+                            >
+                              <span className="timeline-clip-label">{PRESETS[c.preset].label}</span>
+                              <span className="timeline-clip-edge start" onPointerDown={(e) => clipDown(e, n, c, 'start')} />
+                              <span className="timeline-clip-edge end" onPointerDown={(e) => clipDown(e, n, c, 'end')} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </Fragment>
+              );
+            })}
+
+            {/* Animated instances: one purple track each, dragged to change when they start. */}
+            {instances.map((inst) => {
+              const main = editor.doc.get(inst.componentId);
+              const mtl = main?.motion ?? DEFAULT_MOTION;
+              const offset = offsetDrag?.id === inst.id ? offsetDrag.offset : (inst.motionOffset ?? 0);
+              return (
+                <div key={inst.id} className={`timeline-row timeline-track timeline-instance${selection.includes(inst.id) ? ' selected' : ''}`}>
+                  <div className="timeline-name" onClick={() => editor.select([inst.id])} title="Animated instance: its animation is the main component's">
+                    <span className="timeline-instance-dot" />
+                    <span className="timeline-label">{inst.name}</span>
+                  </div>
+                  <div className="timeline-lane" style={{ width: lanesWidth }} onPointerDown={laneDown}>
+                    <div
+                      className="timeline-bar instance"
+                      style={{ left: xOf(offset), width: Math.max(4, xOf(offset + mtl.duration) - xOf(offset)) }}
+                      title={`Starts at ${formatTime(offset, unit)} · ${mtl.duration}ms (${PLAYBACK_LABEL[mtl.playback].toLowerCase()}). Drag to change when it starts.`}
+                      onPointerDown={(e) => instanceDown(e, inst)}
+                    />
+                  </div>
+                </div>
               );
             })}
 

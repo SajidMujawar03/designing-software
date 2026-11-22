@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { solid } from '@figma/document';
+import { addPreset, createInstance, solid } from '@figma/document';
 import { editor } from './editor';
 import {
   copySelectedKeys,
+  deleteSelectedClip,
+  isLockedForMotion,
+  selectClip,
   deleteSelectedKeys,
   drawnDocument,
   followSelection,
@@ -166,6 +169,42 @@ describe('editing in Motion mode', () => {
     expect(deleteSelectedKeys()).toBe(true);
     expect(doc.get(rect)!.keyframes!.x!.map((k) => k.time)).toEqual([0, 1000]);
     expect(deleteSelectedKeys()).toBe(false);
+    setMotionMode(false);
+  });
+});
+
+describe('presets and animated instances in Motion mode', () => {
+  it('locks animated instances, and deletes the selected preset', () => {
+    const doc = editor.doc;
+    const main = doc.change(() => doc.createNode({ type: 'COMPONENT', parentId: editor.pageId, x: 2000, y: 0, width: 40, height: 40 }));
+    const dot = doc.change(() => doc.createNode({ type: 'ELLIPSE', parentId: main, width: 40, height: 40 }));
+    doc.change(() => addPreset(doc, dot, 'PULSE', 0));
+    const frame = doc.change(() => doc.createNode({ type: 'FRAME', parentId: editor.pageId, x: 0, y: 2000, width: 300, height: 100 }));
+    const inst = doc.change(() => createInstance(doc, main, frame, { x: 10, y: 2010 })!);
+    const plain = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: frame, x: 100, y: 20, width: 20, height: 20 }));
+    editor.select([inst]);
+    setMotionMode(true);
+    expect(isLockedForMotion(inst)).toBe(true);
+    expect(isLockedForMotion(doc.children(inst)[0].id)).toBe(true);
+    expect(isLockedForMotion(plain)).toBe(false);
+
+    // Auto-keyframe can't put keyframes on an instance; its non-animated values still change.
+    toggleAutoKey();
+    seek(300);
+    motionApply([inst], { opacity: 0.5, name: 'Dot 1' });
+    expect(doc.get(inst)!.keyframes ?? null).toBeNull();
+    expect(doc.get(inst)!.name).toBe('Dot 1');
+    toggleAutoKey();
+
+    // A preset on an ordinary layer, selected and deleted.
+    let clip: string | null = null;
+    doc.change(() => (clip = addPreset(doc, plain, 'FADE_IN', 0)));
+    selectClip({ nodeId: plain, id: clip! });
+    expect(deleteSelectedClip()).toBe(true);
+    expect(doc.get(plain)!.animations ?? null).toBeNull();
+    // The instance's own presets (from its component) can't be deleted from here.
+    selectClip({ nodeId: doc.children(inst)[0].id, id: doc.children(inst)[0].animations![0].id });
+    expect(deleteSelectedClip()).toBe(false);
     setMotionMode(false);
   });
 });

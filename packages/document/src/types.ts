@@ -289,6 +289,10 @@ export interface SceneNode {
 
   /** Top-level FRAME with a Motion timeline (Figma Motion): how long it runs and how it repeats. */
   motion?: MotionTimeline | null;
+  /** Motion preset animations on this layer (clips on its timeline track). */
+  animations?: MotionClip[] | null;
+  /** INSTANCE of an animated component: when (ms) its animation starts on the timeline it's in. */
+  motionOffset?: number;
   /** Motion keyframes on this layer's properties, by property. */
   keyframes?: Partial<Record<MotionProperty, Keyframe[]>> | null;
   /** Motion's Scale X/Y (1 = 100%), around the box center. Only ever set on posed nodes during playback, never stored. */
@@ -685,3 +689,34 @@ export type MotionEasing =
       damping?: number;
       mass?: number;
     };
+
+/** Ready-made animations (Figma Motion's preset animations). */
+export type MotionPreset =
+  | 'FADE_IN'
+  | 'FADE_OUT'
+  | 'SLIDE_IN'
+  | 'SLIDE_OUT'
+  | 'SCALE_IN'
+  | 'SCALE_OUT'
+  | 'BLUR_IN'
+  | 'BLUR_OUT'
+  | 'SPIN'
+  | 'PULSE'
+  | 'SHAKE'
+  | 'BOUNCE';
+
+export type MotionDirection = 'LEFT' | 'RIGHT' | 'UP' | 'DOWN';
+
+/** A preset animation placed on a layer's track: a clip that can be moved, stretched and re-eased. */
+export interface MotionClip {
+  id: string;
+  preset: MotionPreset;
+  /** Milliseconds from the timeline start. */
+  start: number;
+  duration: number;
+  easing: MotionEasing;
+  /** Slides: where the layer comes from (in) or goes to (out). */
+  direction?: MotionDirection;
+  /** How much: distance (slide, shake, bounce), scale (scale, pulse), degrees (spin) or blur radius. */
+  amount?: number;
+}

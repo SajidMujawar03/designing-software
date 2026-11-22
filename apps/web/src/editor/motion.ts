@@ -1,5 +1,8 @@
 import {
   applyMotionEdit,
+  holdsTimeline,
+  isAnimatedInstance,
+  outerInstance,
   copyKeyframes,
   DEFAULT_MOTION,
   motionFrameOf,
@@ -7,6 +10,7 @@ import {
   playbackEnded,
   poseAt,
   posedDocument,
+  removeClip,
   removeKeyframes,
   timelineTime,
   type CopiedKeys,
@@ -28,7 +32,8 @@ import type { MotionUI } from './store';
  * at the playhead, and the document never changes.
  */
 
-const isTopFrame = (n: SceneNode | undefined): n is SceneNode => !!n && n.type === 'FRAME' && editor.doc.get(n.parentId)?.type === 'PAGE';
+/** Frames and main components directly on the page hold timelines. */
+const isTopFrame = (n: SceneNode | undefined): n is SceneNode => holdsTimeline(editor.doc, n);
 
 /** The frame the timeline shows. */
 export function motionFrame(): SceneNode | null {
@@ -171,6 +176,14 @@ export function inMotionFrame(id: NodeId): boolean {
   return !!f && (f.id === id || editor.doc.isAncestor(f.id, id));
 }
 
+/** Layers of an animated instance (and the instance itself): their animation comes from the main component and can't be edited here. */
+export function isLockedForMotion(id: NodeId): boolean {
+  const n = editor.doc.get(id);
+  if (!n) return false;
+  const inst = n.type === 'INSTANCE' ? n : outerInstance(editor.doc, id);
+  return !!inst && isAnimatedInstance(editor.doc, inst);
+}
+
 /** Shows a short message under the timeline header. */
 export function motionHint(text: string): void {
   setMotion({ hint: { text, at: Date.now() } });
@@ -203,6 +216,7 @@ export function motionUpdate(patches: Array<[NodeId, NodePatch]>, opts?: { const
   const { time, autoKey } = editor.ui.motion;
   const plain: Array<[NodeId, NodePatch]> = [];
   const blocked = new Set<MotionProperty>();
+  let lockedBlocked = false;
   for (const [id, patch] of patches) {
     if (!inMotionFrame(id)) {
       plain.push([id, patch]);
@@ -210,10 +224,14 @@ export function motionUpdate(patches: Array<[NodeId, NodePatch]>, opts?: { const
     }
     const posed = view.get(id);
     if (!posed) continue;
-    for (const p of applyMotionEdit(doc, posed, patch, time, autoKey)) blocked.add(p);
+    const locked = isLockedForMotion(id);
+    const out = applyMotionEdit(doc, posed, patch, time, autoKey, locked);
+    if (locked && out.length) lockedBlocked = true;
+    else for (const p of out) blocked.add(p);
   }
   if (plain.length) doc.updateNodes(plain, opts);
-  if (blocked.size) {
+  if (lockedBlocked) motionHint('This is an animated instance: its animation is locked. Edit it on the main component.');
+  else if (blocked.size) {
     const names = [...blocked].map((p) => PROP_NAMES[p]).join(', ');
     motionHint(`${names[0].toUpperCase()}${names.slice(1)} ${blocked.size > 1 ? 'are' : 'is'} animated: add a keyframe here or turn on auto-keyframe to change it.`);
   }
@@ -240,6 +258,19 @@ export const toggleAutoKey = (): void => setMotion({ autoKey: !editor.ui.motion.
 
 export function selectKeys(keys: MotionUI['selectedKeys']): void {
   setMotion({ selectedKeys: keys });
+}
+
+export function selectClip(clip: MotionUI['selectedClip']): void {
+  setMotion({ selectedClip: clip, selectedKeys: clip ? [] : editor.ui.motion.selectedKeys });
+}
+
+/** Removes the selected preset animation. */
+export function deleteSelectedClip(): boolean {
+  const c = editor.ui.motion.selectedClip;
+  if (!c || isLockedForMotion(c.nodeId)) return false;
+  editor.doc.change(() => removeClip(editor.doc, c.nodeId, c.id));
+  setMotion({ selectedClip: null });
+  return true;
 }
 
 export function deleteSelectedKeys(): boolean {
