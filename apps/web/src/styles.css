@@ -6101,3 +6101,35 @@ a.btn {
 .ready-for-dev {
   border-bottom: 1px solid var(--border);
 }
+.type-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 400;
+  cursor: pointer;
+}
+.type-switch:hover,
+.type-switch[aria-expanded='true'] {
+  background: var(--hover);
+  color: var(--text);
+}
+.panel-header .type-menu {
+  left: 0;
+  right: auto;
+  top: 26px;
+  min-width: 140px;
+}
+.panel-header-name {
+  overflow: visible;
+}
+.panel-header-name b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

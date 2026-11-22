@@ -1,6 +1,7 @@
 import { replaceSelectionColor, selectionColors, isAutoLayout, textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   FlipVertical2,
+  ChevronDown,
   FlipHorizontal2,
   RotateCwSquare,
   Blend,
@@ -53,7 +54,7 @@ import { LocalStyles, StyleMenu, StyleRow } from './Styles';
 import { AutoLayoutFields, ConstraintsSection, FlowButtons, LayoutGridSection, SizingRow } from './LayoutPanels';
 import { addAutoLayout, removeAutoLayout } from '../editor/layoutCommands';
 import { command } from '../editor/commands';
-import { flipSelection, rotateSelection } from '../editor/objectCommands';
+import { convertContainer, convertTargets, flipSelection, rotateSelection } from '../editor/objectCommands';
 import { AnnotationsSection, CodeSnippetSection, SpecSection } from './HandoffPanels';
 import { WidthProfileSelect } from './WidthProfile';
 import { ComponentSection } from './ComponentPanel';
@@ -962,9 +963,11 @@ const TYPE_NAMES: Partial<Record<SceneNode['type'], string>> = {
  */
 function PanelHeader({ nodes }: { nodes: SceneNode[] }) {
   const [boolOpen, setBoolOpen] = useState(false);
+  const [typeOpen, setTypeOpen] = useState(false);
   const types = common(nodes.map((n) => n.type));
   const typeName = types === MIXED ? 'Mixed' : (TYPE_NAMES[types] ?? types.toLowerCase());
   const single = nodes.length === 1 ? nodes[0] : null;
+  const targets = single ? convertTargets(editor, single.id) : [];
   const isBoolean = single?.type === 'BOOLEAN';
   const canCombine = editor.topLevelSelection().length >= 2 || isBoolean;
   const canComponent = !(single && ['COMPONENT', 'INSTANCE', 'COMPONENT_SET'].includes(single.type));
@@ -972,7 +975,39 @@ function PanelHeader({ nodes }: { nodes: SceneNode[] }) {
     <div className="props-title panel-header">
       <span className="panel-header-name" title={single?.name}>
         <b>{single ? single.name : typeName}</b>
-        <span className="props-type">{single ? typeName : `${nodes.length} layers`}</span>
+        {single && targets.length ? (
+          <span className="panel-header-menu">
+            <button type="button" className="type-switch" aria-haspopup="menu" aria-expanded={typeOpen} title="Change the layer type" onClick={() => setTypeOpen(!typeOpen)}>
+              {typeName} <ChevronDown size={11} />
+            </button>
+            {typeOpen && (
+              <div className="menu tool-menu type-menu" role="menu" aria-label="Layer type">
+                {(['FRAME', 'GROUP', 'SECTION'] as const)
+                  .filter((t) => t === single.type || targets.includes(t))
+                  .map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={t === single.type}
+                      className="menu-item"
+                      onClick={() => {
+                        setTypeOpen(false);
+                        if (t !== single.type) convertContainer(editor, single.id, t);
+                      }}
+                    >
+                      <span className="tool-menu-label">
+                        <span className={`palette-check${t === single.type ? ' on' : ''}`} aria-hidden />
+                        {TYPE_NAMES[t]}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </span>
+        ) : (
+          <span className="props-type">{single ? typeName : `${nodes.length} layers`}</span>
+        )}
       </span>
       <span className="panel-header-actions">
         <IconButton title="Create component (Ctrl+Alt+K)" disabled={!canComponent} onClick={() => command('create-component').run()}>

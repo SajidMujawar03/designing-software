@@ -77,6 +77,8 @@ export const EDITOR_MENUS = (): Menu[] => [
       'group',
       'ungroup',
       'wrap-in-section',
+      'convert-to-section',
+      'convert-to-frame',
       'use-as-mask',
       '-',
       'add-auto-layout',
