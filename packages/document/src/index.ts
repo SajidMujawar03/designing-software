@@ -22,4 +22,5 @@ export * from './pathEdit';
 export * from './textPath';
 export * from './motion';
 export * from './motionPresets';
+export * from './selectionColors';
 export { computeAutoLayout, defaultGrid, gridSpans, gridLines, gridSnapEdges, DEFAULT_CONSTRAINTS } from '@figma/layout';

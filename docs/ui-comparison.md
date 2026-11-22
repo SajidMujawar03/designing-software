@@ -41,10 +41,10 @@ Figma groups the tools into seven slots with dropdowns. Since U2, ours does too.
 | Image/video… | Image/video… in Shape tools and quick actions (Ctrl+Shift+K); images only | Same name and place (U2); no video yet |
 | **Creation tools**: Pen (P), Pencil (Shift+P) | Creation tools: Pen (P), Pencil (Shift+P) | Same (U2) |
 | **Type tools**: Text (T), **Text on path** | Text menu: Text (T), Text on path | Same (U1) |
-| **Code tools**: Code (B), Spec (D) | Code tools: Code (B), Spec (D). Code snippet and Annotation (Shift+T) are in quick actions | Same (U2) |
+| **Code tools**: Code (B), Spec (D) | Code tools: Code (B), Spec (D), **Code snippet**, **Annotation** (Shift+T) | Extra in ours (Code snippet and Annotation kept in this menu by choice) |
 | **Comment** (C) | Comment (C) *(cloud files only)* | Same |
 | **Actions** (grid icon, Ctrl+K): AI prompts plus the command list | **Actions** button (grid icon) after the tool slots; Ctrl+K (Ctrl+/ also works) | Same (U3; no AI prompts) |
-| Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | Annotation (Shift+T) in quick actions; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
+| Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | Annotation (Shift+T) in the Code tools menu; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
 | Frame presets (right panel while the Frame tool is on) | Frame presets in the right panel (Phone, …) | Same |
 | Measurement is Shift+M in Figma *(docs)* | Shift+M is our Shape builder (vector edit bar, quick actions) | Different shortcut (clash if Measurement is added) |
 
@@ -86,17 +86,16 @@ Layer selected (frame / group):
 
 | Figma section → contents | Ours | Status |
 | --- | --- | --- |
-| Header: layer type with dropdown ("Frame ▾", "Group ▾"), quick buttons (component, mask, …) | Name + type text ("Frame 1 · Frame") | Different name or place |
-| **Position**: Alignment, Position X/Y, Rotation (with flip buttons), constraints | Alignment buttons at the top, X/Y and rotation in **Layout**; **Constraints** section on children | Different name or place |
-| **Layout**: auto layout toggle; Flow: **Freeform / Vertical / Horizontal / Grid**; Dimensions W/H, lock aspect ratio, Clip content | **Layout** (X, Y, W, H, rotation, corner radius, Clip content) + separate **Auto layout** section with + | Different name or place |
-| **Appearance**: Opacity, Corner radius, Hide (eye), Blend mode | **Appearance**: Opacity, blend mode list | Same name (U1); layout differs (U4) |
+| Header: layer type with dropdown ("Frame ▾", "Group ▾"), quick buttons (component, mask, …) | Type ("Frame", "Group", or "Mixed" with a layer count) and quick buttons: Create component, Use as mask, Boolean groups (with Flatten and Outline stroke) | Same (U4); no convert-type dropdown |
+| **Position**: Alignment, Position X/Y, Rotation (with flip buttons), constraints | **Position**: alignment and distribute, X/Y, Rotation, then Constraints for layers in a frame | Same (U4); no flip buttons |
+| **Layout**: auto layout toggle; Flow: **Freeform / Vertical / Horizontal / Grid**; Dimensions W/H, lock aspect ratio, Clip content | **Layout**: + / − adds or removes auto layout; Flow: Freeform / Vertical / Horizontal (with Wrap) / Grid (disabled); W/H and sizing; Clip content; then gap, alignment and padding | Same (U4); no grid auto layout or lock aspect ratio |
+| **Appearance**: Opacity, Corner radius, Hide (eye), Blend mode | **Appearance**: Opacity, Corner radius, Blend mode, eye button (hide); polygon/star Count and Ratio | Same (U4) |
 | Fill, Stroke, Effects | Fill, Stroke, Effects | Same |
-| **Selection colors** | — | Missing in ours |
+| **Selection colors** | **Selection colors**: the solid fill and stroke colors under the selection, editing one changes it everywhere | Same (U4) |
 | **Layout guide** | **Layout guide** | Same (U1) |
 | Export | Export | Same |
-| — | **Shape** (Flatten, Outline) | Extra in ours |
 | — | **Annotations** section in the Design tab | Extra in ours (Figma puts annotations on the canvas / Dev Mode) |
-| Text layer: **Typography** | Typography | Same |
+| Text layer: **Typography** | **Typography** (was "Text" until U4) | Same (U4) |
 | Instance / component properties | Instance / Properties / Variants | Same |
 
 ## 6. Prototype tab
@@ -107,7 +106,7 @@ Layer selected (frame / group):
 | Flow starting point (on frames) | Flow starting point ("Start a prototype here") | Same |
 | Interactions (+) | Interactions | Same |
 | Scroll behavior → **Position** (Scroll with parent…) and Overflow | Scroll behavior → Overflow (No scrolling, Vertical, Horizontal, Both directions); "Position when scrolling" | Same |
-| **Show prototype settings** (device, background, starting frame), hidden behind a link | **Device** and **Flows** sections shown directly when nothing is selected | Different name or place |
+| **Show prototype settings** (device, background, starting frame), hidden behind a link | **Show prototype settings** link (Device), at the end of the tab; Flows shown directly when nothing is selected | Same (U4) |
 | Present ▷ + **Prototype view** dropdown | Present ▷ | Missing in ours (Prototype view dropdown) |
 
 ## 7. Inspect / Dev Mode
@@ -123,7 +122,7 @@ Layer selected (frame / group):
 | **Layer properties** with **Code / List** toggle | Layout (W, H, X, Y), Fill, Typography as lists | Different name or place |
 | Code: language dropdown (CSS, iOS, Android, plugins) | **Code**: CSS, SwiftUI, Compose | Same |
 | Colors, Assets (icon detection, downloads), Export | Fill colours; Export is in the Design tab | Different name or place |
-| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Annotation (Shift+T, quick actions), Spec tool; Annotations (Shift+Y) | Different name or place |
+| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Annotation (Shift+T, Code tools menu), Spec tool; Annotations (Shift+Y) | Different name or place |
 
 ## 8. Motion
 
@@ -194,8 +193,8 @@ Layer selected (frame / group):
 6. ~~**Code menu**~~ (done in U1 and U2): move "Code snippet" and "Annotate" out (Figma has Code and Spec only). Rename "Annotate" to **Annotation** with Shift+T.
 7. **Mode switcher order and names**: Draw, Design, Motion, Dev Mode; consider renaming the Inspect tab to Dev Mode, or keep Inspect and note the difference.
 8. ~~**Rename "quick actions" to Actions** and add an Actions button to the toolbar.~~ Done in U3.
-9. **Add Selection colors** to the Design tab (Figma shows it for any multi-colour selection).
-10. **Restructure Position / Layout**: split X/Y/rotation and alignment into a **Position** section; put auto layout's Flow (Freeform / Vertical / Horizontal / Grid) and Dimensions into **Layout**.
+9. ~~**Add Selection colors** to the Design tab.~~ Done in U4.
+10. ~~**Restructure Position / Layout**~~ (done in U4): split X/Y/rotation and alignment into a **Position** section; put auto layout's Flow (Freeform / Vertical / Horizontal / Grid) and Dimensions into **Layout**.
 11. **Move the toolbar to the bottom centre** with the mode switcher at its right end, and put Present / Share / zoom at the top of the right panel. This is the biggest visual difference.
 12. ~~**Add a main menu** (logo button)~~ Done in U3, except Flip, Outlines and Pixel preview: with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
 13. **Motion**: name the property section **Transform** (Position, Scale, Rotation) with ◇ buttons beside the normal fields, and add **Add motion** to the right-click menu.

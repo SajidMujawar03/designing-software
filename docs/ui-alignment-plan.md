@@ -81,14 +81,14 @@ Region tools    Frame (F), Section (Shift+S), Slice (S)
 Shape tools     Rectangle (R), Line (L), Arrow (Shift+L), Ellipse (O), Polygon, Star, Image/video… (Ctrl+Shift+K)
 Creation tools  Pen (P), Pencil (Shift+P)
 Type tools      Text (T), Text on path
-Code tools      Code (B), Spec (D)
+Code tools      Code (B), Spec (D), Code snippet, Annotation (Shift+T)  (the last two are ours; kept here by choice)
 Comment (C)     cloud files only
 Actions         (U3)
 ```
 - `ToolSlot` gets a `name` for its menu header and caret label ("Shape tools"), shown at the top of the menu as in Figma.
 - A slot entry can be a **command** instead of a tool: Image/video… runs `place-image`. Give `ToolDef` an optional `run`.
 - The separate Hand button goes away (H still works).
-- "Code snippet" and "Annotation" leave the Code menu. Code snippet stays in quick actions; Annotation moves to the Dev Mode / Inspect tools in U7, and stays in quick actions (Shift+T) until then.
+- "Code snippet" and "Annotation" stay in the Code tools menu next to Code and Spec (decided in U4; U2 had moved them to quick actions). They are also in Actions.
 
 **2. Draw mode toolbar** (`DRAW_TOOLS`)
 - Move tools, **Pen / Brush / Pencil**, then Region, Shape, Type and Code slots, Comment, Actions, as in Figma Draw.
@@ -158,6 +158,15 @@ Branch `ui-right-panel` · about 2–3 days
 **8. Prototype tab, nothing selected**: put Device and Flows behind a **Show prototype settings** link, as Figma does.
 
 Tests: panel unit tests for Position/Layout/Appearance values on mixed selections; `collectPaints` tests; the existing PropertiesPanel tests updated.
+
+---
+
+**Done in U4 / moved to later.** Built: the header (type, Create component, Use as mask, a Boolean groups menu with Flatten and Outline stroke), Position (alignment, X/Y, rotation, constraints), Layout (auto layout + / −, Flow, W/H and sizing, Clip content, auto layout fields), Appearance (opacity, corner radius, blend mode, eye; polygon and star counts), Selection colors (`packages/document/src/selectionColors.ts`), the Design tab's text section renamed **Typography**, and Show prototype settings. Not done:
+- **Convert-type dropdown** in the header (Frame ↔ Group ↔ Section): needs a node type change in the document model.
+- **Flip buttons** next to rotation: wait for flip (see U3).
+- **Lock aspect ratio** and **Grid** auto layout.
+- **Selection colors** don't include text range colors or gradients.
+- **Annotations** stay in the Design tab until U7.
 
 ---
 

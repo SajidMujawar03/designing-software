@@ -1,4 +1,4 @@
-import { LayoutGrid, Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { Braces, NotebookPen, LayoutGrid, Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { MainMenu } from './MainMenu';
@@ -52,6 +52,8 @@ const T = {
   textPath: { id: 'textPath', label: 'Text on path', key: '', Icon: Spline },
   code: { id: 'code', label: 'Code', key: 'B', Icon: SquareCode },
   spec: { id: 'spec', label: 'Spec', key: 'D', Icon: FileText },
+  snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
+  annotate: { id: 'annotate', label: 'Annotation', key: 'Shift+T', Icon: NotebookPen },
   hand: { id: 'hand', label: 'Hand tool', key: 'H', Icon: Hand },
   comment: { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
   image: { id: 'image', label: 'Image/video…', key: 'Ctrl+Shift+K', Icon: ImageIcon, run: () => void placeImages() },
@@ -63,7 +65,8 @@ const REGION: Slot = { name: 'Region tools', tools: [T.frame, T.section, T.slice
 const SHAPE: Slot = { name: 'Shape tools', tools: [T.rectangle, T.line, T.arrow, T.ellipse, T.polygon, T.star, T.image] };
 const CREATION: Slot = { name: 'Creation tools', tools: [T.pen, T.pencil] };
 const TYPE: Slot = { name: 'Type tools', tools: [T.text, T.textPath] };
-const CODE: Slot = { name: 'Code tools', tools: [T.code, T.spec] };
+// Figma's Code tools are Code and Spec; Code snippet and Annotation are kept here too.
+const CODE: Slot = { name: 'Code tools', tools: [T.code, T.spec, T.snippet, T.annotate] };
 const COMMENT: Slot = { tools: [T.comment] };
 
 const TOOLS: Slot[] = [MOVE, REGION, SHAPE, CREATION, TYPE, CODE, COMMENT];

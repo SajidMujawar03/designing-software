@@ -1,6 +1,8 @@
-import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
+import { replaceSelectionColor, selectionColors, isAutoLayout, textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   FlipVertical2,
+  Component,
+  SquareDashed,
   PenTool,
   AlignJustify,
   ArrowDownToLine,
@@ -45,7 +47,9 @@ import { useUI } from '../editor/store';
 import { boundsOf, fitText, moveByWorld, scaleBounds } from '../editor/transforms';
 import { ColorPicker } from './ColorPicker';
 import { LocalStyles, StyleMenu, StyleRow } from './Styles';
-import { AutoLayoutSection, ConstraintsSection, LayoutGridSection, SizingRow } from './LayoutPanels';
+import { AutoLayoutFields, ConstraintsSection, FlowButtons, LayoutGridSection, SizingRow } from './LayoutPanels';
+import { addAutoLayout, removeAutoLayout } from '../editor/layoutCommands';
+import { command } from '../editor/commands';
 import { AnnotationsSection, CodeSnippetSection, SpecSection } from './HandoffPanels';
 import { WidthProfileSelect } from './WidthProfile';
 import { ComponentSection } from './ComponentPanel';
@@ -112,15 +116,13 @@ export function PropertiesPanel() {
   const isLine = types === 'LINE';
   // Sections and slices have no clipping, auto layout, constraints or layout grids.
   const plainBoxes = nodes.some((n) => n.type === 'SECTION' || n.type === 'SLICE' || n.type === 'CODE_SNIPPET' || n.type === 'SPEC');
+  // Groups have no box of their own: position and size come from their bounds.
+  const groups = nodes.some((n) => isGroupLike(n));
 
   return (
     <div className="props">
-      <div className="props-title">
-        {nodes.length === 1 ? nodes[0].name : `${nodes.length} layers`}
-        <span className="props-type">{types === MIXED ? 'Mixed' : types.toLowerCase()}</span>
-      </div>
+      <PanelHeader nodes={nodes} />
 
-      <AlignBar count={editor.topLevelSelection().length} />
       {motionMode &&
         nodes.every((n) => inMotionFrame(n.id)) &&
         (nodes.length === 1 && isLockedForMotion(nodes[0].id) ? (
@@ -138,65 +140,84 @@ export function PropertiesPanel() {
       {nodes.length === 1 && <VariableModes nodeId={nodes[0].id} />}
       <VariableBindings nodes={nodes} />
 
-      {nodes.some((n) => isGroupLike(n)) ? (
-        <BoxLayout ids={ids} />
-      ) : (
-      <Section title="Layout">
-        <div className="grid2">
-          <NumberField label="X" value={num('x')} onChange={(v, live) => apply(ids, { x: v }, live)} />
-          <NumberField label="Y" value={num('y')} onChange={(v, live) => apply(ids, { y: v }, live)} />
-          <NumberField
-            label="W"
-            value={num('width')}
-            min={0.01}
-            onChange={(v, live) =>
-              apply(
-                ids,
-                (n) => ({
-                  width: v,
-                  ...(n.layoutSizingHorizontal && n.layoutSizingHorizontal !== 'FIXED' ? { layoutSizingHorizontal: 'FIXED' as const } : {}),
-                  ...(n.type === 'TEXT' ? { textAutoResize: n.textAutoResize === 'NONE' ? 'NONE' : 'HEIGHT' } : {}),
-                }),
-                live,
-              )
-            }
-          />
-          {!isLine && (
+      <Section title="Position">
+        <AlignBar count={editor.topLevelSelection().length} />
+        {groups ? (
+          <BoxFields ids={ids} part="position" />
+        ) : (
+          <div className="grid2">
+            <NumberField label="X" value={num('x')} onChange={(v, live) => apply(ids, { x: v }, live)} />
+            <NumberField label="Y" value={num('y')} onChange={(v, live) => apply(ids, { y: v }, live)} />
             <NumberField
-              label="H"
-              value={num('height')}
+              label={<RotateCw size={12} />}
+              title="Rotation"
+              value={num('rotation')}
+              suffix="°"
+              onChange={(v, live) => apply(ids, { rotation: ((((v + 180) % 360) + 360) % 360) - 180 }, live)}
+            />
+          </div>
+        )}
+        {!plainBoxes && <ConstraintsSection ids={ids} nodes={nodes} />}
+      </Section>
+
+      <Section
+        title="Layout"
+        actions={
+          !isLine && !plainBoxes ? (
+            nodes.every((n) => isAutoLayout(n)) ? (
+              <IconButton title="Remove auto layout (Shift+Alt+A)" onClick={() => removeAutoLayout(editor)}>
+                <Minus size={14} />
+              </IconButton>
+            ) : (
+              <IconButton title="Add auto layout (Shift+A)" onClick={() => addAutoLayout(editor)}>
+                <Plus size={14} />
+              </IconButton>
+            )
+          ) : undefined
+        }
+      >
+        {!isLine && !plainBoxes && <FlowButtons ids={ids} nodes={nodes} />}
+        {groups ? (
+          <BoxFields ids={ids} part="size" />
+        ) : (
+          <div className="grid2">
+            <NumberField
+              label="W"
+              value={num('width')}
               min={0.01}
               onChange={(v, live) =>
                 apply(
                   ids,
                   (n) => ({
-                    height: v,
-                    ...(n.layoutSizingVertical && n.layoutSizingVertical !== 'FIXED' ? { layoutSizingVertical: 'FIXED' as const } : {}),
-                    ...(n.type === 'TEXT' ? { textAutoResize: 'NONE' } : {}),
+                    width: v,
+                    ...(n.layoutSizingHorizontal && n.layoutSizingHorizontal !== 'FIXED' ? { layoutSizingHorizontal: 'FIXED' as const } : {}),
+                    ...(n.type === 'TEXT' ? { textAutoResize: n.textAutoResize === 'NONE' ? 'NONE' : 'HEIGHT' } : {}),
                   }),
                   live,
                 )
               }
             />
-          )}
-          <NumberField
-            label={<RotateCw size={12} />}
-            title="Rotation"
-            value={num('rotation')}
-            suffix="°"
-            onChange={(v, live) => apply(ids, { rotation: ((((v + 180) % 360) + 360) % 360) - 180 }, live)}
-          />
-          {hasRadius && (
-            <NumberField
-              label={<Scan size={12} />}
-              title="Corner radius"
-              value={num('cornerRadius')}
-              min={0}
-              onChange={(v, live) => apply(ids, { cornerRadius: v }, live)}
-            />
-          )}
-        </div>
-        <SizingRow ids={ids} nodes={nodes} />
+            {!isLine && (
+              <NumberField
+                label="H"
+                value={num('height')}
+                min={0.01}
+                onChange={(v, live) =>
+                  apply(
+                    ids,
+                    (n) => ({
+                      height: v,
+                      ...(n.layoutSizingVertical && n.layoutSizingVertical !== 'FIXED' ? { layoutSizingVertical: 'FIXED' as const } : {}),
+                      ...(n.type === 'TEXT' ? { textAutoResize: 'NONE' } : {}),
+                    }),
+                    live,
+                  )
+                }
+              />
+            )}
+          </div>
+        )}
+        {!groups && <SizingRow ids={ids} nodes={nodes} />}
         {nodes.every(isFrameLike) && !plainBoxes && (
           <label className="checkbox">
             <input
@@ -207,15 +228,17 @@ export function PropertiesPanel() {
             Clip content
           </label>
         )}
+        {!isLine && !plainBoxes && <AutoLayoutFields ids={ids} nodes={nodes} />}
       </Section>
-      )}
 
-      {!isLine && !plainBoxes && <AutoLayoutSection ids={ids} nodes={nodes} />}
-      {!plainBoxes && <ConstraintsSection ids={ids} nodes={nodes} />}
-
-      <ShapeSection ids={ids} nodes={nodes} />
-
-      <Section title="Appearance">
+      <Section
+        title="Appearance"
+        actions={
+          <IconButton title={nodes.every((n) => n.visible) ? 'Hide (Ctrl+Shift+H)' : 'Show (Ctrl+Shift+H)'} onClick={() => editor.toggleVisible()}>
+            {nodes.every((n) => n.visible) ? <Eye size={14} /> : <EyeOff size={14} />}
+          </IconButton>
+        }
+      >
         <div className="grid2">
           <NumberField
             label="Opacity"
@@ -226,8 +249,18 @@ export function PropertiesPanel() {
             precision={0}
             onChange={(v, live) => apply(ids, { opacity: v / 100 }, live)}
           />
+          {hasRadius && (
+            <NumberField
+              label={<Scan size={12} />}
+              title="Corner radius"
+              value={num('cornerRadius')}
+              min={0}
+              onChange={(v, live) => apply(ids, { cornerRadius: v }, live)}
+            />
+          )}
           <BlendSelect ids={ids} nodes={nodes} />
         </div>
+        <ShapeCountFields ids={ids} nodes={nodes} />
       </Section>
 
       {allText && <TextSection ids={ids} nodes={nodes} />}
@@ -237,6 +270,7 @@ export function PropertiesPanel() {
       {nodes.some((n) => n.strokes.length > 0) && <StrokeOptions ids={ids} nodes={nodes} />}
 
       <EffectsSection ids={ids} nodes={nodes} />
+      {!motionMode && <SelectionColorsSection ids={ids} nodes={nodes} />}
       {!plainBoxes && <LayoutGridSection ids={ids} nodes={nodes} />}
 
       {nodes.length === 1 && <AnnotationsSection node={nodes[0]} />}
@@ -314,7 +348,7 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
 
   return (
     <Section
-      title={editing && TextEdit.range().end > TextEdit.range().start ? 'Text · selection' : 'Text'}
+      title={editing && TextEdit.range().end > TextEdit.range().start ? 'Typography · selection' : 'Typography'}
       actions={
         <StyleMenu
           type="TEXT"
@@ -688,10 +722,10 @@ function AlignBar({ count }: { count: number }) {
 }
 
 /**
- * Position and size from on-canvas bounds, for selections that include
+ * Position or size from on-canvas bounds, for selections that include
  * groups (which have no box of their own). Values are relative to the parent.
  */
-function BoxLayout({ ids }: { ids: NodeId[] }) {
+function BoxFields({ ids, part }: { ids: NodeId[]; part: 'position' | 'size' }) {
   const doc = editor.doc;
   const boxes = ids.map((id) => {
     const b = boundsOf(doc, [id])!;
@@ -702,8 +736,8 @@ function BoxLayout({ ids }: { ids: NodeId[] }) {
   const r2 = (v: number) => Math.round(v * 100) / 100;
   const val = (f: (bx: (typeof boxes)[number]) => number) => common(boxes.map((bx) => r2(f(bx))));
   const run = (live: boolean, fn: () => void) => (live ? fn() : doc.change(fn));
-  return (
-    <Section title="Layout">
+  if (part === 'position')
+    return (
       <div className="grid2">
         <NumberField
           label="X"
@@ -715,20 +749,23 @@ function BoxLayout({ ids }: { ids: NodeId[] }) {
           value={val((bx) => bx.y)}
           onChange={(v, live) => run(live, () => boxes.forEach((bx) => moveByWorld(doc, [bx.id], 0, v - bx.y)))}
         />
-        <NumberField
-          label="W"
-          value={val((bx) => bx.b.width)}
-          min={0.01}
-          onChange={(v, live) => run(live, () => boxes.forEach((bx) => scaleBounds(doc, [bx.id], bx.b, { ...bx.b, width: v })))}
-        />
-        <NumberField
-          label="H"
-          value={val((bx) => bx.b.height)}
-          min={0.01}
-          onChange={(v, live) => run(live, () => boxes.forEach((bx) => scaleBounds(doc, [bx.id], bx.b, { ...bx.b, height: v })))}
-        />
       </div>
-    </Section>
+    );
+  return (
+    <div className="grid2">
+      <NumberField
+        label="W"
+        value={val((bx) => bx.b.width)}
+        min={0.01}
+        onChange={(v, live) => run(live, () => boxes.forEach((bx) => scaleBounds(doc, [bx.id], bx.b, { ...bx.b, width: v })))}
+      />
+      <NumberField
+        label="H"
+        value={val((bx) => bx.b.height)}
+        min={0.01}
+        onChange={(v, live) => run(live, () => boxes.forEach((bx) => scaleBounds(doc, [bx.id], bx.b, { ...bx.b, height: v })))}
+      />
+    </div>
   );
 }
 
@@ -834,72 +871,169 @@ const BOOLEAN_OPS: Array<[BooleanOperation, string]> = [
 ];
 
 /** Polygon/star settings, boolean operation, and flatten / outline stroke. */
-function ShapeSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+/** Polygon sides and star points (Count) and the star's inner radius (Ratio), in Appearance. */
+function ShapeCountFields({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
   const radial = nodes.every((n) => n.type === 'POLYGON' || n.type === 'STAR');
   const stars = nodes.every((n) => n.type === 'STAR');
-  const single = nodes.length === 1 ? nodes[0] : null;
-  const isBoolean = single?.type === 'BOOLEAN';
-  const top = editor.topLevelSelection().length;
-  const canCombine = top >= 2 || isBoolean;
+  if (!radial) return null;
   const count = common(nodes.map((n) => n.pointCount ?? 0));
   const ratio = common(nodes.map((n) => Math.round((n.innerRadius ?? 0) * 100)));
-  const hasStroke = nodes.some((n) => n.strokeWeight > 0 && n.strokes.some((st) => st.visible));
-  const canFlatten = nodes.some((n) => n.type !== 'TEXT');
-
-  if (!radial && !canCombine && !canFlatten) return null;
   return (
-    <Section title={isBoolean ? 'Boolean' : 'Shape'}>
-      {radial && (
-        <div className="grid2">
-          <NumberField
-            label="Count"
-            title={stars ? 'Number of points' : 'Number of sides'}
-            value={count}
-            min={3}
-            max={60}
-            precision={0}
-            onChange={(v, live) => apply(ids, { pointCount: Math.round(v) }, live)}
-          />
-          {stars && (
-            <NumberField
-              label="Ratio"
-              title="Inner radius"
-              value={ratio}
-              suffix="%"
-              min={1}
-              max={100}
-              precision={0}
-              onChange={(v, live) => apply(ids, { innerRadius: v / 100 }, live)}
-            />
-          )}
-        </div>
+    <div className="grid2">
+      <NumberField
+        label="Count"
+        title={stars ? 'Number of points' : 'Number of sides'}
+        value={count}
+        min={3}
+        max={60}
+        precision={0}
+        onChange={(v, live) => apply(ids, { pointCount: Math.round(v) }, live)}
+      />
+      {stars && (
+        <NumberField
+          label="Ratio"
+          title="Inner radius"
+          value={ratio}
+          suffix="%"
+          min={1}
+          max={100}
+          precision={0}
+          onChange={(v, live) => apply(ids, { innerRadius: v / 100 }, live)}
+        />
       )}
-      <div className="button-row">
-        {BOOLEAN_OPS.map(([op, label]) => (
-          <IconButton
-            key={op}
-            title={label}
-            disabled={!canCombine}
-            active={isBoolean && single?.booleanOperation === op}
-            onClick={() => booleanSelection(editor, op)}
-          >
-            <BooleanIcon op={op} />
+    </div>
+  );
+}
+
+const TYPE_NAMES: Partial<Record<SceneNode['type'], string>> = {
+  FRAME: 'Frame',
+  GROUP: 'Group',
+  SECTION: 'Section',
+  COMPONENT: 'Component',
+  COMPONENT_SET: 'Component set',
+  INSTANCE: 'Instance',
+  RECTANGLE: 'Rectangle',
+  ELLIPSE: 'Ellipse',
+  POLYGON: 'Polygon',
+  STAR: 'Star',
+  LINE: 'Line',
+  VECTOR: 'Vector',
+  TEXT: 'Text',
+  BOOLEAN: 'Boolean',
+  SLICE: 'Slice',
+  CODE_SNIPPET: 'Code snippet',
+  CODE_LAYER: 'Code',
+  SPEC: 'Spec',
+};
+
+/**
+ * The top of the Design tab, as in Figma: the layer type (or the layer's
+ * name and type), with quick buttons for Create component, Use as mask and
+ * the boolean operations.
+ */
+function PanelHeader({ nodes }: { nodes: SceneNode[] }) {
+  const [boolOpen, setBoolOpen] = useState(false);
+  const types = common(nodes.map((n) => n.type));
+  const typeName = types === MIXED ? 'Mixed' : (TYPE_NAMES[types] ?? types.toLowerCase());
+  const single = nodes.length === 1 ? nodes[0] : null;
+  const isBoolean = single?.type === 'BOOLEAN';
+  const canCombine = editor.topLevelSelection().length >= 2 || isBoolean;
+  const canComponent = !(single && ['COMPONENT', 'INSTANCE', 'COMPONENT_SET'].includes(single.type));
+  return (
+    <div className="props-title panel-header">
+      <span className="panel-header-name" title={single?.name}>
+        <b>{typeName}</b>
+        {nodes.length > 1 && <span className="props-type">{nodes.length} layers</span>}
+      </span>
+      <span className="panel-header-actions">
+        <IconButton title="Create component (Ctrl+Alt+K)" disabled={!canComponent} onClick={() => command('create-component').run()}>
+          <Component size={14} />
+        </IconButton>
+        <IconButton title="Use as mask (Ctrl+Alt+M)" onClick={() => editor.useAsMask()}>
+          <SquareDashed size={14} />
+        </IconButton>
+        <span className="panel-header-menu">
+          <IconButton title="Boolean groups" disabled={!canCombine} active={boolOpen} onClick={() => setBoolOpen(!boolOpen)}>
+            <BooleanIcon op={isBoolean && single?.booleanOperation ? single.booleanOperation : 'UNION'} />
           </IconButton>
+          {boolOpen && canCombine && (
+            <div className="menu tool-menu" role="menu" aria-label="Boolean groups">
+              {BOOLEAN_OPS.map(([op, label]) => (
+                <button
+                  key={op}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={isBoolean && single?.booleanOperation === op}
+                  className="menu-item"
+                  onClick={() => {
+                    setBoolOpen(false);
+                    booleanSelection(editor, op);
+                  }}
+                >
+                  <span className="tool-menu-label">
+                    <BooleanIcon op={op} />
+                    {label}
+                  </span>
+                </button>
+              ))}
+              <div className="menu-divider" />
+              <button type="button" role="menuitem" className="menu-item" onClick={() => (setBoolOpen(false), void flattenSelection(editor))}>
+                <span>Flatten</span>
+                <kbd>Alt+Shift+F</kbd>
+              </button>
+              <button type="button" role="menuitem" className="menu-item" onClick={() => (setBoolOpen(false), void outlineStrokeSelection(editor))}>
+                <span>Outline stroke</span>
+                <kbd>Ctrl+Alt+O</kbd>
+              </button>
+            </div>
+          )}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Selection colors, as in Figma: every solid color in the selection and the
+ * layers inside it, with how many times it's used. Changing one changes it
+ * everywhere under the selection.
+ */
+function SelectionColorsSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const hasChildren = nodes.some((n) => editor.doc.childIds(n.id).length > 0);
+  const colors = selectionColors(editor.doc, ids);
+  // Figma shows it for groups, frames and multi-selections with more than one color.
+  if (colors.length < 2 && !(hasChildren && colors.length)) return null;
+  const editing = colors.find((c) => c.key === open);
+  const shown = colors.slice(0, 8);
+  return (
+    <Section title="Selection colors">
+      <div className="selection-colors">
+        {shown.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            className={`swatch${open === c.key ? ' active' : ''}`}
+            title={`#${rgbToHex(c.color)} · ${Math.round(c.opacity * 100)}% · used ${c.count}×`}
+            aria-label={`#${rgbToHex(c.color)}, used ${c.count} times`}
+            onClick={() => setOpen(open === c.key ? null : c.key)}
+          >
+            <span className="swatch-color" style={{ background: rgbaCss(c.color, c.opacity) }} />
+          </button>
         ))}
-        <span className="spacer" />
-        <button type="button" className="btn small" disabled={!canFlatten} onClick={() => void flattenSelection(editor)} title="Flatten (Ctrl+E)">
-          Flatten
-        </button>
-        <button
-          type="button"
-          className="btn small"
-          disabled={!hasStroke}
-          onClick={() => void outlineStrokeSelection(editor)}
-          title="Outline stroke (Ctrl+Alt+O)"
-        >
-          Outline
-        </button>
+        {colors.length > shown.length && <span className="hint">+{colors.length - shown.length}</span>}
       </div>
+      {editing && (
+        <ColorPicker
+          color={editing.color}
+          opacity={editing.opacity}
+          onChange={(color, opacity) => {
+            // The edited color gets a new key: follow it so the picker stays open.
+            editor.doc.change(() => replaceSelectionColor(editor.doc, ids, editing.key, color, opacity), { merge: true });
+            setOpen(`${rgbToHex(color)}/${Math.round(opacity * 100)}`);
+          }}
+        />
+      )}
     </Section>
   );
 }
