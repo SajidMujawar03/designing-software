@@ -1,4 +1,4 @@
-import type { NodeId, TextStyleProps } from '@figma/document';
+import type { NodeId, TextStyleProps, VectorPath } from '@figma/document';
 import type { Rect, Vec2 } from '@figma/geometry';
 import { create } from 'zustand';
 import type { SnapGuides } from './snapping';
@@ -15,6 +15,7 @@ export type ToolId =
   | 'code'
   | 'brush'
   | 'width'
+  | 'shapes'
   | 'rectangle'
   | 'ellipse'
   | 'polygon'
@@ -33,6 +34,9 @@ export interface SpecFocus {
   at?: 'start' | 'end';
   select?: boolean;
 }
+
+/** Vector edit mode's actions (as in Figma): Move, Lasso, Bend, Cut, Eraser, Paint. */
+export type VectorMode = 'move' | 'lasso' | 'bend' | 'cut' | 'eraser' | 'paint';
 
 /** A point on a vector path: [path index, point index]. */
 export type PointRef = [number, number];
@@ -95,7 +99,13 @@ export interface UIState {
   /** Alt held: measure distances to hovered layers. */
   altHeld: boolean;
   /** Editing a vector's points and handles. */
-  vectorEdit: { id: NodeId; selected: PointRef[] } | null;
+  vectorEdit: { id: NodeId; selected: PointRef[]; mode?: VectorMode } | null;
+  /** A lasso loop, eraser stroke or cut line being drawn in vector edit mode (canvas coordinates). */
+  editStroke: { kind: 'lasso' | 'eraser' | 'cut'; points: Vec2[]; radius?: number } | null;
+  /** Paint's fill color. */
+  paintColor: string;
+  /** Shape builder: the regions under the pointer or being picked (canvas coordinates), and whether Alt (remove) is held. */
+  shapeHover: { pieces: VectorPath[][]; remove: boolean } | null;
   /** Pen tool: rubber-band segment from the last point to the pointer (canvas coords). */
   penPreview: { from: Vec2; c1: Vec2; to: Vec2 } | null;
   /** Paint being edited in the paint popover (and on canvas, for gradients). */
@@ -167,6 +177,9 @@ export const useUI = create<UIState>()(() => ({
   protoDrag: null,
   altHeld: false,
   vectorEdit: null,
+  editStroke: null,
+  paintColor: '#FFC700',
+  shapeHover: null,
   penPreview: null,
   paintEdit: null,
   textSelection: null,

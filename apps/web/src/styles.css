@@ -4869,3 +4869,44 @@ a.btn {
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* ---------- vector edit actions ---------- */
+
+.vector-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 18;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.vector-bar-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: #2c2c2c;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.vector-bar-tools .tool-btn {
+  width: 32px;
+  height: 32px;
+}
+.vector-bar-tools .divider {
+  height: 20px;
+}
+.vector-bar-done {
+  margin-left: 2px;
+}
+.vector-bar-hint {
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(30, 30, 30, 0.75);
+  color: #fff;
+  white-space: nowrap;
+}
