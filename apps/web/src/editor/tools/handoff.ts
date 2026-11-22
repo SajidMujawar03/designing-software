@@ -1,4 +1,4 @@
-import { addAnnotation, createCodeSnippet, createSpec, hitTest, sealedRoot, snippetTextOf, worldTransform } from '@figma/document';
+import { addMeasurement, addAnnotation, createCodeSnippet, createSpec, hitTest, sealedRoot, snippetTextOf, worldTransform } from '@figma/document';
 import { applyToPoint, invert } from '@figma/geometry';
 import type { Editor } from '../editor';
 import type { Tool, ToolEvent } from './types';
@@ -52,6 +52,55 @@ export class AnnotateTool implements Tool {
     this.ed.select([hit.id]);
     this.ed.setUI({ editingAnnotation: { nodeId: hit.id, id } });
     this.ed.setTool('select');
+  }
+}
+
+/**
+ * Measurement (Shift+M in Dev Mode): click a layer, then another, to pin the
+ * distances between them. Stays on for more measurements; Esc starts over.
+ */
+export class MeasureTool implements Tool {
+  cursor = 'crosshair';
+  private from: string | null = null;
+  constructor(private ed: Editor) {}
+
+  private hit(e: ToolEvent): string | null {
+    const doc = this.ed.doc;
+    const hit = hitTest(doc, this.ed.pageId, e.world, { tolerance: 4 / this.ed.ui.viewport.zoom });
+    return hit ? (sealedRoot(doc, hit.id) ?? hit).id : null;
+  }
+
+  down(_e: ToolEvent): void {
+    this.ed.commitTextEdit();
+  }
+
+  move(_e: ToolEvent): void {}
+
+  hover(e: ToolEvent): void {
+    const id = this.hit(e);
+    if (id !== this.ed.ui.hoverId) this.ed.setUI({ hoverId: id });
+  }
+
+  up(e: ToolEvent): void {
+    const id = this.hit(e);
+    if (!id) return this.cancel();
+    if (!this.from || this.from === id) {
+      // First layer: selected, so the distance to the hovered one shows while choosing the second.
+      this.from = id;
+      this.ed.select([id]);
+      return;
+    }
+    const doc = this.ed.doc;
+    doc.change(() => addMeasurement(doc, this.ed.pageId, this.from!, id));
+    this.from = null;
+  }
+
+  cancel(): void {
+    this.from = null;
+  }
+
+  deactivate(): void {
+    this.from = null;
   }
 }
 

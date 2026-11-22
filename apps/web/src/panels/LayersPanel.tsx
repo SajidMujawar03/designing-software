@@ -2,6 +2,7 @@ import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/
 import { Boxes, Braces, FileText, SquareCode, Combine, Component, Contrast, Diamond, Image as ImageIcon, ImageOff, PanelTop, Slice, Star, Triangle } from 'lucide-react';
 import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Search, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
 import { create } from 'zustand';
+import { devStatusLayers } from '@figma/document';
 import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -67,6 +68,7 @@ export function LayersPanel() {
       ) : (
         <>
           <PagesList />
+          <ReadyForDevList />
           <div className="panel-head">
             Layers
             <ThumbnailsToggle />
@@ -93,6 +95,33 @@ function InlineRename({ value, onDone }: { value: string; onDone: (v: string | n
         if (e.key === 'Escape') onDone(null);
       }}
     />
+  );
+}
+
+/** Dev Mode (the Inspect tab): the page's layers marked Ready for dev, above the layers, as in Figma. */
+function ReadyForDevList() {
+  const devMode = useUI((st) => st.rightTab === 'inspect' && !st.drawMode && !st.motionMode);
+  const pageId = useUI((st) => st.pageId);
+  const selection = useUI((st) => st.selection);
+  if (!devMode) return null;
+  const list = pageId ? devStatusLayers(editor.doc, pageId) : [];
+  return (
+    <div className="pages ready-for-dev">
+      <div className="panel-head">Ready for development</div>
+      {!list.length && <div className="hint pad">Nothing yet. Select a frame and use Mark as ready for dev in the Inspect tab.</div>}
+      {list.map((n) => (
+        <div
+          key={n.id}
+          className={`page-row${selection.includes(n.id) ? ' current' : ''}`}
+          onClick={() => {
+            editor.select([n.id]);
+            editor.zoomToSelection();
+          }}
+        >
+          <span className="name">{n.name}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

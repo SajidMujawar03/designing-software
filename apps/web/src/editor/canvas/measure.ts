@@ -1,8 +1,10 @@
-import { worldBounds } from '@figma/document';
+import { measurementsOf, worldBounds } from '@figma/document';
 import { rectUnion, type Rect } from '@figma/geometry';
 import type { Editor } from '../editor';
 
 const RED = '#F24822';
+/** Pinned measurements: Figma's measurement pink. */
+const PINNED = '#E8338E';
 
 /**
  * Distances from the selection to the hovered layer (or, with Alt and
@@ -22,7 +24,21 @@ export function drawMeasurements(ctx: CanvasRenderingContext2D, ed: Editor): voi
   }
   if (!target || !doc.has(target)) return;
   const a = rectUnion(sel.map((id) => worldBounds(doc, id)))!;
-  const b = worldBounds(doc, target);
+  drawGap(ctx, ed, a, worldBounds(doc, target), RED, true);
+}
+
+/**
+ * Dev Mode measurements pinned between two layers (the Measurement tool, Shift+M):
+ * drawn in the Inspect tab, and in Design mode while annotations are shown.
+ */
+export function drawPinnedMeasurements(ctx: CanvasRenderingContext2D, ed: Editor, show: boolean): void {
+  if (!show && ed.ui.rightTab !== 'inspect' && ed.ui.tool !== 'measure') return;
+  for (const m of measurementsOf(ed.doc, ed.pageId)) drawGap(ctx, ed, worldBounds(ed.doc, m.from), worldBounds(ed.doc, m.to), PINNED, false);
+}
+
+/** Distances between two boxes: red lines with values, in screen space; `outline` also frames the second box. */
+function drawGap(ctx: CanvasRenderingContext2D, ed: Editor, a: Rect, b: Rect, color: string, outline: boolean): void {
+  const RED = color;
   const z = ed.ui.viewport.zoom;
   const S = (p: { x: number; y: number }) => ed.worldToScreen(p);
 
@@ -31,7 +47,7 @@ export function drawMeasurements(ctx: CanvasRenderingContext2D, ed: Editor): voi
   ctx.lineWidth = 1;
   // The measured-to layer.
   const tl = S({ x: b.x, y: b.y });
-  ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, b.width * z, b.height * z);
+  if (outline) ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, b.width * z, b.height * z);
 
   const line = (x1: number, y1: number, x2: number, y2: number) => {
     const p = S({ x: x1, y: y1 });

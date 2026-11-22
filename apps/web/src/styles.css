@@ -6066,3 +6066,38 @@ a.btn {
   padding-left: 2px;
   padding-right: 2px;
 }
+
+/* ---------- Dev Mode: status, measurements, layer properties view ---------- */
+
+.dev-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.dev-ready-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #14ae5c;
+  font-weight: 600;
+}
+.inspect-view-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 4px 0;
+}
+.inspect-view-toggle .code-tabs {
+  width: auto;
+  margin-bottom: 0;
+}
+.inspect-view-toggle .code-tabs button {
+  flex: none;
+  padding: 3px 12px;
+}
+.ready-for-dev {
+  border-bottom: 1px solid var(--border);
+}

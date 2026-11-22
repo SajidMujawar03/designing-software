@@ -6,7 +6,7 @@ import { SelectTool } from './select';
 import { CommentTool } from './comment';
 import { WidthTool } from './width';
 import { ShapeBuilderTool } from './shapeBuilder';
-import { AnnotateTool, CodeSnippetTool, SpecTool } from './handoff';
+import { AnnotateTool, CodeSnippetTool, MeasureTool, SpecTool } from './handoff';
 import { BrushTool, PenTool, VectorEditTool } from './vector';
 import type { Tool } from './types';
 
@@ -19,6 +19,7 @@ export function createTools(ed: Editor): Record<ToolId, Tool> {
     scale: new SelectTool(ed, { scale: true }),
     snippet: new CodeSnippetTool(ed),
     annotate: new AnnotateTool(ed),
+    measure: new MeasureTool(ed),
     spec: new SpecTool(ed),
     code: new ShapeTool(ed, 'CODE_LAYER', { name: 'Code layer', props: { codeFiles: SAMPLE_CODE_FILES } }),
     rectangle: new ShapeTool(ed, 'RECTANGLE'),

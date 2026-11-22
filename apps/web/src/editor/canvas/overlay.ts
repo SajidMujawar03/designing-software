@@ -1,5 +1,5 @@
 import { gridLines, gridSpans, pathTrack, isFrameLike, isGroupLike, worldBounds, worldTransform, type NodeId, type SceneNode } from '@figma/document';
-import { drawMeasurements } from './measure';
+import { drawMeasurements, drawPinnedMeasurements } from './measure';
 import { drawPrototype } from './prototypeOverlay';
 import { drawAnnotations } from './annotationsOverlay';
 import { drawWidthHandles } from './widthOverlay';
@@ -98,6 +98,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
   };
 
   if (hoverId && !selected.has(hoverId) && prefs().highlightHover) outline(hoverId, 1.5);
+  drawPinnedMeasurements(ctx, ed, prefs().showAnnotations);
   drawMeasurements(ctx, ed);
   drawPrototype(ctx, ed);
   drawAnnotations(ctx, ed);

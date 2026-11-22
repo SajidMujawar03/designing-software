@@ -1,4 +1,4 @@
-import { CodeXml, Diamond, PanelLeftClose, PenLine, Shapes, Braces, NotebookPen, LayoutGrid, Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { Ruler, CodeXml, Diamond, PanelLeftClose, PenLine, Shapes, Braces, NotebookPen, LayoutGrid, Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -53,6 +53,7 @@ const T = {
   spec: { id: 'spec', label: 'Spec', key: 'D', Icon: FileText },
   snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
   annotate: { id: 'annotate', label: 'Annotation', key: 'Shift+T', Icon: NotebookPen },
+  measure: { id: 'measure', label: 'Measurement', key: 'Shift+M', Icon: Ruler },
   hand: { id: 'hand', label: 'Hand tool', key: 'H', Icon: Hand },
   comment: { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
   image: { id: 'image', label: 'Image/video…', key: 'Ctrl+Shift+K', Icon: ImageIcon, run: () => void placeImages() },
@@ -69,6 +70,9 @@ const CODE: Slot = { name: 'Code tools', tools: [T.code, T.spec, T.snippet, T.an
 const COMMENT: Slot = { tools: [T.comment] };
 
 const TOOLS: Slot[] = [MOVE, REGION, SHAPE, CREATION, TYPE, CODE, COMMENT];
+
+/** Dev Mode's toolbar, as in Figma: moving, Annotation, Measurement and comments. */
+const DEV_TOOLS: Slot[] = [MOVE, { tools: [T.annotate] }, { tools: [T.measure] }, COMMENT];
 
 /** Draw mode's toolbar, as in Figma Draw: Pen, Brush and Pencil after Move, then the usual slots. */
 const DRAW_TOOLS: Slot[] = [MOVE, { tools: [T.pen] }, { tools: [T.brush] }, { tools: [T.pencil] }, REGION, SHAPE, TYPE, CODE, COMMENT];
@@ -148,9 +152,10 @@ export function FloatingToolbar() {
   useDocVersion();
   const tool = useUI((s) => s.tool);
   const drawMode = useUI((s) => s.drawMode);
+  const devMode = useUI((s) => s.rightTab === 'inspect' && !s.drawMode && !s.motionMode);
   return (
     <div className="floating-toolbar" role="toolbar" aria-label="Tools" onPointerDown={(e) => e.stopPropagation()}>
-      {(drawMode ? DRAW_TOOLS : TOOLS).filter((g) => g.tools[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
+      {(drawMode ? DRAW_TOOLS : devMode ? DEV_TOOLS : TOOLS).filter((g) => g.tools[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
         <ToolSlot key={g.name ?? g.tools[0].id} slot={g} tool={tool} />
       ))}
       <button type="button" className="tool-btn" title="Actions (Ctrl+K)" aria-label="Actions" onClick={() => editor.setUI({ paletteOpen: true })}>

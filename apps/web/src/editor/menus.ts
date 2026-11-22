@@ -46,6 +46,7 @@ export const EDITOR_MENUS = (): Menu[] => [
     items: [
       'layout-grids',
       'clear-guides',
+      'clear-measurements',
       'rulers',
       'show-annotations',
       'multiplayer-cursors',

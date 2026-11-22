@@ -11,6 +11,7 @@ export type ToolId =
   | 'scale'
   | 'snippet'
   | 'annotate'
+  | 'measure'
   | 'spec'
   | 'code'
   | 'brush'
