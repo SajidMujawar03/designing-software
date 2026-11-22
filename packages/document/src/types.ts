@@ -287,6 +287,14 @@ export interface SceneNode {
   /** TEXT on a path: the path it runs along (in its box), where it starts (0–1) and which side it's on. */
   textPath?: { path: VectorPath; offset: number; flipped: boolean } | null;
 
+  /** Top-level FRAME with a Motion timeline (Figma Motion): how long it runs and how it repeats. */
+  motion?: MotionTimeline | null;
+  /** Motion keyframes on this layer's properties, by property. */
+  keyframes?: Partial<Record<MotionProperty, Keyframe[]>> | null;
+  /** Motion's Scale X/Y (1 = 100%), around the box center. Only ever set on posed nodes during playback, never stored. */
+  motionScaleX?: number;
+  motionScaleY?: number;
+
   // CODE_LAYER: its files, and which version of them its snapshot (image fill) shows.
   codeFiles?: CodeFiles;
   codeSnapshotKey?: string;
@@ -610,3 +618,70 @@ export const isAutoLayout = (n: SceneNode | undefined | null): boolean =>
 /** A child placed by its auto layout parent (rather than positioned freely). */
 export const isLayoutChild = (n: SceneNode, parent: SceneNode | undefined | null): boolean =>
   isAutoLayout(parent) && n.layoutPositioning !== 'ABSOLUTE';
+
+// ------------------------------------------------------------ motion
+
+/** A frame's Motion timeline. */
+export interface MotionTimeline {
+  /** Milliseconds (Figma's default: 2000). */
+  duration: number;
+  playback: MotionPlayback;
+}
+
+export type MotionPlayback = 'LOOP' | 'ONCE' | 'PING_PONG';
+
+/** Properties Motion can keyframe. Colors are the top solid fill/stroke; blur is the first layer blur. */
+export type MotionProperty =
+  | 'x'
+  | 'y'
+  | 'rotation'
+  | 'scaleX'
+  | 'scaleY'
+  | 'opacity'
+  | 'width'
+  | 'height'
+  | 'cornerRadius'
+  | 'fillColor'
+  | 'strokeColor'
+  | 'strokeWeight'
+  | 'blur';
+
+/** One property's value at a time on the timeline. */
+export interface Keyframe {
+  id: string;
+  /** Milliseconds from the timeline start. */
+  time: number;
+  /** A number, or a color as hex RGBA (RRGGBBAA). */
+  value: number | string;
+  /** Easing of the segment from this keyframe to the next. */
+  easing: MotionEasing;
+}
+
+export type MotionEasingPreset =
+  | 'LINEAR'
+  | 'EASE_IN'
+  | 'EASE_OUT'
+  | 'EASE_IN_AND_OUT'
+  | 'EASE_IN_BACK'
+  | 'EASE_OUT_BACK'
+  | 'EASE_IN_AND_OUT_BACK'
+  | 'HOLD';
+
+export type SpringPreset = 'GENTLE' | 'QUICK' | 'BOUNCY' | 'SLOW';
+
+/** Easing between two keyframes, as in Figma Motion: presets, a custom Bézier curve, or a spring. */
+export type MotionEasing =
+  | { type: MotionEasingPreset }
+  | { type: 'BEZIER'; x1: number; y1: number; x2: number; y2: number }
+  | {
+      type: 'SPRING';
+      preset?: SpringPreset;
+      /** TIME: bounce (0–1) over a duration. PHYSICS: stiffness, damping and mass; its length follows from them. */
+      mode: 'TIME' | 'PHYSICS';
+      bounce?: number;
+      /** Milliseconds (TIME); defaults to the segment's length. */
+      duration?: number;
+      stiffness?: number;
+      damping?: number;
+      mass?: number;
+    };

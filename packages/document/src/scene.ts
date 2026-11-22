@@ -26,13 +26,15 @@ const DEG = Math.PI / 180;
 /** Node box to parent space. Rotation is around the box center. */
 export function localTransform(n: SceneNode): Mat2D {
   if (!hasOwnTransform(n)) return IDENTITY;
-  if (!n.rotation) return translation(n.x, n.y);
+  const sx = n.motionScaleX ?? 1;
+  const sy = n.motionScaleY ?? 1;
+  if (!n.rotation && sx === 1 && sy === 1) return translation(n.x, n.y);
   const cx = n.width / 2;
   const cy = n.height / 2;
-  return multiply(
-    multiply(translation(n.x + cx, n.y + cy), rotation(n.rotation * DEG)),
-    translation(-cx, -cy),
-  );
+  // Rotation and Motion's scale both turn around the box center.
+  let m = multiply(translation(n.x + cx, n.y + cy), rotation((n.rotation || 0) * DEG));
+  if (sx !== 1 || sy !== 1) m = multiply(m, [sx, 0, 0, sy, 0, 0]);
+  return multiply(m, translation(-cx, -cy));
 }
 
 /** Node box to canvas (page) space. */
