@@ -209,16 +209,17 @@ Matches Figma's "Type text on a path" ([Guide to text](https://help.figma.com/hc
 
 ---
 
-### Phase F9: Motion timeline (outline; gets its own plan)
-About 3–4 weeks
+### Phase F9: Motion timeline
+About 3 weeks for M1–M4, plus M5–M7 later. The full plan is in [motion-plan.md](motion-plan.md).
 
-- **Mode:** a "Motion" mode (beta) with a timeline panel under the canvas: play/pause, a time counter, a seconds ruler, one track per animated layer, and zoom.
-- **Model:** `animations` per node, holding keyframes on properties (position, size, rotation, opacity, fills, corner radius) with easing. Uses the existing easing curves from the prototype's smart animate.
-- **Playback:** interpolates properties at time t and renders without changing the document. Scrubbing updates the canvas live.
-- **Export:** MP4 or GIF (WebCodecs in the browser, Electron in the desktop app), and Lottie JSON later.
-- **Prototype:** the presenter can play a frame's timeline when the frame opens.
+It follows Figma Motion (beta):
+- a Motion mode with a timeline under the canvas (play, scrub, duration, Loop/Once/Ping-pong);
+- keyframes on 12 properties, with auto-keyframe and the diamond beside each field;
+- easing presets, custom Bézier curves and springs;
+- MP4, WebM and GIF export of top-level frames;
+- an Inspect Motion tab with CSS/JSON code, and the presenter playing timelines.
 
-Before starting, write `docs/motion-plan.md` with the data model, the playback loop, and how keyframes interact with auto layout and components.
+Keyframes are optional fields (`motion` on top-level frames, `keyframes` on layers), so there's no schema bump. Playback poses the renderers without changing the document.
 
 ## 4. Order and estimates
 
@@ -233,7 +234,7 @@ Before starting, write `docs/motion-plan.md` with the data model, the playback l
 | F6 | Draw mode and brushes | ~5 days | Optional fields |
 | F7 | Width profiles and draw actions | 1–2 weeks | Optional fields |
 | F8 | Text on path | ~1 week | Optional fields |
-| F9 | Motion timeline | 3–4 weeks | **v6** (separate plan) |
+| F9 | Motion timeline | ~3 weeks (M1–M4) + M5–M7 | Optional fields ([motion-plan.md](motion-plan.md)) |
 
 F1–F3 can ship in any order. F5b builds on F5's tokenizer. F7 needs F6. F9 is best done last.
 
