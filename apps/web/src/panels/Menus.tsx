@@ -104,7 +104,8 @@ interface Entry {
 const matches = (q: string, ...texts: Array<string | undefined>) => !q || texts.some((t) => t?.toLowerCase().includes(q));
 
 function commandEntries(q: string): Entry[] {
-  const found = COMMANDS.filter((c) => isEnabled(c) && matches(q, c.label, c.id));
+  const debug = new URLSearchParams(location.search).has('debug');
+  const found = COMMANDS.filter((c) => isEnabled(c) && (!c.debug || debug) && matches(q, c.label, c.id));
   // Before searching, view settings come last under their own heading.
   const ordered = q ? found : [...found.filter((c) => !c.setting), ...found.filter((c) => c.setting)];
   return ordered.map((c, i) => ({
@@ -156,7 +157,7 @@ const TABS: Array<[PaletteTab, string]> = [
   ['plugins', 'Plugins & widgets'],
 ];
 
-/** Ctrl+/ (or Ctrl+K): search and run commands, insert components and run plugins. */
+/** Actions (Ctrl+K, or Ctrl+/): search and run commands, insert components and run plugins. */
 export function CommandPalette() {
   const open = useUI((s) => s.paletteOpen);
   const [query, setQuery] = useState('');
@@ -200,7 +201,7 @@ export function CommandPalette() {
 
   return (
     <div className="palette-backdrop" onPointerDown={close}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="Quick actions" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label="Actions" onPointerDown={(e) => e.stopPropagation()}>
         <input
           ref={input}
           autoFocus

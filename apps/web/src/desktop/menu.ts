@@ -6,6 +6,7 @@ import { allPlugins, notify, runPlugin, usePlugins } from '../plugins/host';
 import type { MenuModel, MenuModelItem, NativeEditAction } from './api';
 import { bridgeMessage, renameDisk, saveDiskAs, saveNow, useDiskFile } from './diskFile';
 import { usePrefs } from '../editor/prefs';
+import { EDITOR_MENUS, FILE_ITEMS, type MenuEntry } from '../editor/menus';
 import { desktop } from '.';
 
 /**
@@ -16,7 +17,7 @@ import { desktop } from '.';
  * key handling still runs them, so typing in text fields works as before.
  */
 
-type Entry = string | '-' | { label: string; items: Entry[] };
+type Entry = MenuEntry;
 
 /** Actions that aren't editor commands (files on disk, plugins). */
 const ACTIONS: Record<string, { label: string; shortcut?: string; run: () => void; enabled?: () => boolean }> = {
@@ -54,79 +55,12 @@ function fileEntries(): Entry[] {
   return [
     ...(disk ? ['file:save', 'file:saveAs', 'file:rename', 'file:showInFolder', '-', 'file:upload'] : ['file:saveCopy']),
     '-',
-    'place-image',
-    'export-selection',
-    'export-json',
+    ...FILE_ITEMS,
   ];
 }
 
-const MENUS = (): Array<{ label: string; items: Entry[] }> => [
-  { label: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'select-all', 'find-replace', '-', 'copy-png', 'copy-svg'] },
-  {
-    label: 'View',
-    items: [
-      'zoom-in',
-      'zoom-out',
-      'zoom-100',
-      'zoom-fit',
-      'zoom-selection',
-      '-',
-      'rulers',
-      'clear-guides',
-      '-',
-      'snap-pixel',
-      'multiplayer-cursors',
-      'layer-thumbnails',
-      'show-annotations',
-      'nudge-amount',
-      '-',
-      'minimize-ui',
-      'hide-ui',
-      '-',
-      { label: 'Theme', items: ['theme-light', 'theme-dark', 'theme-system'] },
-    ],
-  },
-  {
-    label: 'Object',
-    items: [
-      'group',
-      'ungroup',
-      'frame-selection',
-      '-',
-      'create-component',
-      'detach-instance',
-      'reset-instance',
-      'go-to-main',
-      '-',
-      'add-auto-layout',
-      'remove-auto-layout',
-      '-',
-      'use-as-mask',
-      'flatten',
-      'outline-stroke',
-      { label: 'Boolean', items: ['union', 'subtract', 'intersect', 'exclude'] },
-      '-',
-      'toggle-visible',
-      'toggle-locked',
-      '-',
-      'add-page',
-    ],
-  },
-  {
-    label: 'Arrange',
-    items: [
-      'front',
-      'forward',
-      'backward',
-      'back',
-      '-',
-      { label: 'Align', items: ['align-left', 'align-hcenter', 'align-right', '-', 'align-top', 'align-vcenter', 'align-bottom'] },
-      { label: 'Distribute', items: ['distribute-h', 'distribute-v'] },
-    ],
-  },
-  { label: 'Plugins', items: ['plugins', '-', ...allPlugins().map((p) => `plugin:${p.id}`)] },
-  { label: 'Help', items: ['shortcuts', 'tour', 'variables', 'libraries'] },
-];
+/** Edit through Help come from the shared list, so the desktop menu bar matches the web Main menu. */
+const MENUS = (): Array<{ label: string; items: Entry[] }> => EDITOR_MENUS();
 
 /** Editor shortcut text → an Electron accelerator ('Ctrl+Shift+Z' → 'CmdOrCtrl+Shift+Z'). */
 export function toAccelerator(shortcut: string | undefined): string | undefined {

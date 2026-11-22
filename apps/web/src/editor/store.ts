@@ -91,6 +91,8 @@ export interface UIState {
   /** Open context menu position (CSS px in the window). */
   contextMenu: { x: number; y: number } | null;
   paletteOpen: boolean;
+  /** Bumped by Collapse layers (Alt+L): the layers panel closes every group. */
+  collapseLayers: number;
   /** The nudge amount dialog. */
   nudgeOpen: boolean;
   /** The find and replace panel (Ctrl+F). */
@@ -188,6 +190,7 @@ export const useUI = create<UIState>()(() => ({
   showRulers: true,
   contextMenu: null,
   paletteOpen: false,
+  collapseLayers: 0,
   nudgeOpen: false,
   findOpen: false,
   editingAnnotation: null,

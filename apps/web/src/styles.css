@@ -164,6 +164,50 @@ button {
   margin-right: 6px;
 }
 
+/* The Main menu: the logo button, its menu and the flyout submenus. */
+.main-menu {
+  position: relative;
+  margin-right: 6px;
+}
+.logo-btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--blue);
+  font-size: 16px;
+  cursor: pointer;
+}
+.logo-btn:hover,
+.logo-btn[aria-expanded='true'] {
+  background: var(--toolbar-hover);
+}
+.main-menu-list {
+  left: 0;
+  right: auto;
+  top: 40px;
+  width: max-content;
+  min-width: 220px;
+  z-index: 50;
+}
+.main-menu-list .menu-item kbd {
+  flex-shrink: 0;
+}
+.main-menu-list .menu-item {
+  align-items: center;
+  gap: 24px;
+  min-height: 28px;
+  white-space: nowrap;
+}
+.submenu {
+  position: relative;
+}
+.main-menu-list .submenu-list {
+  left: 100%;
+  top: -6px;
+}
+
 .tool-btn {
   display: grid;
   place-items: center;

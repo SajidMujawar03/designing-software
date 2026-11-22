@@ -351,6 +351,7 @@ export function CanvasView() {
       const id = hit && (ev.mod ? hit.id : selectableAncestor(editor.doc, hit.id, editor.ui.selection));
       if (!id) editor.select([]);
       else if (!editor.ui.selection.includes(id)) editor.select([id]);
+      editor.contextPoint = ev.world;
       editor.setUI({ contextMenu: { x: e.clientX, y: e.clientY } });
     };
     canvas.addEventListener('contextmenu', onContext);

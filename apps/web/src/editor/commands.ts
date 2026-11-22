@@ -10,6 +10,28 @@ import { editor } from './editor';
 import { placeImages } from './shortcuts';
 import { prefs, setPrefs, toggleHiddenUI, toggleMinimizedUI } from './prefs';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
+import {
+  canPickColor,
+  copyProperties,
+  distributeSelection,
+  hasCopiedProperties,
+  hideOtherLayers,
+  packSelection,
+  pasteHere,
+  pasteProperties,
+  pickColor,
+  removeFill,
+  removeStroke,
+  rotateSelection,
+  roundToPixel,
+  selectInverse,
+  selectMatchingLayers,
+  stepFrame,
+  stepPage,
+  swapFillAndStroke,
+  tidyUpSelection,
+  toggleTextStyle,
+} from './objectCommands';
 import { copyAsPng, copyAsSvg, exportJson, exportLayers, saveFiles } from './export';
 
 export interface Command {
@@ -23,6 +45,8 @@ export interface Command {
   checked?: () => boolean;
   /** Listed under "Common settings" when the palette opens. */
   setting?: boolean;
+  /** Developer commands: only listed with ?debug in the address. */
+  debug?: boolean;
 }
 
 const hasSelection = () => editor.ui.selection.length > 0;
@@ -39,6 +63,7 @@ const canMakeComponent = () => {
   const sel = editor.selectedNodes();
   return sel.length > 0 && !(sel.length === 1 && ['COMPONENT', 'INSTANCE', 'COMPONENT_SET'].includes(sel[0].type));
 };
+const hasText = () => editor.selectedNodes().some((n) => n.type === 'TEXT') || !!editor.ui.editingTextId;
 const hasInstance = () => editor.selectedNodes().some((n) => n.type === 'INSTANCE');
 
 /** Every user command, used by the context menu and the command palette. */
@@ -70,12 +95,12 @@ export const COMMANDS: Command[] = [
   { id: 'share', label: 'Share…', run: () => editor.setUI({ shareOpen: true }), enabled: () => location.pathname.startsWith('/file/') },
   {
     id: 'version-history',
-    label: 'Version history',
+    label: 'Show version history',
     run: () => editor.setUI({ historyOpen: true }),
     enabled: () => location.pathname.startsWith('/file/'),
   },
   { id: 'libraries', label: 'Libraries', run: () => editor.setUI({ librariesOpen: true }) },
-  { id: 'variables', label: 'Local variables', shortcut: 'Ctrl+Alt+V', run: () => editor.setUI({ variablesOpen: true }) },
+  { id: 'variables', label: 'Local variables', run: () => editor.setUI({ variablesOpen: true }) },
   { id: 'go-to-main', label: 'Go to main component', run: () => goToMainComponent(editor), enabled: hasInstance },
   {
     id: 'combine-variants',
@@ -153,12 +178,14 @@ export const COMMANDS: Command[] = [
   {
     id: 'renderer-canvaskit',
     label: 'Renderer: use CanvasKit (Skia)',
+    debug: true,
     run: () => editor.setRenderer('canvaskit'),
     enabled: () => editor.ui.rendererPref !== 'canvaskit',
   },
   {
     id: 'renderer-canvas2d',
     label: 'Renderer: use Canvas 2D',
+    debug: true,
     run: () => editor.setRenderer('canvas2d'),
     enabled: () => editor.ui.rendererPref !== 'canvas2d',
   },
@@ -170,8 +197,68 @@ export const COMMANDS: Command[] = [
   { id: 'theme-light', label: 'Theme: Light', run: () => setTheme('light') },
   { id: 'theme-dark', label: 'Theme: Dark', run: () => setTheme('dark') },
   { id: 'theme-system', label: 'Theme: Match system', run: () => setTheme('system') },
-  { id: 'benchmark-page', label: 'Create a 10,000-layer test page', run: () => void createBenchmarkPage() },
+  { id: 'benchmark-page', label: 'Create a 10,000-layer test page', debug: true, run: () => void createBenchmarkPage() },
   { id: 'export-json', label: 'Export file as JSON', run: () => exportJson() },
+
+  // Edit menu
+  { id: 'copy-properties', label: 'Copy properties', shortcut: 'Ctrl+Alt+C', run: () => copyProperties(editor), enabled: hasSelection },
+  { id: 'paste-properties', label: 'Paste properties', shortcut: 'Ctrl+Alt+V', run: () => pasteProperties(editor), enabled: () => hasSelection() && hasCopiedProperties() },
+  { id: 'pick-color', label: 'Pick color', shortcut: 'I', run: () => void pickColor(editor), enabled: () => hasSelection() && canPickColor() },
+  { id: 'select-matching', label: 'Select matching layers', shortcut: 'Ctrl+Alt+A', run: () => selectMatchingLayers(editor), enabled: hasSelection },
+  { id: 'select-none', label: 'Select none', shortcut: 'Esc', run: () => editor.select([]), enabled: hasSelection },
+  { id: 'select-inverse', label: 'Select inverse', shortcut: 'Ctrl+Shift+A', run: () => selectInverse(editor) },
+
+  // Object menu
+  {
+    id: 'wrap-in-section',
+    label: 'Wrap in new section',
+    run: () => editor.frameSelection('SECTION'),
+    enabled: () => editor.topLevelSelection().length > 0 && editor.selectedNodes().every((n) => editor.doc.get(n.parentId)?.type === 'PAGE'),
+  },
+  { id: 'rotate-180', label: 'Rotate 180°', run: () => rotateSelection(editor, 180), enabled: hasSelection },
+  { id: 'rotate-left', label: 'Rotate 90° left', run: () => rotateSelection(editor, -90), enabled: hasSelection },
+  { id: 'rotate-right', label: 'Rotate 90° right', run: () => rotateSelection(editor, 90), enabled: hasSelection },
+  { id: 'hide-others', label: 'Hide other layers', run: () => hideOtherLayers(editor), enabled: hasSelection },
+  { id: 'collapse-layers', label: 'Collapse layers', shortcut: 'Alt+L', run: () => editor.setUI({ collapseLayers: Date.now() }) },
+  { id: 'remove-fill', label: 'Remove fill', shortcut: 'Alt+/', run: () => removeFill(editor), enabled: hasSelection },
+  { id: 'remove-stroke', label: 'Remove stroke', run: () => removeStroke(editor), enabled: hasStroke },
+  { id: 'swap-fill-stroke', label: 'Swap fill and stroke', shortcut: 'Shift+X', run: () => swapFillAndStroke(editor), enabled: hasSelection },
+
+  // Text menu
+  { id: 'text-bold', label: 'Bold', shortcut: 'Ctrl+B', run: () => toggleTextStyle(editor, 'bold'), enabled: hasText },
+  { id: 'text-italic', label: 'Italic', shortcut: 'Ctrl+I', run: () => toggleTextStyle(editor, 'italic'), enabled: hasText },
+  { id: 'text-underline', label: 'Underline', shortcut: 'Ctrl+U', run: () => toggleTextStyle(editor, 'underline'), enabled: hasText },
+  { id: 'text-strikethrough', label: 'Strikethrough', shortcut: 'Ctrl+Shift+X', run: () => toggleTextStyle(editor, 'strikethrough'), enabled: hasText },
+
+  // Arrange menu
+  { id: 'round-to-pixel', label: 'Round to pixel', run: () => roundToPixel(editor), enabled: hasSelection },
+  { id: 'tidy-up', label: 'Tidy up', shortcut: 'Ctrl+Alt+Shift+T', run: () => tidyUpSelection(editor), enabled: multi(2) },
+  { id: 'pack-h', label: 'Pack horizontal', run: () => packSelection(editor, 'x'), enabled: multi(2) },
+  { id: 'pack-v', label: 'Pack vertical', run: () => packSelection(editor, 'y'), enabled: multi(2) },
+  { id: 'distribute-left', label: 'Distribute left', run: () => distributeSelection(editor, 'left'), enabled: multi(3) },
+  { id: 'distribute-hcenter', label: 'Distribute horizontal centers', run: () => distributeSelection(editor, 'hcenter'), enabled: multi(3) },
+  { id: 'distribute-right', label: 'Distribute right', run: () => distributeSelection(editor, 'right'), enabled: multi(3) },
+  { id: 'distribute-top', label: 'Distribute top', run: () => distributeSelection(editor, 'top'), enabled: multi(3) },
+  { id: 'distribute-vcenter', label: 'Distribute vertical centers', run: () => distributeSelection(editor, 'vcenter'), enabled: multi(3) },
+  { id: 'distribute-bottom', label: 'Distribute bottom', run: () => distributeSelection(editor, 'bottom'), enabled: multi(3) },
+
+  // View menu
+  { id: 'page-prev', label: 'Previous page', shortcut: 'PageUp', run: () => stepPage(editor, -1), enabled: () => editor.doc.pages()[0]?.id !== editor.pageId },
+  { id: 'page-next', label: 'Next page', shortcut: 'PageDown', run: () => stepPage(editor, 1), enabled: () => editor.doc.pages().at(-1)?.id !== editor.pageId },
+  { id: 'frame-prev', label: 'Zoom to previous frame', shortcut: 'Shift+N', run: () => stepFrame(editor, -1) },
+  { id: 'frame-next', label: 'Zoom to next frame', shortcut: 'N', run: () => stepFrame(editor, 1) },
+
+  // Preferences menu
+  { id: 'keep-tool', label: 'Keep tool selected after use', run: () => setPrefs({ keepToolSelected: !prefs().keepToolSelected }), checked: () => prefs().keepToolSelected },
+  { id: 'highlight-hover', label: 'Highlight layers on hover', run: () => setPrefs({ highlightHover: !prefs().highlightHover }), checked: () => prefs().highlightHover },
+
+  // Right-click menu
+  { id: 'paste-here', label: 'Paste here', run: () => void pasteHere(editor), enabled: () => editor.contextPoint !== null },
+  { id: 'add-motion', label: 'Add motion', run: () => setMotionMode(true), enabled: () => !editor.ui.motionMode },
+
+  // Main menu
+  { id: 'actions', label: 'Actions…', shortcut: 'Ctrl+K', run: () => editor.setUI({ paletteOpen: true }) },
+  { id: 'back-to-files', label: 'Back to files', run: () => location.assign('/') },
 ];
 
 export const command = (id: string): Command => COMMANDS.find((c) => c.id === id)!;
@@ -186,6 +273,7 @@ export const CANVAS_MENU = [
   'copy-png',
   'copy-svg',
   'paste',
+  'paste-here',
   'duplicate',
   'delete',
   '-',
@@ -213,10 +301,12 @@ export const CANVAS_MENU = [
   'flatten',
   'outline-stroke',
   '-',
+  'add-motion',
+  '-',
   'toggle-visible',
   'toggle-locked',
   '-',
   'zoom-selection',
 ];
 
-export const EMPTY_CANVAS_MENU = ['paste', 'select-all', '-', 'zoom-fit', 'zoom-100', 'rulers'];
+export const EMPTY_CANVAS_MENU = ['paste-here', 'select-all', '-', 'zoom-fit', 'zoom-100', 'rulers'];
