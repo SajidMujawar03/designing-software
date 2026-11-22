@@ -1,4 +1,4 @@
-import { ArrowUpRight, Braces, Brush, FileText, SquareCode, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { Spline, ArrowUpRight, Braces, Brush, FileText, SquareCode, ChevronDown, NotebookPen, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
 import { ShareButton } from './ShareDialog';
@@ -34,6 +34,7 @@ const T = {
   pencil: { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   brush: { id: 'brush', label: 'Brush', key: '', Icon: Brush },
   text: { id: 'text', label: 'Text', key: 'T', Icon: Type },
+  textPath: { id: 'textPath', label: 'Text on a path', key: '', Icon: Spline },
   code: { id: 'code', label: 'Code', key: 'B', Icon: SquareCode },
   spec: { id: 'spec', label: 'Spec', key: 'D', Icon: FileText },
   snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
@@ -54,7 +55,7 @@ const TOOLS: ToolDef[][] = [
   [T.arrow],
   [T.pen],
   [T.pencil],
-  [T.text],
+  [T.text, T.textPath],
   [T.code, T.spec, T.snippet, T.annotate],
   [T.hand],
   [T.comment],

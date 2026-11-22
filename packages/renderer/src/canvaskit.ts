@@ -6,6 +6,8 @@ import {
   pathData,
   shapePaths,
   maxWidth,
+  placeGlyphs,
+  textPathOutset,
   strokeWidthOutline,
   usesWidthProfile,
   type VectorPath,
@@ -636,6 +638,21 @@ export class CanvasKitRenderer implements SceneRenderer {
 
   private drawText(c: Canvas, n: SceneNode): void {
     if (!(n.characters ?? '')) return;
+    if (n.textPath) {
+      // Text on a path: each character placed and turned along it.
+      const glyphs = this.text.glyphs(n, this.doc!);
+      const places = placeGlyphs(n.textPath, glyphs.map((g) => g.width), n.textAlign);
+      glyphs.forEach((g, i) => {
+        const p = places[i];
+        if (!p.visible) return;
+        c.save();
+        c.translate(p.x, p.y);
+        c.rotate((p.angle * 180) / Math.PI, 0, 0);
+        c.drawParagraph(g.paragraph, -g.width / 2, -g.baseline);
+        c.restore();
+      });
+      return;
+    }
     const layout = this.text.layout(n, this.doc!);
     c.drawParagraph(layout.paragraph, 0, layout.offsetY);
   }
@@ -700,7 +717,7 @@ export function sliceArea(doc: DesignDocument, id: NodeId): { rect: Rect; roots:
 }
 
 /** What a layer draws outside its box: its stroke and effects. */
-const outset = (n: SceneNode) => effectOutset(n) + strokeOutset(n);
+const outset = (n: SceneNode) => effectOutset(n) + strokeOutset(n) + textPathOutset(n);
 
 /** On-canvas bounds grown by the layer's (and its children's) strokes and effects, for exports and caches. */
 export function renderBounds(doc: DesignDocument, id: NodeId): Rect {

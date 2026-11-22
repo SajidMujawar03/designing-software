@@ -25,6 +25,7 @@ export type ToolId =
   | 'pen'
   | 'pencil'
   | 'text'
+  | 'textPath'
   | 'hand'
   | 'comment';
 

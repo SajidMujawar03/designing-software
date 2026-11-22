@@ -1,4 +1,4 @@
-import { applyCase, baseTextStyle, hexToRgb, styledSegments, type DesignDocument, type SceneNode } from '@figma/document';
+import { applyCase, baseTextStyle, hexToRgb, paintColor, placeGlyphs, startHandle, styledSegments, type DesignDocument, type SceneNode } from '@figma/document';
 import type { CanvasKit, FontWeight, Paint as CkPaint, Paragraph, TypefaceFontProvider } from 'canvaskit-wasm';
 import { CkPaints } from './ckpaint';
 import type { FontRegistry } from './types';
@@ -17,6 +17,25 @@ export interface CaretRect {
   x: number;
   y: number;
   height: number;
+  /** Text on a path: the caret is turned by this (radians) around (x, y), its top. */
+  angle?: number;
+}
+
+/** A selection rectangle. Text on a path: relative to `origin` and turned by `angle`. */
+export interface SelectionRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  origin?: { x: number; y: number };
+  angle?: number;
+}
+
+/** One character of text on a path, laid out on its own. */
+export interface SkGlyph {
+  paragraph: Paragraph;
+  width: number;
+  baseline: number;
 }
 
 interface Cached {
@@ -33,6 +52,7 @@ export class SkText {
   private provider: TypefaceFontProvider;
   private registered = new Set<string>();
   private cache = new Map<string, Cached>();
+  private glyphCache = new Map<string, { key: string; glyphs: SkGlyph[] }>();
   private paints: CkPaints;
   /** Bumped when a font is registered, so cached layouts that used a fallback rebuild. */
   private fontVersion = 0;
@@ -177,8 +197,109 @@ export class SkText {
 
   // ------------------------------------------------------------ editing geometry (box coordinates)
 
+  // ------------------------------------------------------------ text on a path
+
+  /** Each character laid out on its own (cached until the text, styles or fonts change), for placing along a path. */
+  glyphs(n: SceneNode, doc: DesignDocument): SkGlyph[] {
+    const segs = styledSegments(n);
+    const weights = segs.map((s) => this.font(s.style.fontFamily, s.style.fontWeight, s.style.italic));
+    this.font('Inter', 400, false);
+    const key = JSON.stringify([n.characters, n.textRuns, baseTextStyle(n), n.fills, this.fontVersion]);
+    const cached = this.glyphCache.get(n.id);
+    if (cached?.key === key) return cached.glyphs;
+    if (cached) for (const g of cached.glyphs) g.paragraph.delete();
+    void doc;
+
+    const ck = this.ck;
+    const text = (n.characters ?? '').replace(/\n/g, ' ');
+    const top = [...n.fills].reverse().find((f) => f.visible);
+    const layer = top ? paintColor(top) : null;
+    const glyphs: SkGlyph[] = [];
+    segs.forEach((seg, k) => {
+      const s = seg.style;
+      const color = s.color ? hexColor(ck, s.color) : layer ? ck.Color4f(layer.color.r, layer.color.g, layer.color.b, layer.opacity) : ck.Color4f(0, 0, 0, 0);
+      const ts = {
+        color,
+        fontFamilies: [s.fontFamily, 'Inter'],
+        fontSize: s.fontSize,
+        fontStyle: { weight: this.weight(weights[k]), slant: s.italic ? ck.FontSlant.Italic : ck.FontSlant.Upright },
+        letterSpacing: s.letterSpacing,
+        heightMultiplier: s.lineHeight,
+        halfLeading: true,
+      };
+      for (const ch of applyCase(text.slice(seg.start, seg.end), s.textCase)) {
+        const builder = ck.ParagraphBuilder.MakeFromFontProvider(new ck.ParagraphStyle({ textStyle: ts }), this.provider);
+        builder.addText(ch);
+        const paragraph = builder.build();
+        builder.delete();
+        paragraph.layout(1e5);
+        glyphs.push({ paragraph, width: paragraph.getMaxIntrinsicWidth(), baseline: paragraph.getAlphabeticBaseline() });
+      }
+    });
+    this.glyphCache.set(n.id, { key, glyphs });
+    return glyphs;
+  }
+
+  /** Where each character of text on a path sits, with its width. */
+  private pathPlaces(n: SceneNode, doc: DesignDocument) {
+    const glyphs = this.glyphs(n, doc);
+    const places = placeGlyphs(n.textPath!, glyphs.map((g) => g.width), n.textAlign);
+    const size = baseTextStyle(n).fontSize;
+    return { glyphs, places, ascent: size * 0.85, descent: size * 0.25 };
+  }
+
+  /** The caret on a path: at the start of character `index` (or the end of the last), standing up from the path. */
+  private pathCaret(n: SceneNode, doc: DesignDocument, index: number): CaretRect {
+    const { glyphs, places, ascent, descent } = this.pathPlaces(n, doc);
+    const i = Math.max(0, Math.min(index, glyphs.length));
+    let x: number;
+    let y: number;
+    let angle: number;
+    if (!glyphs.length) {
+      const h = startHandle(n.textPath!);
+      [x, y, angle] = [h.x, h.y, 0];
+    } else {
+      const k = i < glyphs.length ? i : glyphs.length - 1;
+      const p = places[k];
+      const side = i < glyphs.length ? -1 : 1;
+      angle = p.angle;
+      x = p.x + Math.cos(angle) * (side * glyphs[k].width) / 2;
+      y = p.y + Math.sin(angle) * (side * glyphs[k].width) / 2;
+    }
+    // From the baseline point, up by the ascent (perpendicular to the path).
+    return { x: x + Math.sin(angle) * ascent, y: y - Math.cos(angle) * ascent, height: ascent + descent, angle };
+  }
+
+  private pathSelection(n: SceneNode, doc: DesignDocument, start: number, end: number): SelectionRect[] {
+    const { glyphs, places, ascent, descent } = this.pathPlaces(n, doc);
+    const out: SelectionRect[] = [];
+    for (let i = Math.max(0, Math.min(start, end)); i < Math.min(glyphs.length, Math.max(start, end)); i++) {
+      const p = places[i];
+      if (!p.visible) continue;
+      out.push({ left: -glyphs[i].width / 2, right: glyphs[i].width / 2, top: -ascent, bottom: descent, origin: { x: p.x, y: p.y }, angle: p.angle });
+    }
+    return out;
+  }
+
+  /** The character position nearest a point: before or after the nearest character, by which half it's on. */
+  private pathIndexAt(n: SceneNode, doc: DesignDocument, x: number, y: number): number {
+    const { glyphs, places } = this.pathPlaces(n, doc);
+    let best = -1;
+    let dist = Infinity;
+    places.forEach((p, i) => {
+      if (!p.visible) return;
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d < dist) [best, dist] = [i, d];
+    });
+    if (best < 0) return glyphs.length;
+    const p = places[best];
+    const along = (x - p.x) * Math.cos(p.angle) + (y - p.y) * Math.sin(p.angle);
+    return along > 0 ? best + 1 : best;
+  }
+
   /** Caret position before character `index`. */
   caret(n: SceneNode, doc: DesignDocument, index: number): CaretRect {
+    if (n.textPath) return this.pathCaret(n, doc, index);
     const { paragraph: p, offsetY } = this.layout(n, doc);
     const lines = p.getLineMetrics();
     const text = n.characters ?? '';
@@ -207,13 +328,15 @@ export class SkText {
   }
 
   /** Selection highlight rectangles for [start, end). */
-  selectionRects(n: SceneNode, doc: DesignDocument, start: number, end: number): Array<{ left: number; top: number; right: number; bottom: number }> {
+  selectionRects(n: SceneNode, doc: DesignDocument, start: number, end: number): SelectionRect[] {
+    if (n.textPath) return this.pathSelection(n, doc, start, end);
     const { paragraph: p, offsetY } = this.layout(n, doc);
     return this.rects(p, Math.min(start, end), Math.max(start, end)).map((r) => ({ ...r, top: r.top + offsetY, bottom: r.bottom + offsetY }));
   }
 
   /** Character index nearest to a point in the box. */
   indexAt(n: SceneNode, doc: DesignDocument, x: number, y: number): number {
+    if (n.textPath) return this.pathIndexAt(n, doc, x, y);
     const { paragraph: p, offsetY } = this.layout(n, doc);
     return p.getGlyphPositionAtCoordinate(x, y - offsetY).pos;
   }
@@ -271,12 +394,20 @@ export class SkText {
         this.cache.delete(id);
       }
     }
+    for (const [id, c] of this.glyphCache) {
+      if (!doc.get(id)?.textPath) {
+        for (const g of c.glyphs) g.paragraph.delete();
+        this.glyphCache.delete(id);
+      }
+    }
   }
 
   dispose(): void {
     this.unsubscribe();
     for (const c of this.cache.values()) c.result.paragraph.delete();
     this.cache.clear();
+    for (const c of this.glyphCache.values()) for (const g of c.glyphs) g.paragraph.delete();
+    this.glyphCache.clear();
     this.paints.dispose();
     this.provider.delete();
   }

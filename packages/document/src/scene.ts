@@ -19,6 +19,7 @@ import {
 import type { DesignDocument } from './document';
 import { isSealed, hasOwnTransform, isFrameLike, isGroupLike, type NodeId, type SceneNode } from './types';
 import { shapePaths, vectorContainsPoint } from './vector';
+import { nearestOnPath, textPathOutset } from './textPath';
 
 const DEG = Math.PI / 180;
 
@@ -83,6 +84,8 @@ export function shapeContainsPoint(doc: DesignDocument, n: SceneNode, p: Vec2, t
   if (isGroupLike(n)) return doc.children(n.id).some((c) => c.visible && shapeContainsPoint(doc, c, p, tolerance));
   const local = applyToPoint(invert(worldTransform(doc, n.id)), p);
   const grown = { x: -tolerance, y: -tolerance, width: n.width + tolerance * 2, height: n.height + tolerance * 2 };
+  // Text on a path: near the path, within a line of text.
+  if (n.type === 'TEXT' && n.textPath) return nearestOnPath(n.textPath, local).dist <= textPathOutset(n) + tolerance;
   switch (n.type) {
     case 'ELLIPSE':
       return ellipseContainsPoint(grown, local);

@@ -1,4 +1,5 @@
 import {
+  placeGlyphs,
   strokeWidthOutline,
   isFrameLike,
   baseTextStyle,
@@ -20,7 +21,7 @@ import { multiply, translation } from '@figma/geometry';
 import { renderBounds, sliceArea } from './canvaskit';
 import { imageMatrix } from './ckpaint';
 import { markerPathData, nodeMarkers } from './markers';
-import { layoutText } from './text';
+import { layoutText, pathGlyphs } from './text';
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -272,8 +273,27 @@ function nodeToSvg(c: SvgContext, n: SceneNode): string {
   const children = () => childrenSvg(c, doc.children(n.id));
   let body = '';
 
-  const spans = n.type === 'TEXT' ? c.options.textSpans?.(n) : null;
-  if (n.type === 'TEXT' && spans) {
+  const spans = n.type === 'TEXT' && !n.textPath ? c.options.textSpans?.(n) : null;
+  if (n.type === 'TEXT' && n.textPath) {
+    // Text on a path: one positioned, turned character per glyph, so it looks the same in every viewer.
+    const glyphs = pathGlyphs(n);
+    const places = placeGlyphs(n.textPath, glyphs.map((g) => g.width), n.textAlign);
+    const top = [...n.fills].reverse().find((f) => f.visible);
+    const layer = top ? paintColor(top) : null;
+    body = glyphs
+      .map((g, i) => {
+        const p = places[i];
+        if (!p.visible || g.ch === ' ') return '';
+        const hex = g.style.color ? g.style.color.slice(0, 6) : layer ? rgbToHex(layer.color) : null;
+        const a = g.style.color ? (g.style.color.length >= 8 ? parseInt(g.style.color.slice(6, 8), 16) / 255 : 1) : (layer?.opacity ?? 1);
+        return (
+          `<text x="${num(p.x)}" y="${num(p.y)}" transform="rotate(${num((p.angle * 180) / Math.PI)} ${num(p.x)} ${num(p.y)})" text-anchor="middle"` +
+          ` font-family="${esc(g.style.fontFamily)}" font-size="${num(g.style.fontSize)}" font-weight="${g.style.fontWeight}"${g.style.italic ? ' font-style="italic"' : ''}` +
+          ` fill="${hex ? '#' + hex : 'none'}"${a < 1 ? ` fill-opacity="${num(a)}"` : ''}>${esc(g.ch)}</text>`
+        );
+      })
+      .join('');
+  } else if (n.type === 'TEXT' && spans) {
     const top = [...n.fills].reverse().find((f) => f.visible);
     const layer = top ? paintColor(top) : null;
     const tspans = spans

@@ -8,6 +8,7 @@ import type { SceneRenderer } from '@figma/renderer';
 import type { SnapContext } from './snapping';
 import { useUI, type SpecFocus, type ToolId, type UIState, type Viewport } from './store';
 import { boundsOf, fitText, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
+import { textPathToVector } from './textOnPath';
 import { nudgeInLayout } from './layoutCommands';
 import { fonts } from './fonts';
 import { gridSnapEdges, isFrameLike, isGroupLike, worldBounds, worldTransform } from '@figma/document';
@@ -650,7 +651,10 @@ export class Editor {
 
   /** Enter (or double-click): edit the points of the selected vector. */
   enterVectorEdit(id: NodeId): void {
-    if (this.doc.get(id)?.type !== 'VECTOR') return;
+    const n = this.doc.get(id);
+    // Vectors, and text on a path (Edit object edits its path).
+    if (n?.type !== 'VECTOR' && !n?.textPath) return;
+    this.commitTextEdit();
     this.doc.endGesture();
     this.setUI({ vectorEdit: { id, selected: [] }, selection: [id], tool: 'select' });
   }
@@ -748,8 +752,10 @@ export class Editor {
       return;
     }
     if (n && !(n.characters ?? '').trim()) {
-      this.doc.deleteNodes([id]);
-      this.select(this.ui.selection.filter((s) => s !== id));
+      // Empty text on a path turns back into its path rather than taking the shape with it.
+      const back = n.textPath ? textPathToVector(this, id) : null;
+      if (!back) this.doc.deleteNodes([id]);
+      this.select(back ? [back] : this.ui.selection.filter((s) => s !== id));
     }
     this.doc.endGesture();
   }

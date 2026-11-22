@@ -981,13 +981,18 @@ export class DesignDocument {
     return out;
   }
 
-  /** Resizing a vector's box scales its paths with it (unless new paths are given). */
+  /** Resizing a vector's box scales its paths with it (unless new paths are given); text on a path scales its path. */
   private withScaledPaths(id: NodeId, patch: NodePatch): NodePatch {
     const n = this.nodes.get(id);
-    if (n?.type !== 'VECTOR' || patch.vectorPaths || (patch.width === undefined && patch.height === undefined)) return patch;
+    if (!n || (patch.width === undefined && patch.height === undefined)) return patch;
     const w1 = patch.width ?? n.width;
     const h1 = patch.height ?? n.height;
     if (w1 === n.width && h1 === n.height) return patch;
+    if (n.type === 'TEXT' && n.textPath && patch.textPath === undefined) {
+      const [path] = scalePaths([n.textPath.path], n.width, n.height, w1, h1);
+      return { ...patch, textPath: { ...n.textPath, path } };
+    }
+    if (n.type !== 'VECTOR' || patch.vectorPaths) return patch;
     return { ...patch, vectorPaths: scalePaths(n.vectorPaths ?? [], n.width, n.height, w1, h1) };
   }
 

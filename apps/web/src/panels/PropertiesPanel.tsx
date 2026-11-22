@@ -1,5 +1,7 @@
 import { textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
+  FlipVertical2,
+  PenTool,
   AlignJustify,
   ArrowDownToLine,
   ArrowUpToLine,
@@ -410,7 +412,7 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           </IconButton>
         ))}
         <span className="spacer" />
-        {(
+        {!nodes.some((n) => n.textPath) && (
           [
             ['TOP', ArrowUpToLine, 'Align top'],
             ['CENTER', FoldVertical, 'Align middle'],
@@ -427,6 +429,9 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           </IconButton>
         ))}
       </div>
+      {nodes.length === 1 && nodes[0].textPath ? (
+        <TextPathRow n={nodes[0]} />
+      ) : (
       <div className="button-row">
         {(
           [
@@ -440,8 +445,35 @@ function TextSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[] }) {
           </IconButton>
         ))}
       </div>
+      )}
       {editing && <SelectionColor />}
     </Section>
+  );
+}
+
+/** Text on a path: where it starts along the path, which side it's on, and editing the path. */
+function TextPathRow({ n }: { n: SceneNode }) {
+  const tp = n.textPath!;
+  const set = (patch: Partial<typeof tp>, live = false) => apply([n.id], { textPath: { ...tp, ...patch } }, live);
+  return (
+    <div className="button-row">
+      <NumberField
+        label="Offset"
+        title="Where the text starts along the path"
+        value={Math.round(tp.offset * 1000) / 10}
+        suffix="%"
+        min={0}
+        max={100}
+        precision={1}
+        onChange={(v, live) => set({ offset: v / 100 }, live)}
+      />
+      <IconButton title="Flip text orientation" active={tp.flipped} onClick={() => set({ flipped: !tp.flipped, offset: 1 - tp.offset })}>
+        <FlipVertical2 size={14} />
+      </IconButton>
+      <IconButton title="Edit object (the path's points)" onClick={() => editor.enterVectorEdit(n.id)}>
+        <PenTool size={14} />
+      </IconButton>
+    </div>
   );
 }
 

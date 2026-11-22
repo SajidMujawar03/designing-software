@@ -1,4 +1,4 @@
-import type { SceneNode } from '@figma/document';
+import { applyCase, styleAt, styledSegments, type SceneNode } from '@figma/document';
 
 export interface TextLine {
   text: string;
@@ -79,4 +79,35 @@ export function drawText(ctx: CanvasRenderingContext2D, n: SceneNode, layout: Te
     ctx.fillText(line.text, x, i * layout.lineHeightPx + layout.lineHeightPx / 2);
   });
   c.letterSpacing = '0px';
+}
+
+/** One character of text on a path: what it is, how wide it is, and its style. */
+export interface PathGlyph {
+  ch: string;
+  width: number;
+  style: ReturnType<typeof styleAt>;
+}
+
+/** The font of a character style, as a CSS font string. */
+export const styleFont = (s: ReturnType<typeof styleAt>): string =>
+  `${s.italic ? 'italic ' : ''}${s.fontWeight} ${s.fontSize}px "${s.fontFamily}", system-ui, sans-serif`;
+
+/**
+ * The characters of a text layer with their widths (Canvas 2D metrics) and
+ * styles, for placing them one by one along a path. Line breaks become spaces.
+ */
+export function pathGlyphs(n: SceneNode, ctx: CanvasRenderingContext2D = getMeasureCtx()): PathGlyph[] {
+  const text = (n.characters ?? '').replace(/\n/g, ' ');
+  const out: PathGlyph[] = [];
+  const c = ctx as CtxWithSpacing;
+  ctx.save();
+  for (const seg of styledSegments(n)) {
+    const s = seg.style;
+    ctx.font = styleFont(s);
+    c.letterSpacing = '0px';
+    const chunk = applyCase(text.slice(seg.start, seg.end), s.textCase);
+    for (const ch of chunk) out.push({ ch, width: ctx.measureText(ch).width + (s.letterSpacing ?? 0), style: s });
+  }
+  ctx.restore();
+  return out;
 }
