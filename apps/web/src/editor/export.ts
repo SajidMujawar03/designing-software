@@ -1,5 +1,5 @@
 import { paintColor, rgbToHex, type ExportSetting, type NodeId } from '@figma/document';
-import { exportSvg, renderBounds, renderNodeToCanvas, withSvgBackground } from '@figma/renderer';
+import { exportSvg, renderBounds, renderNodeToCanvas, withSvgBackground, type SvgOptions } from '@figma/renderer';
 import { getCanvasKit } from './canvaskit';
 import { editor } from './editor';
 import { booleanSvgPathData } from './pathCommands';
@@ -65,14 +65,19 @@ export function exportBackground(id: NodeId): string | null {
   return fill ? `#${rgbToHex(paintColor(fill).color)}` : '#F5F5F5';
 }
 
-async function svgOf(id: NodeId): Promise<string> {
+/** What SVG export needs from the editor: Skia's path operations for booleans, and laid-out text. */
+export async function svgExportOptions(): Promise<SvgOptions> {
   // Boolean layers need Skia's path operations to export their combined outline.
   const ck = await getCanvasKit().catch(() => null);
   const eng = textEngine();
-  const svg = exportSvg(editor.doc, id, {
+  return {
     booleanPathData: ck ? (bid) => booleanSvgPathData(ck, editor.doc, bid) : undefined,
     textSpans: eng ? (n) => eng.spans(n, editor.doc) : undefined,
-  });
+  };
+}
+
+async function svgOf(id: NodeId): Promise<string> {
+  const svg = exportSvg(editor.doc, id, await svgExportOptions());
   return withSvgBackground(svg, exportBackground(id));
 }
 

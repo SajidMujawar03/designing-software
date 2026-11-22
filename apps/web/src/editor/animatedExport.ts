@@ -1,6 +1,10 @@
-import { DEFAULT_MOTION, poseAt, posedDocument, timelineTime, worldBounds, type MotionTimeline, type NodeId } from '@figma/document';
+import { DEFAULT_MOTION, poseAt, posedDocument, timelineTime, worldBounds, worldTransform, type MotionTimeline, type NodeId } from '@figma/document';
+import { invert } from '@figma/geometry';
 import { renderBounds, renderNodeToCanvas } from '@figma/renderer';
 import { editor } from './editor';
+import { animatedSvg } from './animatedSvg';
+import { svgExportOptions } from './export';
+import { buildLottie, dotLottie, type Rasterize } from './lottieExport';
 
 /**
  * Animated export of a top-level frame (as in Figma Motion's Animated tab):
@@ -9,7 +13,10 @@ import { editor } from './editor';
  * document posed at that moment, so the file matches the canvas.
  */
 
-export type AnimatedFormat = 'MP4' | 'WEBM' | 'GIF';
+export type AnimatedFormat = 'MP4' | 'WEBM' | 'GIF' | 'LOTTIE' | 'DOTLOTTIE' | 'SVG';
+
+/** Formats that are drawings rather than pictures (no size or quality). */
+export const VECTOR_FORMATS = new Set<AnimatedFormat>(['LOTTIE', 'DOTLOTTIE', 'SVG']);
 export type AnimatedQuality = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface AnimatedExportOptions {
@@ -46,7 +53,7 @@ export function outputSize(width: number, height: number, scale: number, format:
 
 /** Which formats this browser can encode (MP4 and WebM need WebCodecs). */
 export async function encodableFormats(): Promise<Record<AnimatedFormat, boolean>> {
-  const out: Record<AnimatedFormat, boolean> = { MP4: false, WEBM: false, GIF: true };
+  const out: Record<AnimatedFormat, boolean> = { MP4: false, WEBM: false, GIF: true, LOTTIE: true, DOTLOTTIE: true, SVG: true };
   if (typeof VideoEncoder === 'undefined') return out;
   try {
     const { canEncodeVideo } = await import('mediabunny');
@@ -89,6 +96,19 @@ async function drawFrame(ctx: CanvasRenderingContext2D, frameId: NodeId, time: n
 export async function exportAnimation(frameId: NodeId, opts: AnimatedExportOptions, onProgress: (k: number) => void, signal?: AbortSignal): Promise<Blob> {
   const frame = editor.doc.get(frameId);
   if (!frame) throw new Error('No frame to export');
+  if (opts.format === 'SVG') {
+    const svg = animatedSvg(editor.doc, frameId, await svgExportOptions());
+    onProgress(1);
+    return new Blob([svg], { type: 'image/svg+xml' });
+  }
+  if (opts.format === 'LOTTIE' || opts.format === 'DOTLOTTIE') {
+    const tl0 = frame.motion ?? DEFAULT_MOTION;
+    const anim = await buildLottie(editor.doc, frameId, { fps: opts.fps }, rasterizeIn(frameId, signal, onProgress));
+    onProgress(1);
+    if (opts.format === 'LOTTIE') return new Blob([JSON.stringify(anim)], { type: 'application/json' });
+    const zip = await dotLottie(anim, tl0.playback !== 'ONCE');
+    return new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' });
+  }
   const tl = frame.motion ?? DEFAULT_MOTION;
   const fps = opts.format === 'GIF' ? Math.min(GIF_MAX_FPS, opts.fps) : opts.fps;
   const times = frameTimes(tl, fps);
@@ -144,4 +164,27 @@ export async function exportAnimation(frameId: NodeId, opts: AnimatedExportOptio
   return new Blob([target.buffer!], { type: opts.format === 'MP4' ? 'video/mp4' : 'video/webm' });
 }
 
-export const animatedExtension = (f: AnimatedFormat) => ({ MP4: 'mp4', WEBM: 'webm', GIF: 'gif' })[f];
+export const animatedExtension = (f: AnimatedFormat) => ({ MP4: 'mp4', WEBM: 'webm', GIF: 'gif', LOTTIE: 'json', DOTLOTTIE: 'lottie', SVG: 'svg' })[f];
+
+/** Renders layers Lottie can't draw as shapes into pictures (at 2x), placed in the frame. */
+function rasterizeIn(frameId: NodeId, signal: AbortSignal | undefined, onProgress: (k: number) => void): Rasterize {
+  let done = 0;
+  return async (n) => {
+    if (signal?.aborted) throw new DOMException('Export canceled', 'AbortError');
+    const doc = editor.doc;
+    const png = editor.renderer
+      ? await editor.renderer.exportPng(doc, n.id, 2)
+      : await new Promise<Blob | null>((r) => renderNodeToCanvas(doc, n.id, 2).toBlob(r, 'image/png'));
+    if (!png) return null;
+    const b = renderBounds(doc, n.id);
+    const toFrame = invert(worldTransform(doc, frameId));
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(png);
+    });
+    onProgress(Math.min(0.95, (done += 0.1)));
+    return { dataUrl, width: b.width, height: b.height, x: toFrame[0] * b.x + toFrame[2] * b.y + toFrame[4], y: toFrame[1] * b.x + toFrame[3] * b.y + toFrame[5] };
+  };
+}

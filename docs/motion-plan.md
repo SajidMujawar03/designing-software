@@ -236,6 +236,16 @@ M1–M4 make a complete, usable Motion feature (about 3 weeks). M5–M7 follow F
 - **Presenter:** a screen with a timeline plays it from the start each time it opens (Once stops at the end). It shows its first moment straight away rather than its design state.
 - **Not included:** React output, which Figma offers alongside CSS and JSON.
 
+### M7 as built
+
+- **Lottie (JSON)** and **dotLottie**, in the Animated export tab beside MP4, WebM and GIF:
+  - **Baked:** the frame is posed at every frame of the export, then samples a straight line between their neighbours reproduces are dropped, leaving linear keyframes. So keyframes, presets, springs, staggered instances and ping-pong match the canvas.
+  - **Shape layers:** rectangles, frames, ellipses and paths with solid fills and strokes. Their size, corner radius, fill and stroke colour, stroke width, opacity and transform animate.
+  - **Picture layers:** text, images, gradients and effects are rendered once at 2x and move by their change from rest, as Figma does for what Lottie can't draw.
+  - **dotLottie** zips the animation, its pictures as files, and a version 1 manifest (loops unless the timeline plays once).
+  - **Not exported:** clipping inside nested frames, masks, strokes inside or outside a shape, and text animated by unit (it's a picture).
+- **Animated SVG:** the static SVG with CSS `@keyframes` on each moving layer's group (`transform: matrix(…)` and opacity), sampled and simplified the same way. Size, colour and blur changes aren't included.
+
 ## 9. Testing
 
 - **Unit tests:**

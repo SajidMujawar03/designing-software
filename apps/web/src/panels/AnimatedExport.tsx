@@ -11,10 +11,19 @@ import {
   outputSize,
   type AnimatedExportOptions,
   type AnimatedFormat,
+  VECTOR_FORMATS,
 } from '../editor/animatedExport';
 import { saveFiles } from '../editor/export';
 
-const FORMAT_LABEL: Record<AnimatedFormat, string> = { MP4: 'MP4', WEBM: 'WebM', GIF: 'GIF' };
+const FORMAT_LABEL: Record<AnimatedFormat, string> = { MP4: 'MP4', WEBM: 'WebM', GIF: 'GIF', LOTTIE: 'Lottie (JSON)', DOTLOTTIE: 'dotLottie', SVG: 'SVG' };
+const FORMAT_ORDER: AnimatedFormat[] = ['MP4', 'WEBM', 'GIF', 'LOTTIE', 'DOTLOTTIE', 'SVG'];
+
+/** What each drawing format keeps of the animation. */
+const FORMAT_NOTE: Partial<Record<AnimatedFormat, string>> = {
+  LOTTIE: 'Shapes keep their size, corners, colors and opacity animated. Text, images, gradients and effects become pictures that move, turn, scale and fade.',
+  DOTLOTTIE: 'Lottie in a zip, with its pictures as files. Shapes animate fully; text, images, gradients and effects become moving pictures.',
+  SVG: 'Animated with CSS: layers move, turn, scale and fade. Sizes, colors and blur keep their first-moment look.',
+};
 
 /** The Animated tab of a top-level frame's Export section: video or GIF of its timeline. */
 export function AnimatedExport({ frame }: { frame: SceneNode }) {
@@ -30,7 +39,7 @@ export function AnimatedExport({ frame }: { frame: SceneNode }) {
       if (!alive) return;
       setFormats(f);
       // Fall back to a format this browser can make.
-      setOpts((o) => (f[o.format] ? o : { ...o, format: (['MP4', 'WEBM', 'GIF'] as const).find((x) => f[x])! }));
+      setOpts((o) => (f[o.format] ? o : { ...o, format: FORMAT_ORDER.find((x) => f[x])! }));
     });
     return () => {
       alive = false;
@@ -67,7 +76,7 @@ export function AnimatedExport({ frame }: { frame: SceneNode }) {
         <label>
           <span>Format</span>
           <select value={opts.format} onChange={(e) => set({ format: e.target.value as AnimatedFormat })} aria-label="Animated format">
-            {(['MP4', 'WEBM', 'GIF'] as const).map((f) => (
+            {FORMAT_ORDER.map((f) => (
               <option key={f} value={f} disabled={formats ? !formats[f] : f !== 'GIF'}>
                 {FORMAT_LABEL[f]}
                 {formats && !formats[f] ? ' (not supported here)' : ''}
@@ -75,6 +84,7 @@ export function AnimatedExport({ frame }: { frame: SceneNode }) {
             ))}
           </select>
         </label>
+        {!VECTOR_FORMATS.has(opts.format) && (
         <label>
           <span>Size</span>
           <select value={opts.scale} onChange={(e) => set({ scale: Number(e.target.value) })} aria-label="Animated size">
@@ -85,6 +95,8 @@ export function AnimatedExport({ frame }: { frame: SceneNode }) {
             ))}
           </select>
         </label>
+        )}
+        {opts.format !== 'SVG' && (
         <label>
           <span>Frame rate</span>
           <select value={opts.fps} onChange={(e) => set({ fps: Number(e.target.value) })} aria-label="Frame rate">
@@ -95,7 +107,8 @@ export function AnimatedExport({ frame }: { frame: SceneNode }) {
             ))}
           </select>
         </label>
-        {opts.format === 'GIF' ? (
+        )}
+        {VECTOR_FORMATS.has(opts.format) ? null : opts.format === 'GIF' ? (
           <label>
             <span>Loop</span>
             <select value={opts.loop ? 'loop' : 'once'} onChange={(e) => set({ loop: e.target.value === 'loop' })} aria-label="GIF loop">
@@ -114,8 +127,9 @@ export function AnimatedExport({ frame }: { frame: SceneNode }) {
           </label>
         )}
       </div>
+      {FORMAT_NOTE[opts.format] && <div className="hint">{FORMAT_NOTE[opts.format]}</div>}
       <div className="hint">
-        {size.width} × {size.height} · {count} frames · {(tl.duration / 1000).toFixed(2)}s{tl.playback === 'PING_PONG' ? ' there and back' : ''}
+        {VECTOR_FORMATS.has(opts.format) ? `${Math.round(box.width)} × ${Math.round(box.height)}` : `${size.width} × ${size.height}`} · {opts.format === 'SVG' ? 'CSS' : `${count} frames`} · {(tl.duration / 1000).toFixed(2)}s{tl.playback === 'PING_PONG' ? ' there and back' : ''}
         {opts.format === 'GIF' && opts.fps > GIF_MAX_FPS ? ` · GIFs play at most ${GIF_MAX_FPS} fps` : ''}
       </div>
       {error && <div className="hint error">{error}</div>}
