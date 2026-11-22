@@ -138,9 +138,9 @@ The renderers read nodes through `doc.get` and `doc.children` (about 16 call sit
 - **Motion mode** (`ui.motionMode`) is a third toolbar choice next to Design and Draw. Turning it on picks the selected top-level frame (or the one under the selection), creating its `motion` with the defaults. It also shows the **Timeline** panel at the bottom of the canvas area, a resizable dock.
 - **Timeline panel** (`panels/Timeline.tsx`, drawn with DOM and CSS, no canvas):
   - Header: Play/Pause, auto-keyframe, current time, duration (field, plus a drag handle on the ruler), ms/s, playback mode, collapse all.
-  - Body: a ruler with ms ticks, the playhead, and a layer track for each animated layer. Each track has a bar from its first to last keyframe (drag to shift it, drag the ends to stretch it), with property rows under it holding diamonds and the segment lines between them.
+  - Body: a ruler with ms ticks, the playhead, and a layer track for each animated layer. Each track has a bar from its first to last keyframe (drag to shift it), with property rows under it holding diamonds and the segment lines between them. Dragging the bar's ends to stretch the timing is not built yet.
   - Zoom slider; Ctrl/Cmd plus the wheel zooms.
-- **Properties panel:** in Motion mode, each animatable field gets a diamond. It's empty with no keyframes, half-filled when the property has keyframes, and filled when there's a keyframe at the playhead. Clicking it adds or removes a keyframe at the playhead. Fields show the **posed** value at the playhead.
+- **Properties panel:** fields show values at the playhead, and edits follow the rules below. Built in M3 as an **Animate** section listing every animatable property with its diamond and value (including Scale X/Y, which has no design field), rather than a diamond on each existing field. The diamond is empty with no keyframes, half-filled when the property is animated, and filled when there's a keyframe at the playhead; clicking it adds a keyframe holding the current value, or removes the one at the playhead.
 - **Editing a value in Motion mode:**
   - Auto-keyframe on: writes or updates a keyframe at the playhead.
   - Off, and the property has a keyframe at the playhead: updates that keyframe.

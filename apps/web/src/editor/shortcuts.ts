@@ -1,5 +1,5 @@
 import { snippetTextOf } from '@figma/document';
-import { togglePlay } from './motion';
+import { copySelectedKeys, deleteSelectedKeys, KEYFRAMES_CLIPBOARD, pasteKeys, selectKeys, togglePlay } from './motion';
 import type { BooleanOperation } from '@figma/document';
 import { useOnboarding } from '../panels/Onboarding';
 import { copyAsPng, exportLayers, saveFiles } from './export';
@@ -153,6 +153,12 @@ export function installShortcuts(): () => void {
       if (e.code === 'Digit2') return run(() => editor.zoomToSelection());
     }
 
+    // Motion mode: keyframes selected on the timeline come first.
+    if (ui.motionMode && ui.motion.selectedKeys.length) {
+      if (e.key === 'Delete' || e.key === 'Backspace') return run(() => void deleteSelectedKeys());
+      if (e.key === 'Escape') return run(() => selectKeys([]));
+    }
+
     switch (e.key) {
       case 'Delete':
       case 'Backspace':
@@ -208,6 +214,13 @@ export function installShortcuts(): () => void {
 
   const onCopy = (e: ClipboardEvent) => {
     if (isTyping(e.target) || !e.clipboardData) return;
+    // Selected keyframes copy (and cut) as keyframes.
+    if (editor.ui.motionMode && copySelectedKeys()) {
+      e.preventDefault();
+      e.clipboardData.setData('text/plain', KEYFRAMES_CLIPBOARD);
+      if (e.type === 'cut') deleteSelectedKeys();
+      return;
+    }
     const text = editor.copyText();
     if (!text) return;
     e.preventDefault();
@@ -217,6 +230,8 @@ export function installShortcuts(): () => void {
   const onPaste = (e: ClipboardEvent) => {
     if (isTyping(e.target) || !e.clipboardData) return;
     e.preventDefault();
+    // Copied keyframes paste at the playhead (until something else is copied).
+    if (e.clipboardData.getData('text/plain') === KEYFRAMES_CLIPBOARD && pasteKeys()) return;
     const images = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
     if (images.length) void importImages(images);
     else editor.pasteText(e.clipboardData.getData('text/plain'));

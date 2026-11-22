@@ -1,7 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { solid } from '@figma/document';
 import { editor } from './editor';
-import { drawnDocument, followSelection, formatTime, motionFrame, parseTime, pause, play, seek, setMotionMode, setTimeline, timelineOf } from './motion';
+import {
+  copySelectedKeys,
+  deleteSelectedKeys,
+  drawnDocument,
+  followSelection,
+  formatTime,
+  motionApply,
+  motionFrame,
+  parseTime,
+  pasteKeys,
+  pause,
+  play,
+  seek,
+  selectKeys,
+  setMotionMode,
+  setTimeline,
+  timelineOf,
+  toggleAutoKey,
+} from './motion';
 
 describe('timeline times', () => {
   it('shows and reads times in either unit', () => {
@@ -107,5 +125,47 @@ describe('playback', () => {
     expect(editor.ui.motion.time).toBeCloseTo(100);
     setMotionMode(false);
     vi.restoreAllMocks();
+  });
+});
+
+describe('editing in Motion mode', () => {
+  it('records keyframes with auto-keyframe, explains blocked changes, and edits keyframes on the timeline', () => {
+    const doc = editor.doc;
+    const frame = doc.change(() => doc.createNode({ type: 'FRAME', parentId: editor.pageId, width: 300, height: 300 }));
+    const rect = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: frame, x: 0, y: 0, width: 50, height: 50 }));
+    // Outside Motion mode, panel changes are design changes.
+    motionApply([rect], { x: 5 });
+    expect(doc.get(rect)!.x).toBe(5);
+
+    editor.select([rect]);
+    setMotionMode(true);
+    toggleAutoKey();
+    seek(0);
+    motionApply([rect], { x: 0 });
+    seek(1000);
+    motionApply([rect], { x: 200 });
+    expect(doc.get(rect)!.keyframes!.x!.map((k) => [k.time, k.value])).toEqual([[0, 0], [1000, 200]]);
+    expect(doc.get(rect)!.x).toBe(5);
+    seek(500);
+    expect(drawnDocument().get(rect)!.x).toBeCloseTo(100);
+
+    // Auto-keyframe off, between keyframes: the change is blocked and explained.
+    toggleAutoKey();
+    motionApply([rect], { x: 999 });
+    expect(doc.get(rect)!.keyframes!.x).toHaveLength(2);
+    expect(editor.ui.motion.hint?.text).toMatch(/X is animated/);
+
+    // Select, copy, paste at the playhead, delete.
+    const keys = doc.get(rect)!.keyframes!.x!.map((k) => ({ nodeId: rect, prop: 'x' as const, id: k.id }));
+    selectKeys(keys);
+    expect(copySelectedKeys()).toBe(true);
+    seek(1500);
+    expect(pasteKeys()).toBe(true);
+    expect(doc.get(rect)!.keyframes!.x!.map((k) => k.time)).toEqual([0, 1000, 1500, 2500]);
+    expect(editor.ui.motion.selectedKeys).toHaveLength(2);
+    expect(deleteSelectedKeys()).toBe(true);
+    expect(doc.get(rect)!.keyframes!.x!.map((k) => k.time)).toEqual([0, 1000]);
+    expect(deleteSelectedKeys()).toBe(false);
+    setMotionMode(false);
   });
 });

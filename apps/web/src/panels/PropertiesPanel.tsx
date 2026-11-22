@@ -51,6 +51,8 @@ import { WidthProfileSelect } from './WidthProfile';
 import { ComponentSection } from './ComponentPanel';
 import { VariableBindings, VariableModes } from './VariablesPanel';
 import { common, IconButton, MIXED, NumberField, PaintRow, Section, type Mixed } from './controls';
+import { drawnDocument, inMotionFrame, motionApply } from '../editor/motion';
+import { AnimateSection } from './AnimateSection';
 
 const WEIGHT_NAMES: Record<number, string> = {
   100: 'Thin',
@@ -71,8 +73,9 @@ const DEFAULT_WEIGHTS: Array<[number, string]> = [
   [700, 'Bold'],
 ];
 
-/** Applies a patch to nodes; live updates merge into the current undo step. */
+/** Applies a patch to nodes; live updates merge into the current undo step. In Motion mode, Motion's rules decide (keyframes or design values). */
 function apply(ids: NodeId[], patch: NodePatch | ((n: SceneNode) => NodePatch), live = false): void {
+  if (editor.ui.motionMode && ids.some(inMotionFrame)) return motionApply(ids, patch, live);
   const doc = editor.doc;
   const run = () => {
     for (const id of ids) {
@@ -89,7 +92,11 @@ function apply(ids: NodeId[], patch: NodePatch | ((n: SceneNode) => NodePatch), 
 export function PropertiesPanel() {
   useDocVersion();
   const selection = useUI((s) => s.selection);
-  const nodes = selection.map((id) => editor.doc.get(id)).filter((n): n is SceneNode => !!n);
+  // Motion mode: fields show the values at the playhead.
+  const motionMode = useUI((s) => s.motionMode);
+  useUI((s) => (s.motionMode ? s.motion.time : 0));
+  const view = motionMode ? drawnDocument() : editor.doc;
+  const nodes = selection.map((id) => view.get(id)).filter((n): n is SceneNode => !!n);
 
   const tool = useUI((s) => s.tool);
   if (tool === 'frame') return <FramePresets />;
@@ -113,6 +120,7 @@ export function PropertiesPanel() {
       </div>
 
       <AlignBar count={editor.topLevelSelection().length} />
+      {motionMode && nodes.length === 1 && inMotionFrame(nodes[0].id) && <AnimateSection n={nodes[0]} />}
 
       <ComponentSection nodes={nodes} />
       {nodes.length === 1 && nodes[0].type === 'CODE_SNIPPET' && <CodeSnippetSection node={nodes[0]} />}

@@ -5,7 +5,7 @@ import type { Editor } from '../editor';
 import { insertIntoLayout, layoutDropAt } from '../layoutCommands';
 import { snapPoint, snapRect } from '../snapping';
 import { dragHandle, handleAt } from '../textOnPath';
-import { drawnDocument } from '../motion';
+import { drawnDocument, motionUpdate } from '../motion';
 import {
   boundsOf,
   fitText,
@@ -63,15 +63,22 @@ export class SelectTool implements Tool {
     return this.ed.doc;
   }
 
-  /** Snapshots the leaves of `ids` (groups are expanded: they carry no geometry). */
+  /** Writes gesture changes: through Motion's rules in Motion mode (keyframes or design values). */
+  private write(patches: Array<[NodeId, NodePatch]>, opts?: { constraints?: boolean }): void {
+    if (this.ed.ui.motionMode) motionUpdate(patches, opts);
+    else this.doc.updateNodes(patches, opts);
+  }
+
+  /** Snapshots the leaves of `ids` (groups are expanded: they carry no geometry). Motion mode: as drawn at the playhead. */
   private snapshot(ids: NodeId[]): ItemSnapshot[] {
+    const view = drawnDocument();
     return leafIds(this.doc, ids).map((id) => {
-      const n = this.doc.get(id)!;
+      const n = view.get(id)!;
       return {
         id,
         parentId: n.parentId!,
-        center: worldCenter(this.doc, id),
-        rotation: worldRotation(this.doc, id),
+        center: worldCenter(view, id),
+        rotation: worldRotation(view, id),
         width: n.width,
         height: n.height,
       };
@@ -197,7 +204,7 @@ export class SelectTool implements Tool {
           const c = { x: g.center.x + vx * cos - vy * sin, y: g.center.y + vx * sin + vy * cos };
           return [it.id, placementIn(this.doc, it.parentId, c, normDeg(it.rotation + delta), it.width, it.height)];
         });
-        this.doc.updateNodes(patches);
+        this.write(patches);
         return;
       }
       case 'endpoint': {
@@ -235,6 +242,24 @@ export class SelectTool implements Tool {
     if (e.shift) {
       if (Math.abs(dx) > Math.abs(dy)) (dy = 0), (lockY = true);
       else (dx = 0), (lockX = true);
+    }
+
+    // Motion mode moves layers in place (keyframes or design values); it never moves them into other frames.
+    if (this.ed.ui.motionMode) {
+      let guides = null;
+      if (!e.mod) {
+        const r = { ...g.bounds, x: g.bounds.x + dx, y: g.bounds.y + dy };
+        const snap = snapRect(r, this.ed.snapContext(g.tops, this.doc.get(g.tops[0])!.parentId!), lockX, lockY);
+        dx += snap.dx;
+        dy += snap.dy;
+        guides = snap.guides;
+      }
+      this.ed.setUI({ snapGuides: guides });
+      this.write(g.items.map((it) => {
+        const p = placementIn(this.doc, it.parentId, { x: it.center.x + dx, y: it.center.y + dy }, it.rotation, it.width, it.height);
+        return [it.id, { x: p.x, y: p.y }];
+      }));
+      return;
     }
 
     // Dragging over a frame moves the layers into it; dragging out moves them to the page.
@@ -286,7 +311,7 @@ export class SelectTool implements Tool {
       const p = placementIn(this.doc, it.parentId, { x: it.center.x + dx, y: it.center.y + dy }, it.rotation, it.width, it.height);
       return [it.id, { x: p.x, y: p.y }];
     });
-    this.doc.updateNodes(patches);
+    this.write(patches);
   }
 
   private resize(g: Extract<Gesture, { kind: 'resize' }>, e: ToolEvent): void {
@@ -369,13 +394,13 @@ export class SelectTool implements Tool {
           runs.push([d.id, scaledRuns(orig, s)]);
         }
       }
-      this.doc.updateNodes(patches, { constraints: false });
+      this.write(patches, { constraints: false });
       for (const [id, list] of runs) for (const r of list) this.doc.formatText(id, r.start, r.length, r.style);
       for (const [id] of patches) fitText(this.doc, id);
       return;
     }
     // Ctrl resizes a frame without moving its children by their constraints.
-    this.doc.updateNodes(patches, { constraints: !e.mod });
+    this.write(patches, { constraints: !e.mod });
     for (const [id] of patches) fitText(this.doc, id);
   }
 

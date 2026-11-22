@@ -347,3 +347,229 @@ export function posedDocument(doc: DesignDocument, pose: Map<NodeId, NodePatch>)
   });
   return view;
 }
+
+// ------------------------------------------------------------ editing keyframes
+
+/** Which properties a layer can animate (corner radius only where corners exist). */
+export function animatableProperties(n: SceneNode): MotionProperty[] {
+  const corners = ['RECTANGLE', 'FRAME', 'COMPONENT', 'INSTANCE', 'SECTION', 'CODE_SNIPPET'].includes(n.type);
+  return MOTION_PROPERTIES.filter((p) => p !== 'cornerRadius' || corners);
+}
+
+/** A keyframe, by layer, property and id. */
+export interface KeyRef {
+  nodeId: NodeId;
+  prop: MotionProperty;
+  id: string;
+}
+
+/** Keyframes closer than this (ms) are at the same time. */
+const SAME_TIME = 0.5;
+
+/** The keyframe of a property at time `t`, if there is one. */
+export function keyframeAt(n: SceneNode, p: MotionProperty, t: number): Keyframe | undefined {
+  return n.keyframes?.[p]?.find((k) => Math.abs(k.time - t) < SAME_TIME);
+}
+
+/** Whether a property has keyframes. */
+export const isAnimated = (n: SceneNode, p: MotionProperty): boolean => !!n.keyframes?.[p]?.length;
+
+let keySerial = 0;
+const newKeyId = () => `k${Date.now().toString(36)}${(keySerial++).toString(36)}`;
+
+function writeKeys(doc: DesignDocument, n: SceneNode, p: MotionProperty, frames: Keyframe[]): void {
+  const next = { ...(n.keyframes ?? {}) };
+  if (frames.length) next[p] = [...frames].sort((a, b) => a.time - b.time);
+  else delete next[p];
+  doc.updateNode(n.id, { keyframes: Object.keys(next).length ? next : null });
+}
+
+/** The frame holding a layer gets a timeline the first time something in it is keyframed. */
+function ensureTimeline(doc: DesignDocument, id: NodeId): void {
+  const f = motionFrameOf(doc, id);
+  if (f && !f.motion) doc.updateNode(f.id, { motion: { ...DEFAULT_MOTION } });
+}
+
+/** Adds a keyframe at `t`, or changes the value of the one there. */
+export function setKeyframe(doc: DesignDocument, id: NodeId, p: MotionProperty, t: number, value: number | string): void {
+  const n = doc.get(id);
+  if (!n) return;
+  const time = Math.max(0, Math.round(t));
+  const frames = n.keyframes?.[p] ?? [];
+  const at = frames.findIndex((k) => Math.abs(k.time - time) < SAME_TIME);
+  const next = at >= 0 ? frames.map((k, i) => (i === at ? { ...k, value } : k)) : [...frames, { id: newKeyId(), time, value, easing: DEFAULT_EASING }];
+  writeKeys(doc, n, p, next);
+  ensureTimeline(doc, id);
+}
+
+/** Adds a keyframe holding the property's current value (as posed at `t`), or removes the one at `t`. */
+export function toggleKeyframe(doc: DesignDocument, id: NodeId, p: MotionProperty, t: number): void {
+  const n = doc.get(id);
+  if (!n) return;
+  const existing = keyframeAt(n, p, t);
+  if (existing) return removeKeyframes(doc, [{ nodeId: id, prop: p, id: existing.id }]);
+  const frames = n.keyframes?.[p];
+  setKeyframe(doc, id, p, t, frames?.length ? keyframeValue(frames, t)! : restValue(n, p));
+}
+
+/** Groups keyframe refs by layer and property. */
+function byProperty(refs: KeyRef[]): Map<string, { nodeId: NodeId; prop: MotionProperty; ids: Set<string> }> {
+  const out = new Map<string, { nodeId: NodeId; prop: MotionProperty; ids: Set<string> }>();
+  for (const r of refs) {
+    const key = `${r.nodeId}/${r.prop}`;
+    let g = out.get(key);
+    if (!g) out.set(key, (g = { nodeId: r.nodeId, prop: r.prop, ids: new Set() }));
+    g.ids.add(r.id);
+  }
+  return out;
+}
+
+export function removeKeyframes(doc: DesignDocument, refs: KeyRef[]): void {
+  for (const g of byProperty(refs).values()) {
+    const n = doc.get(g.nodeId);
+    if (!n?.keyframes?.[g.prop]) continue;
+    writeKeys(doc, n, g.prop, n.keyframes[g.prop]!.filter((k) => !g.ids.has(k.id)));
+  }
+}
+
+/**
+ * Moves keyframes by `delta` ms (not before 0). A moved keyframe landing on
+ * one that stays replaces it, as dropping a keyframe onto another does.
+ */
+export function moveKeyframes(doc: DesignDocument, refs: KeyRef[], delta: number): void {
+  for (const g of byProperty(refs).values()) {
+    const n = doc.get(g.nodeId);
+    const frames = n?.keyframes?.[g.prop];
+    if (!n || !frames) continue;
+    const moved = frames.filter((k) => g.ids.has(k.id)).map((k) => ({ ...k, time: Math.max(0, Math.round(k.time + delta)) }));
+    const kept = frames.filter((k) => !g.ids.has(k.id) && !moved.some((m) => Math.abs(m.time - k.time) < SAME_TIME));
+    writeKeys(doc, n, g.prop, [...kept, ...moved]);
+  }
+}
+
+/** Sets the easing of the segments starting at these keyframes. */
+export function setKeyframeEasing(doc: DesignDocument, refs: KeyRef[], easing: MotionEasing): void {
+  for (const g of byProperty(refs).values()) {
+    const n = doc.get(g.nodeId);
+    const frames = n?.keyframes?.[g.prop];
+    if (!n || !frames) continue;
+    writeKeys(doc, n, g.prop, frames.map((k) => (g.ids.has(k.id) ? { ...k, easing } : k)));
+  }
+}
+
+/** Copied keyframes: times relative to the earliest. */
+export interface CopiedKeys {
+  items: Array<{ nodeId: NodeId; prop: MotionProperty; time: number; value: number | string; easing: MotionEasing }>;
+}
+
+export function copyKeyframes(doc: DesignDocument, refs: KeyRef[]): CopiedKeys {
+  const items: CopiedKeys['items'] = [];
+  for (const r of refs) {
+    const k = doc.get(r.nodeId)?.keyframes?.[r.prop]?.find((x) => x.id === r.id);
+    if (k) items.push({ nodeId: r.nodeId, prop: r.prop, time: k.time, value: k.value, easing: k.easing });
+  }
+  const t0 = Math.min(...items.map((i) => i.time));
+  return { items: items.map((i) => ({ ...i, time: i.time - t0 })) };
+}
+
+/** Pastes copied keyframes (onto the layers they came from) with the earliest at `t`. Returns the new keyframes. */
+export function pasteKeyframes(doc: DesignDocument, copied: CopiedKeys, t: number): KeyRef[] {
+  const out: KeyRef[] = [];
+  for (const it of copied.items) {
+    if (!doc.get(it.nodeId)) continue;
+    const time = Math.max(0, Math.round(t + it.time));
+    setKeyframe(doc, it.nodeId, it.prop, time, it.value);
+    const k = keyframeAt(doc.get(it.nodeId)!, it.prop, time)!;
+    const ref = { nodeId: it.nodeId, prop: it.prop, id: k.id };
+    setKeyframeEasing(doc, [ref], it.easing);
+    out.push(ref);
+  }
+  return out;
+}
+
+/** The Motion values a design change sets (only properties whose value actually changes). */
+export function motionValuesOf(n: SceneNode, patch: NodePatch): Array<[MotionProperty, number | string]> {
+  const out: Array<[MotionProperty, number | string]> = [];
+  for (const p of ['x', 'y', 'width', 'height', 'rotation', 'opacity', 'cornerRadius', 'strokeWeight'] as const) {
+    const v = patch[p];
+    if (typeof v === 'number' && v !== n[p]) out.push([p, v]);
+  }
+  if (patch.motionScaleX !== undefined) out.push(['scaleX', patch.motionScaleX]);
+  if (patch.motionScaleY !== undefined) out.push(['scaleY', patch.motionScaleY]);
+  const color = (paints: Paint[] | undefined, p: 'fillColor' | 'strokeColor') => {
+    if (!paints) return;
+    const s = topSolid(paints);
+    if (!s) return;
+    const hex = toHex([s.color.r, s.color.g, s.color.b, s.opacity]);
+    if (hex !== restValue(n, p)) out.push([p, hex]);
+  };
+  color(patch.fills, 'fillColor');
+  color(patch.strokes, 'strokeColor');
+  if (patch.effects) {
+    const b = patch.effects.find((e) => e.type === 'LAYER_BLUR');
+    const r = b && 'radius' in b ? b.radius : 0;
+    if (r !== restValue(n, 'blur')) out.push(['blur', r]);
+  }
+  return out;
+}
+
+const PATCH_KEYS: Record<MotionProperty, Array<keyof NodePatch>> = {
+  x: ['x'],
+  y: ['y'],
+  width: ['width'],
+  height: ['height'],
+  rotation: ['rotation'],
+  scaleX: ['motionScaleX'],
+  scaleY: ['motionScaleY'],
+  opacity: ['opacity'],
+  cornerRadius: ['cornerRadius'],
+  fillColor: ['fills'],
+  strokeColor: ['strokes'],
+  strokeWeight: ['strokeWeight'],
+  blur: ['effects'],
+};
+
+/**
+ * Applies a change to a layer in Motion mode, as Figma Motion does. `n` is
+ * the layer as posed at `t` (the values the change was made against). For
+ * each Motion property the change touches:
+ * - auto-keyframe on, or a keyframe at the playhead: writes that keyframe;
+ * - animated, no keyframe here, auto-keyframe off: nothing changes (blocked);
+ * - not animated: changes the design value, as in Design mode.
+ * Everything else in the change applies normally. Returns the blocked properties.
+ */
+export function applyMotionEdit(doc: DesignDocument, n: SceneNode, patch: NodePatch, t: number, autoKey: boolean): MotionProperty[] {
+  const stored = doc.get(n.id);
+  if (!stored) return [];
+  const base: NodePatch = { ...patch };
+  const blocked: MotionProperty[] = [];
+  for (const [p, value] of motionValuesOf(n, patch)) {
+    const keyed = autoKey || !!keyframeAt(stored, p, t);
+    if (keyed) setKeyframe(doc, n.id, p, t, value);
+    else if (isAnimated(stored, p)) blocked.push(p);
+    else continue;
+    for (const k of PATCH_KEYS[p]) delete (base as Record<string, unknown>)[k];
+  }
+  // An animated property's design value never shows (its keyframes win), so even an
+  // unchanged value for it (a field committing twice) must not land on the design.
+  const after = doc.get(n.id)!;
+  for (const p of MOTION_PROPERTIES) if (isAnimated(after, p)) for (const k of PATCH_KEYS[p]) delete (base as Record<string, unknown>)[k];
+  // Pose-only fields never reach the document.
+  delete base.motionScaleX;
+  delete base.motionScaleY;
+  if (Object.keys(base).length) doc.updateNode(n.id, base);
+  return blocked;
+}
+
+/** The change that sets one Motion property to a value on a layer (for fields that edit a single property). */
+export function motionPatch(n: SceneNode, p: MotionProperty, value: number | string): NodePatch {
+  const tmp = { ...n, keyframes: { [p]: [{ id: '', time: 0, value, easing: DEFAULT_EASING }] } } as SceneNode;
+  return layerPose(tmp, 0) ?? {};
+}
+
+/** A layer's current value of a Motion property (as posed, if `n` is a posed layer). */
+export function currentValue(n: SceneNode, p: MotionProperty): number | string {
+  if (p === 'scaleX') return n.motionScaleX ?? 1;
+  if (p === 'scaleY') return n.motionScaleY ?? 1;
+  return restValue(n, p);
+}

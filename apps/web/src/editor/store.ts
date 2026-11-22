@@ -1,4 +1,4 @@
-import type { NodeId, TextStyleProps, VectorPath } from '@figma/document';
+import type { KeyRef, NodeId, TextStyleProps, VectorPath } from '@figma/document';
 import type { Rect, Vec2 } from '@figma/geometry';
 import { create } from 'zustand';
 import type { SnapGuides } from './snapping';
@@ -48,6 +48,12 @@ export interface MotionUI {
   collapsed: NodeId[];
   /** Height of the timeline panel (px). */
   height: number;
+  /** Auto-keyframe: every change records a keyframe at the playhead. */
+  autoKey: boolean;
+  /** Keyframes selected on the timeline. */
+  selectedKeys: KeyRef[];
+  /** A short message under the timeline header (e.g. why a change didn't apply), and when it was shown. */
+  hint: { text: string; at: number } | null;
 }
 
 /** Vector edit mode's actions (as in Figma): Move, Lasso, Bend, Cut, Eraser, Paint. */
@@ -187,7 +193,7 @@ export const useUI = create<UIState>()(() => ({
   codeEditorFor: null,
   drawMode: false,
   motionMode: false,
-  motion: { frameId: null, time: 0, playing: false, unit: 'ms', pxPerSec: 240, collapsed: [], height: 220 },
+  motion: { frameId: null, time: 0, playing: false, unit: 'ms', pxPerSec: 240, collapsed: [], height: 220, autoKey: false, selectedKeys: [], hint: null },
   widthEdit: null,
   runningCode: {},
   variablesOpen: false,
