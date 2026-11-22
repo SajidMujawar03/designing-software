@@ -17,6 +17,7 @@ import { textEngine } from '../textEngine';
 import { drawnDocument } from '../motion';
 import { handleOwner, handleWorld } from '../textOnPath';
 import { drawRulers } from './rulers';
+import { prefs } from '../prefs';
 
 export const BLUE = '#0D99FF';
 export const RED = '#F24822';
@@ -96,7 +97,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, ed: Editor, dpr: numb
     ctx.setLineDash([]);
   };
 
-  if (hoverId && !selected.has(hoverId)) outline(hoverId, 1.5);
+  if (hoverId && !selected.has(hoverId) && prefs().highlightHover) outline(hoverId, 1.5);
   drawMeasurements(ctx, ed);
   drawPrototype(ctx, ed);
   drawAnnotations(ctx, ed);

@@ -23,10 +23,14 @@ export interface Prefs {
   sampleHintClosed: boolean;
   /** Side panels shown, collapsed to narrow strips, or everything but the canvas hidden. */
   ui: 'full' | 'minimized' | 'hidden';
+  /** Preferences > Keep tool selected after use: shape tools stay on after drawing. */
+  keepToolSelected: boolean;
+  /** Preferences > Highlight layers on hover: outline the layer under the pointer. */
+  highlightHover: boolean;
 }
 
 const KEY = 'figma-clone:prefs';
-export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, showAnnotations: true, brushes: DEFAULT_BRUSHES, sampleHintClosed: false, ui: 'full' };
+export const DEFAULT_PREFS: Prefs = { snapToPixel: true, showCursors: true, nudge: 1, bigNudge: 10, layerThumbnails: true, showAnnotations: true, brushes: DEFAULT_BRUSHES, sampleHintClosed: false, ui: 'full', keepToolSelected: false, highlightHover: true };
 
 /** Stored prefs, with anything missing or out of range set back to its default. */
 export function parsePrefs(raw: string | null): Prefs {
@@ -48,6 +52,8 @@ export function parsePrefs(raw: string | null): Prefs {
     sampleHintClosed: v.sampleHintClosed === true,
     // Hidden UI isn't restored: a reload shouldn't leave someone with no panels and no idea why.
     ui: v.ui === 'minimized' ? 'minimized' : 'full',
+    keepToolSelected: v.keepToolSelected === true,
+    highlightHover: v.highlightHover !== false,
   };
 }
 

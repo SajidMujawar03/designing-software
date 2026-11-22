@@ -18,7 +18,7 @@ Status key: **Same** · **Different name or place** · **Missing in ours** · **
 | --- | --- | --- | --- |
 | Tool bar | Floating toolbar at the **bottom centre** of the canvas | Top bar across the window (dark), with modes, tools, undo/redo, file name, Plugins, Present, zoom | Different name or place |
 | Navigation rail | Narrow left rail: **File**, **Agents**, **Assets**, **Tools**, **Variables** | None; Layers and Assets are tabs at the top of the left panel | Different name or place |
-| Main menu | Figma logo button, top left of the left panel | Missing (the ◆ logo isn't a button) | Missing in ours |
+| Main menu | Figma logo button, top left of the left panel | **Main menu**: the ◆ logo button, top left of the top bar | Same (U3; place changes in U5) |
 | File name and location | Top of the left panel: file name + chevron (Edit file menu), with "Drafts · Free" under it | Top bar centre: `Untitled ▾ / Page 1` | Different name or place |
 | Minimize UI | Button next to the file name; also View menu, Ctrl+Shift+\ | Quick actions only (Minimize UI, Ctrl+Shift+\) | Different name or place |
 | Present / Share | Top of the right panel: avatars (Multiplayer tools), **Present** ▷ with **Prototype view** dropdown, **Share** | Top bar right: Plugins, Present ▷, zoom; Share *(cloud files)* | Different name or place |
@@ -43,7 +43,7 @@ Figma groups the tools into seven slots with dropdowns. Since U2, ours does too.
 | **Type tools**: Text (T), **Text on path** | Text menu: Text (T), Text on path | Same (U1) |
 | **Code tools**: Code (B), Spec (D) | Code tools: Code (B), Spec (D). Code snippet and Annotation (Shift+T) are in quick actions | Same (U2) |
 | **Comment** (C) | Comment (C) *(cloud files only)* | Same |
-| **Actions** (grid icon, Ctrl+K): AI prompts plus the command list | Quick actions (Ctrl+/ and Ctrl+K), no button | Different name or place |
+| **Actions** (grid icon, Ctrl+K): AI prompts plus the command list | **Actions** button (grid icon) after the tool slots; Ctrl+K (Ctrl+/ also works) | Same (U3; no AI prompts) |
 | Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | Annotation (Shift+T) in quick actions; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
 | Frame presets (right panel while the Frame tool is on) | Frame presets in the right panel (Phone, …) | Same |
 | Measurement is Shift+M in Figma *(docs)* | Shift+M is our Shape builder (vector edit bar, quick actions) | Different shortcut (clash if Measurement is added) |
@@ -145,17 +145,17 @@ Layer selected (frame / group):
 
 | Figma | Ours | Status |
 | --- | --- | --- |
-| **Main menu**: Back to files, Actions…, File, Edit, View, Object, Text, Arrange, Vector, Plugins, Widgets, Preferences, Libraries, Open in desktop app, Help and account | — | Missing in ours |
-| **Actions** (Ctrl+K): AI prompts on top (Ask for changes, Create variations, …), then All / Assets / Plugins & widgets tabs and suggested commands | **Quick actions** palette (Ctrl+/ and Ctrl+K): All / Assets / Plugins & widgets tabs, full command list | Different name (Actions vs quick actions; Figma has no Ctrl+/) |
-| Edit file menu (chevron by file name): Show version history, Publish library…, Export…, Add to sidebar, Create branch…, File color profile, Duplicate, Rename, Move file…, Move to trash | File-name menu: Rename file, Your account's files, New file, Libraries…, Theme, Files in this browser | Different name or place |
-| Edit menu: Copy properties / Paste properties, Pick color (I), Select matching layers, Select inverse, Paste to replace, Paste over selection | — (copy as PNG/SVG exists) | Missing in ours |
-| Object menu: Wrap in new section, Flip horizontal/vertical, Rotate 90°/180°, Remove fill/stroke, Swap fill and stroke, Boolean groups | Boolean ops, Flatten, Outline stroke, mask, auto layout (context menu); no flip/rotate commands | Missing in ours (flip, rotate, fill/stroke commands) |
-| Arrange menu: Tidy up, Pack, Distribute horizontal/vertical spacing, Distribute left/centers/right/top/bottom | Align ×6 and Distribute horizontal/vertical (quick actions; desktop Arrange menu) | Missing in ours (Tidy up, Pack, edge distributes) |
+| **Main menu**: Back to files, Actions…, File, Edit, View, Object, Text, Arrange, Vector, Plugins, Widgets, Preferences, Libraries, Open in desktop app, Help and account | **Main menu**: Back to files, Actions…, File, Edit, View, Object, Text, Arrange, Vector, Plugins, Preferences, Libraries, Help | Same (U3; no Widgets, Open in desktop app or account items) |
+| **Actions** (Ctrl+K): AI prompts on top (Ask for changes, Create variations, …), then All / Assets / Plugins & widgets tabs and suggested commands | **Actions** (Ctrl+K; Ctrl+/ also works): All / Assets / Plugins & widgets tabs, full command list | Same (U3; no AI prompts) |
+| Edit file menu (chevron by file name): Show version history, Publish library…, Export…, Add to sidebar, Create branch…, File color profile, Duplicate, Rename, Move file…, Move to trash | File-name menu: Rename, Your account's files / Back to files, New file, Libraries…, Show version history (cloud), Theme, Files in this browser | Different name or place (no Publish library, Duplicate, Move to trash) |
+| Edit menu: Copy properties / Paste properties, Pick color (I), Select matching layers, Select inverse, Paste to replace, Paste over selection | Edit: Copy as (PNG, SVG), Copy properties (Ctrl+Alt+C), Paste properties (Ctrl+Alt+V), Pick color (I), Select all, Select matching layers (Ctrl+Alt+A), Select none, Select inverse (Ctrl+Shift+A) | Same (U3); missing Paste to replace, Paste over selection |
+| Object menu: Wrap in new section, Flip horizontal/vertical, Rotate 90°/180°, Remove fill/stroke, Swap fill and stroke, Boolean groups | Object: Wrap in new section, Rotate 180° / 90° left / 90° right, Boolean groups, Hide other layers, Collapse layers (Alt+L), Remove fill (Alt+/), Remove stroke, Swap fill and stroke (Shift+X) | Same (U3); missing Flip horizontal/vertical |
+| Arrange menu: Tidy up, Pack, Distribute horizontal/vertical spacing, Distribute left/centers/right/top/bottom | Arrange: Round to pixel, Align ×6, Tidy up (Ctrl+Alt+Shift+T), Pack horizontal/vertical, Distribute spacing and Distribute left/centers/right/top/bottom | Same (U3) |
 | Vector menu: Join, Smooth join, Delete and heal, Split, Simplify, Offset | Vector edit actions (F6) | Same (not compared item by item) |
-| Text menu: Bold, Italic, Underline, Strikethrough, Create link, Bulleted / Numbered list | — | Missing in ours (as a menu) |
-| Right-click: Copy, **Paste here**, **Paste to replace**, **Copy/Paste as**, Build this with code, **Add motion**, **Select layer**, **Move to page**, order, group, Flatten, Outline stroke, mask, auto layout, Create component, Plugins, Widgets, Show/Hide, Lock/Unlock, **Flip** | Copy, Copy as PNG/SVG, Paste, Duplicate, Delete, order ×4, group, component, variants, instance commands, frame, auto layout, mask, boolean ×4, Flatten, Outline stroke, Show/Hide, Lock/Unlock, Zoom to selection | Different name or place |
-| Theme in Preferences > Theme | Theme in the file-name menu and quick actions | Different name or place |
-| — | "Renderer: use Canvas 2D", "Create a 10,000-layer test page" (quick actions) | Extra in ours (debug commands) |
+| Text menu: Bold, Italic, Underline, Strikethrough, Create link, Bulleted / Numbered list | Text: Bold (Ctrl+B), Italic (Ctrl+I), Underline (Ctrl+U), Strikethrough (Ctrl+Shift+X), on selected text layers or while editing | Same (U3); missing Create link and lists |
+| Right-click: Copy, **Paste here**, **Paste to replace**, **Copy/Paste as**, Build this with code, **Add motion**, **Select layer**, **Move to page**, order, group, Flatten, Outline stroke, mask, auto layout, Create component, Plugins, Widgets, Show/Hide, Lock/Unlock, **Flip** | Copy, Copy as PNG/SVG, Paste, **Paste here**, Duplicate, Delete, order ×4, group, component, variants, instance commands, frame, auto layout, mask, boolean ×4, Flatten, Outline stroke, **Add motion**, Show/Hide, Lock/Unlock, Zoom to selection | Different name or place (U3 added Paste here and Add motion; missing Paste to replace, Copy/Paste as, Select layer, Move to page, Flip) |
+| Theme in Preferences > Theme | Main menu > Preferences > Theme (also the file-name menu and Actions) | Same (U3) |
+| — | "Renderer: use Canvas 2D", "Create a 10,000-layer test page": only listed in Actions with `?debug` in the address | Extra in ours (hidden since U3) |
 
 ![Figma main menu](ui-comparison/figma-main-menu.png)
 ![Our quick actions](ui-comparison/ours-quick-actions.png)
@@ -171,8 +171,8 @@ Layer selected (frame / group):
 | Rulers (Shift+R) | Show rulers (Shift+R) | Same |
 | **Outlines**, Mask outlines, Frame outlines | — | Missing in ours |
 | Show slices, Comments (Shift+C), Annotations (Shift+Y), Additional labels, Multiplayer cursors | Show annotations (Shift+Y), Multiplayer cursors | Missing in ours (Show slices, Additional labels) |
-| Previous/next page, Zoom to previous/next frame (N / Shift+N) | — | Missing in ours |
-| Preferences: snapping, Keep tool selected after use, Nudge amount…, etc. | Nudge amount… only | Missing in ours (most preferences) |
+| Previous/next page, Zoom to previous/next frame (N / Shift+N) | View: Previous page / Next page (Page Up / Page Down), Zoom to previous / next frame (Shift+N / N) | Same (U3) |
+| Preferences: snapping, Keep tool selected after use, Nudge amount…, etc. | Preferences: Snap to pixel grid, Keep tool selected after use, Highlight layers on hover, Nudge amount…, Theme | Missing in ours (the other preferences) |
 
 ## 11. Export
 
@@ -193,11 +193,11 @@ Layer selected (frame / group):
 5. ~~**Group the shape buttons into one "Shape tools" slot** (Rectangle, Line, Arrow, Ellipse, Polygon, Star, Image/video…) and **Pen + Pencil into "Creation tools"**. Our toolbar then has Figma's seven slots.~~ Done in U2.
 6. ~~**Code menu**~~ (done in U1 and U2): move "Code snippet" and "Annotate" out (Figma has Code and Spec only). Rename "Annotate" to **Annotation** with Shift+T.
 7. **Mode switcher order and names**: Draw, Design, Motion, Dev Mode; consider renaming the Inspect tab to Dev Mode, or keep Inspect and note the difference.
-8. **Rename "quick actions" to Actions** and add an Actions button to the toolbar.
+8. ~~**Rename "quick actions" to Actions** and add an Actions button to the toolbar.~~ Done in U3.
 9. **Add Selection colors** to the Design tab (Figma shows it for any multi-colour selection).
 10. **Restructure Position / Layout**: split X/Y/rotation and alignment into a **Position** section; put auto layout's Flow (Freeform / Vertical / Horizontal / Grid) and Dimensions into **Layout**.
 11. **Move the toolbar to the bottom centre** with the mode switcher at its right end, and put Present / Share / zoom at the top of the right panel. This is the biggest visual difference.
-12. **Add a main menu** (logo button) with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
+12. ~~**Add a main menu** (logo button)~~ Done in U3, except Flip, Outlines and Pixel preview: with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
 13. **Motion**: name the property section **Transform** (Position, Scale, Rotation) with ◇ buttons beside the normal fields, and add **Add motion** to the right-click menu.
 14. **Left navigation rail** (File, Assets, Variables): larger change; it moves Assets out of the left-panel tabs and Variables out of the right panel.
 15. Dev Mode extras: Ready for dev, Compare changes, Measurement tool (Shift+M).

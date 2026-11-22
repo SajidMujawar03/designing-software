@@ -5,6 +5,7 @@ import { fitText, placementIn, reparentKeepingPosition, setLineEndpoints, worldR
 import { snapPoint } from '../snapping';
 import { convertToTextPath, pathTargetAt } from '../textOnPath';
 import { snapAngle, type Tool, type ToolEvent } from './types';
+import { prefs } from '../prefs';
 
 const DEFAULT_SIZE = 100;
 
@@ -146,7 +147,7 @@ export class ShapeTool implements Tool {
     this.start = null;
     this.created = null;
     this.ed.select([id]);
-    this.ed.setTool('select');
+    if (!prefs().keepToolSelected) this.ed.setTool('select');
     // A new code layer opens its code editor.
     if (this.type === 'CODE_LAYER') this.ed.openCodeEditor(id);
   }

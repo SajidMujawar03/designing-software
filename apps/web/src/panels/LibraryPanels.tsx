@@ -133,7 +133,7 @@ function CloudFileMenu() {
           </button>
           {canEdit && (
             <button role="menuitem" onClick={() => (setOpen(false), setRenaming(true))}>
-              Rename file
+              Rename
             </button>
           )}
           <button
@@ -149,7 +149,7 @@ function CloudFileMenu() {
             <BookOpen size={12} /> Libraries…
           </button>
           <button role="menuitem" onClick={() => (setOpen(false), editor.setUI({ historyOpen: true }))}>
-            <History size={12} /> Version history
+            <History size={12} /> Show version history
           </button>
           <SaveToDiskItem name={file?.name ?? 'Untitled'} onDone={() => setOpen(false)} />
           {!desktop && file && (
@@ -208,7 +208,7 @@ function LocalFileMenu() {
       {open && (
         <div className="menu file-menu-pop" role="menu">
           <button role="menuitem" onClick={() => (setOpen(false), setRenaming(true))}>
-            Rename file
+            Rename
           </button>
           <button role="menuitem" onClick={() => location.assign('/')}>
             <FileText size={12} /> {desktop ? 'Back to start' : "Your account's files"}

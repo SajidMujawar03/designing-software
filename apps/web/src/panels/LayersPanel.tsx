@@ -167,6 +167,12 @@ function LayerTree() {
   const [view, setView] = useState({ top: 0, height: 800 });
   const treeRef = useRef<HTMLDivElement>(null);
 
+  // Object > Collapse layers (Alt+L).
+  const collapse = useUI((s) => s.collapseLayers);
+  useEffect(() => {
+    if (collapse) setExpanded(new Set());
+  }, [collapse]);
+
   // Reveal selected layers by expanding their ancestors.
   useEffect(() => {
     const need = selection.flatMap((id) => editor.doc.ancestors(id).map((a) => a.id));
@@ -389,6 +395,7 @@ function LayerRowView(p: LayerRowProps) {
       onContextMenu={(e) => {
         e.preventDefault();
         if (!p.selected) editor.select([node.id]);
+        editor.contextPoint = null;
         editor.setUI({ contextMenu: { x: e.clientX, y: e.clientY } });
       }}
     >

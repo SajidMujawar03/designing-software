@@ -1,6 +1,7 @@
-import { Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { LayoutGrid, Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
+import { MainMenu } from './MainMenu';
 import { ShareButton } from './ShareDialog';
 import { PluginsButton } from './PluginPanels';
 import { presentUrl } from '../cloud/route';
@@ -150,9 +151,7 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar-left">
-        <div className="logo" aria-hidden>
-          ◆
-        </div>
+        <MainMenu />
         <div className="mode-switch" role="radiogroup" aria-label="Mode">
           {(['design', 'draw', 'motion'] as const).map((m) => (
             <button
@@ -174,6 +173,9 @@ export function Toolbar() {
         {(drawMode ? DRAW_TOOLS : TOOLS).filter((g) => g.tools[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
           <ToolSlot key={g.name ?? g.tools[0].id} slot={g} tool={tool} />
         ))}
+        <button type="button" className="tool-btn" title="Actions (Ctrl+K)" aria-label="Actions" onClick={() => editor.setUI({ paletteOpen: true })}>
+          <LayoutGrid size={16} strokeWidth={1.75} />
+        </button>
         <span className="divider" />
         <button type="button" className="tool-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!editor.doc.canUndo()} onClick={() => editor.undo()}>
           <Undo2 size={16} strokeWidth={1.75} />

@@ -129,6 +129,15 @@ Tests: one test per new command (flip, rotate, tidy up, copy/paste properties, s
 
 ---
 
+**Done in U3 / moved to later.** Built: Actions (button, Ctrl+K, debug commands behind `?debug`), the Main menu with one menu list shared with the desktop app (`editor/menus.ts`), and the Edit, Object, Text, Arrange, View and Preferences commands above, plus Paste here and Add motion in the context menu. Moved to a later phase because they need renderer or model work, or more UI than a menu item:
+- **Flip horizontal / vertical** (Shift+H / Shift+V): needs a flip in the node model, drawn by all three renderers.
+- **Outlines, Pixel preview, Pixel grid, Show slices**: renderer modes.
+- **Paste to replace, Copy/Paste as, Select layer, Move to page** in the context menu, and **Bulleted / Numbered list**, **Create link** in Text.
+- **Remove stroke** has no shortcut: Figma's Shift+/ is our `?` (keyboard shortcuts).
+- The file-name menu got Figma's names (Rename, Show version history) but not Publish library, Duplicate or Move to trash.
+
+---
+
 ### Phase U4: Right panel sections
 Branch `ui-right-panel` · about 2–3 days
 

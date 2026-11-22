@@ -10,6 +10,7 @@ import { editor } from './editor';
 import { importImages, pickImageFiles } from './images';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import type { ToolId } from './store';
+import { copyProperties, pasteProperties, pickColor, removeFill, selectInverse, selectMatchingLayers, stepFrame, stepPage, swapFillAndStroke, tidyUpSelection, toggleTextStyle } from './objectCommands';
 import { prefs, setPrefs, toggleHiddenUI, toggleMinimizedUI } from './prefs';
 
 const TOOL_KEYS: Record<string, ToolId> = {
@@ -85,16 +86,29 @@ export function installShortcuts(): () => void {
 
     if (mod && e.altKey) {
       const ops: Record<string, BooleanOperation> = { KeyU: 'UNION', KeyS: 'SUBTRACT', KeyI: 'INTERSECT', KeyX: 'EXCLUDE' };
+      if (e.shiftKey && e.code === 'KeyT') return run(() => tidyUpSelection(editor));
       if (e.code === 'KeyG') return run(() => editor.frameSelection());
+      if (!e.shiftKey && e.code === 'KeyC') return run(() => copyProperties(editor));
+      if (!e.shiftKey && e.code === 'KeyA') return run(() => selectMatchingLayers(editor));
       if (e.code === 'KeyK') return run(() => createComponent(editor));
       if (e.key === 'Enter') return run(() => (document.querySelector('.present-btn') as HTMLButtonElement | null)?.click());
-      if (e.code === 'KeyV') return run(() => editor.setUI({ variablesOpen: true }));
+      // Ctrl+Alt+V: Paste properties, as in Figma (Local variables is in the right panel and quick actions).
+      if (e.code === 'KeyV') return run(() => pasteProperties(editor));
       if (e.code === 'KeyB') return run(() => detachSelection(editor));
       if (ops[e.code]) return run(() => booleanSelection(editor, ops[e.code]));
       if (e.code === 'KeyO') return run(() => void outlineStrokeSelection(editor));
       if (e.code === 'KeyM') return run(() => editor.useAsMask());
     }
     if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') return run(() => void flattenSelection(editor));
+    if (mod && e.shiftKey && !e.altKey && e.code === 'KeyA') return run(() => selectInverse(editor));
+    // Text > Bold / Italic / Underline (Ctrl+B / I / U) and Strikethrough (Ctrl+Shift+X) on selected text layers.
+    const textSelected = editor.selectedNodes().some((n) => n.type === 'TEXT');
+    if (mod && !e.altKey && textSelected) {
+      if (!e.shiftKey && e.code === 'KeyB') return run(() => toggleTextStyle(editor, 'bold'));
+      if (!e.shiftKey && e.code === 'KeyI') return run(() => toggleTextStyle(editor, 'italic'));
+      if (!e.shiftKey && e.code === 'KeyU') return run(() => toggleTextStyle(editor, 'underline'));
+      if (e.shiftKey && e.code === 'KeyX') return run(() => toggleTextStyle(editor, 'strikethrough'));
+    }
     if (mod && e.shiftKey && !e.altKey && (e.code === 'KeyC' || key === 'c')) return run(() => void copyAsPng());
     if (mod && e.shiftKey && !e.altKey && (e.code === 'KeyE' || key === 'e')) return run(() => void exportLayers(editor.topLevelSelection()).then((f) => saveFiles(f)));
 
@@ -103,6 +117,8 @@ export function installShortcuts(): () => void {
       const k = e.code.replace('Key', '').toLowerCase();
       if (e.shiftKey && k === 'a') return run(() => removeAutoLayout(editor));
       if (e.shiftKey && k === 'f') return run(() => void flattenSelection(editor));
+      if (!e.shiftKey && k === 'l') return run(() => editor.setUI({ collapseLayers: Date.now() }));
+      if (!e.shiftKey && e.code === 'Slash') return run(() => removeFill(editor));
       if (e.shiftKey && k === 'h') return run(() => editor.distribute('x'));
       if (e.shiftKey && k === 'v') return run(() => editor.distribute('y'));
       const map: Record<string, Parameters<typeof editor.align>[0]> = {
@@ -148,6 +164,8 @@ export function installShortcuts(): () => void {
       // Shift+G: layout guides, as in Figma (Polygon has no shortcut there).
       if (e.code === 'KeyG') return run(() => editor.setUI({ showLayoutGrids: !ui.showLayoutGrids }));
       if (e.code === 'KeyT') return run(() => editor.setTool('annotate'));
+      if (e.code === 'KeyX') return run(() => swapFillAndStroke(editor));
+      if (e.code === 'KeyN') return run(() => stepFrame(editor, -1));
       if (e.code === 'KeyS') return run(() => editor.setTool('section'));
       if (e.code === 'KeyL') return run(() => editor.setTool('arrow'));
       if (e.code === 'KeyY') return run(() => setPrefs({ showAnnotations: !prefs().showAnnotations }));
@@ -164,6 +182,10 @@ export function installShortcuts(): () => void {
       if (e.key === 'Delete' || e.key === 'Backspace') return run(() => void deleteSelectedKeys());
       if (e.key === 'Escape') return run(() => selectKeys([]));
     }
+
+    if (!mod && !e.altKey && !e.shiftKey && (e.key === 'PageUp' || e.key === 'PageDown')) return run(() => stepPage(editor, e.key === 'PageUp' ? -1 : 1));
+    if (!mod && !e.altKey && !e.shiftKey && key === 'n') return run(() => stepFrame(editor, 1));
+    if (!mod && !e.altKey && !e.shiftKey && key === 'i') return run(() => void pickColor(editor));
 
     // ] and [: bring to front and send to back, as in Figma (Ctrl+Shift+] and [ still work).
     if (!mod && !e.altKey && (e.key === ']' || e.key === '[')) return run(() => editor.reorder(e.key === ']' ? 'front' : 'back'));

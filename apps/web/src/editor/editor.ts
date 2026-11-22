@@ -35,6 +35,8 @@ export class Editor {
   /** Tells the previous tool it is no longer active (set by the canvas view). */
   toolDeactivated: (tool: ToolId) => void = () => {};
   private internalClipboard: ClipboardData | null = null;
+  /** Where the canvas was right-clicked (canvas coordinates), for Paste here; null from the layers panel. */
+  contextPoint: Vec2 | null = null;
 
   constructor() {
     // Keep UI state consistent with remote edits, undo/redo, deletions.
@@ -442,8 +444,8 @@ export class Editor {
     });
   }
 
-  /** Ctrl+Alt+G: wraps the selection in a frame of the same size. */
-  frameSelection(): void {
+  /** Ctrl+Alt+G: wraps the selection in a frame of the same size (or, for Wrap in new section, a section). */
+  frameSelection(type: 'FRAME' | 'SECTION' = 'FRAME'): void {
     const ids = this.sortByZ(this.topLevelSelection());
     if (ids.some((id) => isInInstance(this.doc, id))) return;
     const b = boundsOf(this.doc, ids);
@@ -452,10 +454,10 @@ export class Editor {
     const parentId = top.parentId!;
     const frameId = this.doc.change(() => {
       const f = this.doc.createNode({
-        type: 'FRAME',
+        type,
         parentId,
         aboveId: top.id,
-        name: this.nextName('Frame', 'FRAME'),
+        name: this.nextName(type === 'SECTION' ? 'Section' : 'Frame', type),
       });
       this.doc.updateNode(
         f,
