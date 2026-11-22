@@ -1,6 +1,7 @@
 import { isFrameLike, type NodeId, type NodeType, type SceneNode } from '@figma/document';
 import { Boxes, Braces, FileText, SquareCode, Combine, Component, Contrast, Diamond, Image as ImageIcon, ImageOff, PanelTop, Slice, Star, Triangle } from 'lucide-react';
-import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Eye, EyeOff, Hash, Lock, Minus, PenTool, Plus, Search, Square, SquareDashed, Trash2, Type, Unlock } from 'lucide-react';
+import { create } from 'zustand';
 import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
@@ -33,34 +34,34 @@ const ICONS: Partial<Record<NodeType, typeof Square>> = {
 
 const TAB_KEY = 'figma-clone:left-tab';
 
-export function LayersPanel() {
-  useDocVersion();
-  const drawMode = useUI((st) => st.drawMode);
-  const [tab, setTab] = useState<'layers' | 'assets'>(() => {
+type LeftTab = 'layers' | 'assets';
+
+/** What the left panel shows: File (pages and layers) or Assets, picked in the navigation rail. */
+export const useLeftTab = create<{ tab: LeftTab }>(() => ({
+  tab: (() => {
     try {
       return localStorage.getItem(TAB_KEY) === 'assets' ? 'assets' : 'layers';
     } catch {
       return 'layers';
     }
-  });
-  const pick = (t: 'layers' | 'assets') => {
-    setTab(t);
-    try {
-      localStorage.setItem(TAB_KEY, t);
-    } catch {
-      // storage unavailable
-    }
-  };
+  })(),
+}));
+
+export function setLeftTab(tab: LeftTab): void {
+  useLeftTab.setState({ tab });
+  try {
+    localStorage.setItem(TAB_KEY, tab);
+  } catch {
+    // storage unavailable
+  }
+}
+
+export function LayersPanel() {
+  useDocVersion();
+  const drawMode = useUI((st) => st.drawMode);
+  const tab = useLeftTab((s) => s.tab);
   return (
     <div className={`layers${drawMode ? ' draw' : ''}`}>
-      <div className="side-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'layers'} className={tab === 'layers' ? 'active' : ''} onClick={() => pick('layers')}>
-          Layers
-        </button>
-        <button role="tab" aria-selected={tab === 'assets'} className={tab === 'assets' ? 'active' : ''} onClick={() => pick('assets')}>
-          Assets
-        </button>
-      </div>
       {tab === 'assets' ? (
         <AssetsPanel />
       ) : (
@@ -103,9 +104,14 @@ function PagesList() {
     <div className="pages">
       <div className="panel-head">
         Pages
-        <IconButton title="Add page" onClick={() => editor.addPage()}>
-          <Plus size={14} />
-        </IconButton>
+        <span className="panel-head-actions">
+          <IconButton title="Find (Ctrl+F)" onClick={() => editor.setUI({ findOpen: true })}>
+            <Search size={13} />
+          </IconButton>
+          <IconButton title="Add new page" onClick={() => editor.addPage()}>
+            <Plus size={14} />
+          </IconButton>
+        </span>
       </div>
       {pages.map((p) => (
         <div

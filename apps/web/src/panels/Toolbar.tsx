@@ -1,9 +1,7 @@
-import { Braces, NotebookPen, LayoutGrid, Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
+import { CodeXml, Diamond, PanelLeftClose, PenLine, Shapes, Braces, NotebookPen, LayoutGrid, Image as ImageIcon, Spline, ArrowUpRight, Brush, FileText, SquareCode, ChevronDown, Circle, Frame, Hand, MessageCircle, Minus, MousePointer2, PenTool, Pencil, Redo2, Scaling, Slice, Square, PanelTop, Star, Triangle, Type, Undo2 } from 'lucide-react';
 import { follow, people, usePresence } from '../cloud/presence';
 import { FileMenu } from './LibraryPanels';
-import { MainMenu } from './MainMenu';
 import { ShareButton } from './ShareDialog';
-import { PluginsButton } from './PluginPanels';
 import { presentUrl } from '../cloud/route';
 import { flowsOf, screenOf } from '@figma/document';
 import { Play } from 'lucide-react';
@@ -14,6 +12,7 @@ import { useUI, type ToolId } from '../editor/store';
 import { setMotionMode } from '../editor/motion';
 import { placeImages } from '../editor/shortcuts';
 import { command } from '../editor/commands';
+import { toggleMinimizedUI } from '../editor/prefs';
 
 /** View settings listed under the zoom levels, as in Figma's zoom/view options menu. */
 const VIEW_TOGGLES = ['snap-pixel', 'layout-grids', 'rulers', 'multiplayer-cursors', 'show-annotations'];
@@ -141,66 +140,99 @@ function ToolSlot({ slot, tool }: { slot: Slot; tool: ToolId }) {
   );
 }
 
-export function Toolbar() {
+/**
+ * Figma's floating toolbar, at the bottom of the canvas: the tool slots and
+ * Actions, then the mode switch (Draw, Design, Motion, Dev Mode) at its right end.
+ */
+export function FloatingToolbar() {
   useDocVersion();
   const tool = useUI((s) => s.tool);
   const drawMode = useUI((s) => s.drawMode);
-  const motionMode = useUI((s) => s.motionMode);
-  const mode = motionMode ? 'motion' : drawMode ? 'draw' : 'design';
-  const zoom = useUI((s) => s.viewport.zoom);
-  const pageId = useUI((s) => s.pageId);
-  const page = editor.doc.get(pageId);
-
   return (
-    <header className="toolbar">
-      <div className="toolbar-left">
-        <MainMenu />
-        <div className="mode-switch" role="radiogroup" aria-label="Mode">
-          {(['design', 'draw', 'motion'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={mode === m}
-              className={mode === m ? 'active' : ''}
-              title={m === 'motion' ? 'Motion (beta): animate a frame on a timeline' : undefined}
-              onClick={() => {
-                setMotionMode(m === 'motion');
-                if (m !== 'motion') editor.setDrawMode(m === 'draw');
-              }}
-            >
-              {m === 'draw' ? 'Draw' : m === 'motion' ? 'Motion' : 'Design'}
-            </button>
-          ))}
-        </div>
-        {(drawMode ? DRAW_TOOLS : TOOLS).filter((g) => g.tools[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
-          <ToolSlot key={g.name ?? g.tools[0].id} slot={g} tool={tool} />
-        ))}
-        <button type="button" className="tool-btn" title="Actions (Ctrl+K)" aria-label="Actions" onClick={() => editor.setUI({ paletteOpen: true })}>
-          <LayoutGrid size={16} strokeWidth={1.75} />
-        </button>
-        <span className="divider" />
-        <button type="button" className="tool-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!editor.doc.canUndo()} onClick={() => editor.undo()}>
-          <Undo2 size={16} strokeWidth={1.75} />
-        </button>
-        <button type="button" className="tool-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!editor.doc.canRedo()} onClick={() => editor.redo()}>
-          <Redo2 size={16} strokeWidth={1.75} />
-        </button>
-      </div>
-      <div className="toolbar-center">
-        <FileMenu />
-        <span className="sep">/</span>
-        <span>{page?.name}</span>
-      </div>
-      <div className="toolbar-right">
-        <Avatars />
-        <PluginsButton />
-        <PresentButton />
-        <ShareButton />
-        <ZoomMenu zoom={zoom} />
-      </div>
-    </header>
+    <div className="floating-toolbar" role="toolbar" aria-label="Tools" onPointerDown={(e) => e.stopPropagation()}>
+      {(drawMode ? DRAW_TOOLS : TOOLS).filter((g) => g.tools[0].id !== 'comment' || location.pathname.startsWith('/file/')).map((g) => (
+        <ToolSlot key={g.name ?? g.tools[0].id} slot={g} tool={tool} />
+      ))}
+      <button type="button" className="tool-btn" title="Actions (Ctrl+K)" aria-label="Actions" onClick={() => editor.setUI({ paletteOpen: true })}>
+        <LayoutGrid size={16} strokeWidth={1.75} />
+      </button>
+      <span className="divider" />
+      <ModeSwitch />
+    </div>
   );
+}
+
+type Mode = 'draw' | 'design' | 'motion' | 'dev';
+const MODES: Array<[Mode, string, typeof Square]> = [
+  ['draw', 'Draw', PenLine],
+  ['design', 'Design', Shapes],
+  ['motion', 'Motion (beta): animate a frame on a timeline', Diamond],
+  ['dev', 'Dev Mode: inspect and copy code (the Inspect tab)', CodeXml],
+];
+
+/** Draw, Design, Motion and Dev Mode, as icon toggles. Dev Mode is Design mode with the Inspect tab. */
+function ModeSwitch() {
+  const drawMode = useUI((s) => s.drawMode);
+  const motionMode = useUI((s) => s.motionMode);
+  const rightTab = useUI((s) => s.rightTab);
+  const mode: Mode = motionMode ? 'motion' : drawMode ? 'draw' : rightTab === 'inspect' ? 'dev' : 'design';
+  const pick = (m: Mode) => {
+    setMotionMode(m === 'motion');
+    if (m !== 'motion') editor.setDrawMode(m === 'draw');
+    if (m === 'dev') editor.setUI({ rightTab: 'inspect' });
+    // Leaving Dev Mode goes back to the Design tab (Motion's Animate section is there).
+    else if (rightTab === 'inspect') editor.setUI({ rightTab: 'design' });
+  };
+  return (
+    <div className="mode-switch" role="radiogroup" aria-label="Mode">
+      {MODES.map(([m, title, Icon]) => {
+        const label = title.split(' (')[0].split(':')[0];
+        return (
+          <button key={m} type="button" role="radio" aria-checked={mode === m} aria-label={label} title={title} className={mode === m ? 'active' : ''} onClick={() => pick(m)}>
+            <Icon size={16} strokeWidth={1.75} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Top of the right panel: who's here, Present and Share. */
+export function RightHead() {
+  return (
+    <div className="right-head">
+      <Avatars />
+      <span className="spacer" />
+      <PresentButton />
+      <ShareButton />
+    </div>
+  );
+}
+
+/** Top of the left panel: the file name (and its menu), Undo / Redo and Minimize UI. */
+export function LeftHead() {
+  useDocVersion();
+  return (
+    <div className="left-head">
+      <FileMenu />
+      <span className="spacer" />
+      <button type="button" className="icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!editor.doc.canUndo()} onClick={() => editor.undo()}>
+        <Undo2 size={14} strokeWidth={1.75} />
+      </button>
+      <button type="button" className="icon-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!editor.doc.canRedo()} onClick={() => editor.redo()}>
+        <Redo2 size={14} strokeWidth={1.75} />
+      </button>
+      <button type="button" className="icon-btn" title="Minimize UI (Ctrl+Shift+\\)" aria-label="Minimize UI" onClick={() => toggleMinimizedUI()}>
+        <PanelLeftClose size={14} strokeWidth={1.75} />
+      </button>
+    </div>
+  );
+}
+
+/** The zoom level (and its zoom/view options menu), at the right end of the right panel's tab row. */
+export function ZoomControl() {
+  const zoom = useUI((s) => s.viewport.zoom);
+  return <ZoomMenu zoom={zoom} />;
 }
 
 function ZoomMenu({ zoom }: { zoom: number }) {

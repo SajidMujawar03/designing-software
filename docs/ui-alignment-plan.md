@@ -195,6 +195,15 @@ Tests: layout smoke test at 1440×900 and 1024×768 (nothing overlaps the canvas
 
 ---
 
+**Done in U5 / changed.** Built: the floating toolbar with the Draw / Design / Motion / Dev Mode switch (Dev Mode opens the Inspect tab; leaving it returns to Design), the navigation rail (Main menu, File, Assets, Variables, Plugins), the left panel head (file menu, Minimize UI), the right panel head (avatars, Present, Share) with the zoom at the end of the tab row, the Find magnifier next to Pages (Figma's magnifier there is Find, not a page search as this plan first said) and the Help button. Minimize UI now keeps the rail and toolbar. Changed from the plan:
+- **Undo / Redo buttons are kept**, small, at the top of the left panel (Figma has none).
+- **Motion keeps the Design / Prototype / Inspect tabs**; only Draw shows the mode name.
+- The toolbar stays dark rather than Figma's light bar.
+- No Prototype view dropdown next to Present.
+Also fixed here: Add page (File menu) and Remove all guides on this page (View menu) were missing from the menus since U3, and the Design tab header shows the layer's name again.
+
+---
+
 ### Phase U6: Motion panel
 Branch `ui-motion-panel` · about 2 days
 

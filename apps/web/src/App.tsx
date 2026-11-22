@@ -19,7 +19,8 @@ import { InspectPanel, RightTabs } from './panels/InspectPanel';
 import { PrototypePanel } from './panels/PrototypePanel';
 import { maybeStartTour, ShortcutsSheet, Tour } from './panels/Onboarding';
 import { PluginHost, PluginManager } from './panels/PluginPanels';
-import { Toolbar } from './panels/Toolbar';
+import { FloatingToolbar, LeftHead, RightHead, ZoomControl } from './panels/Toolbar';
+import { HelpButton, NavRail } from './panels/NavRail';
 import { ErrorBoundary } from './panels/ErrorBoundary';
 import { usePrefs } from './editor/prefs';
 import { startLayerThumbs } from './editor/layerThumbs';
@@ -77,7 +78,6 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
 
   return (
     <div className={`app${uiMode === 'full' ? '' : ` ui-${uiMode}`}`}>
-      <Toolbar />
       {route.kind === 'file' && <VersionPreviewBar />}
       {editor.doc.schema?.tooNew && (
         <div className="offline-banner" role="status">
@@ -91,7 +91,9 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
       )}
       {offlineNotice && <div className="offline-banner">The server can't be reached, so you're working with files kept in this browser.</div>}
       <div className="workspace">
+        <NavRail />
         <aside className="sidebar left">
+          <LeftHead />
           <ErrorBoundary name="layers" variant="panel">
             <LayersPanel />
           </ErrorBoundary>
@@ -108,18 +110,30 @@ function Editor({ route, offlineNotice }: { route: Route; offlineNotice: boolean
           <VectorEditBar />
           <ShapeBuilderHint />
           <Timeline />
+          <FloatingToolbar />
+          <HelpButton />
         </main>
         <aside className="sidebar right">
+          <RightHead />
           <ErrorBoundary name={`right:${rightTab}`} variant="panel" resetKey={selection.join(",")}>
           {route.kind === 'file' && historyOpen && !previewing ? (
             <VersionHistoryPanel />
           ) : drawMode ? (
-            <DrawPanel />
+            <>
+              <div className="right-tabs-row">
+                <span className="mode-label">Draw</span>
+                <ZoomControl />
+              </div>
+              <DrawPanel />
+            </>
           ) : tool === 'comment' && route.kind === 'file' && !previewing ? (
             <CommentsPanel />
           ) : (
             <>
-              <RightTabs />
+              <div className="right-tabs-row">
+                <RightTabs />
+                <ZoomControl />
+              </div>
               {rightTab === 'inspect' ? <InspectPanel /> : rightTab === 'prototype' ? <PrototypePanel /> : <PropertiesPanel />}
             </>
           )}

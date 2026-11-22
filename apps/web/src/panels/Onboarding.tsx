@@ -16,10 +16,10 @@ interface Step {
 
 const STEPS: Step[] = [
   { title: 'Welcome to the editor', body: 'A quick tour of where things are. It takes half a minute; you can skip it and bring it back from Actions (Ctrl+K).' },
-  { target: '.toolbar-left', title: 'Tools', body: 'Draw frames, shapes, text and vectors. Each tool has a key: V move, F frame, R rectangle, T text, P pen. Press H or hold Space to pan.' },
-  { target: '.sidebar.left', title: 'Layers and assets', body: 'Every layer of the page, in order. Drag to reorder or nest. The Assets tab lists components to drag onto the canvas.' },
+  { target: '.floating-toolbar', title: 'Tools', body: 'Draw frames, shapes, text and vectors. Each tool has a key: V move, F frame, R rectangle, T text, P pen. Press H or hold Space to pan. The icons at the right end switch between Draw, Design, Motion and Dev Mode.' },
+  { target: '.sidebar.left', title: 'Layers and assets', body: 'Every layer of the page, in order. Drag to reorder or nest. The rail on the left switches to Assets (components to drag onto the canvas), Variables and Plugins.' },
   { target: '.sidebar.right', title: 'Design, prototype, inspect', body: 'Edit the selection here: layout, fills, text, effects and export. Prototype connects screens; Inspect shows code and measurements.' },
-  { target: '.toolbar-right', title: 'Share and present', body: 'Invite people, see who is here, and play the prototype. In account files, changes save and sync as you work.' },
+  { target: '.right-head', title: 'Share and present', body: 'Invite people, see who is here, and play the prototype. In account files, changes save and sync as you work.' },
   { title: 'Find any command', body: 'Press Ctrl+K for Actions (every command), and ? for all keyboard shortcuts. The logo at the top left opens the Main menu. Have fun designing!' },
 ];
 

@@ -9,22 +9,23 @@ Status key: **Same** · **Different name or place** · **Missing in ours** · **
 
 | Figma | Ours |
 | --- | --- |
-| ![Figma editor](ui-comparison/figma-editor.png) | ![Our editor](ui-comparison/ours-editor.png) |
+| ![Figma editor](ui-comparison/figma-editor.png) | ![Our editor, before U1](ui-comparison/ours-editor.png) |
+|  | ![Our editor after U5](ui-comparison/ours-u5-layout.png) |
 | ![Figma, frame selected](ui-comparison/figma-frame-selected.png) | ![Ours, frame selected](ui-comparison/ours-frame-selected.png) |
 
 ## 1. Overall layout
 
 | Feature | Figma (name, location) | Ours (name, location) | Status |
 | --- | --- | --- | --- |
-| Tool bar | Floating toolbar at the **bottom centre** of the canvas | Top bar across the window (dark), with modes, tools, undo/redo, file name, Plugins, Present, zoom | Different name or place |
-| Navigation rail | Narrow left rail: **File**, **Agents**, **Assets**, **Tools**, **Variables** | None; Layers and Assets are tabs at the top of the left panel | Different name or place |
-| Main menu | Figma logo button, top left of the left panel | **Main menu**: the ◆ logo button, top left of the top bar | Same (U3; place changes in U5) |
-| File name and location | Top of the left panel: file name + chevron (Edit file menu), with "Drafts · Free" under it | Top bar centre: `Untitled ▾ / Page 1` | Different name or place |
-| Minimize UI | Button next to the file name; also View menu, Ctrl+Shift+\ | Quick actions only (Minimize UI, Ctrl+Shift+\) | Different name or place |
-| Present / Share | Top of the right panel: avatars (Multiplayer tools), **Present** ▷ with **Prototype view** dropdown, **Share** | Top bar right: Plugins, Present ▷, zoom; Share *(cloud files)* | Different name or place |
-| Zoom/view options | `44% ▾` on the right panel's tab row | `100%` in the top bar | Different name or place |
-| Undo / Redo buttons | None on screen (menu and shortcuts only) | Buttons in the top bar | Extra in ours |
-| Help | `?` button, bottom right | Missing (the editor tour is in quick actions) | Missing in ours |
+| Tool bar | Floating toolbar at the **bottom centre** of the canvas | Floating toolbar at the bottom centre of the canvas: tool slots, Actions, then the mode switch | Same (U5; ours is dark) |
+| Navigation rail | Narrow left rail: **File**, **Agents**, **Assets**, **Tools**, **Variables** | Left rail: Main menu, then **File**, **Assets**, **Variables**, **Plugins** (our Tools) | Same (U5; no Agents) |
+| Main menu | Figma logo button, top left of the left panel | **Main menu**: the ◆ logo button at the top of the rail | Same (U3, U5) |
+| File name and location | Top of the left panel: file name + chevron (Edit file menu), with "Drafts · Free" under it | Top of the left panel: file name + chevron (file menu); cloud files show the project, sync status and "View only" | Same (U5) |
+| Minimize UI | Button next to the file name; also View menu, Ctrl+Shift+\ | Button at the top of the left panel; View menu; Ctrl+Shift+\. The rail and toolbar stay; File or Assets in the rail brings the panels back | Same (U5) |
+| Present / Share | Top of the right panel: avatars (Multiplayer tools), **Present** ▷ with **Prototype view** dropdown, **Share** | Top of the right panel: avatars, Present ▷, Share *(cloud files)* | Same (U5); no Prototype view dropdown |
+| Zoom/view options | `44% ▾` on the right panel's tab row | `100%` at the right end of the right panel's tab row | Same (U5) |
+| Undo / Redo buttons | None on screen (menu and shortcuts only) | Small buttons at the top of the left panel, next to the file name | Extra in ours (kept) |
+| Help | `?` button, bottom right | `?` button at the bottom right of the canvas: Keyboard shortcuts, Show the editor tour | Same (U5) |
 | Editor tour | — | "Welcome to the editor" tour on first open | Extra in ours |
 
 ## 2. Toolbar and tools (Design mode)
@@ -52,10 +53,10 @@ Figma groups the tools into seven slots with dropdowns. Since U2, ours does too.
 
 | Feature | Figma | Ours | Status |
 | --- | --- | --- | --- |
-| Mode switcher | Segmented icons at the **right end of the bottom toolbar**, in this order: **Draw**, **Design**, **Motion (Beta)**, **Dev Mode** | Text tabs at the left of the top bar: **Design**, **Draw**, **Motion** | Different name or place (order, position, Dev Mode) |
-| Mode name on the right panel | The tab row shows the mode: "Draw", "Motion Beta" | Design / Prototype / Inspect tabs stay the same in every mode | Different name or place |
+| Mode switcher | Segmented icons at the **right end of the bottom toolbar**, in this order: **Draw**, **Design**, **Motion (Beta)**, **Dev Mode** | Icon toggles at the right end of the floating toolbar: Draw, Design, Motion, Dev Mode (Dev Mode = the Inspect tab) | Same (U5) |
+| Mode name on the right panel | The tab row shows the mode: "Draw", "Motion Beta" | Draw shows "Draw" in the tab row; Motion keeps the Design / Prototype / Inspect tabs | Different name or place (Motion keeps its tabs) |
 | Draw toolbar | Move, **Pen / Brush / Pencil** (drawn as real pens), Frame, Shape, Text, Code, Comment, Actions | Move tools, Pen, Brush, Pencil, Region, Shape, Type and Code tools (Comment on cloud files) | Same (U2; Actions comes in U3) |
-| Dev Mode | Mode in the toolbar (Shift+D), paid plans; its own right panel (Inspect, Plugins) | **Inspect tab** in the right panel, in every mode | Different name or place |
+| Dev Mode | Mode in the toolbar (Shift+D), paid plans; its own right panel (Inspect, Plugins) | **Dev Mode** toggle in the toolbar opens the Inspect tab | Different name or place (no Shift+D; same right panel) |
 
 ![Figma Draw mode](ui-comparison/figma-draw.png)
 
@@ -63,12 +64,12 @@ Figma groups the tools into seven slots with dropdowns. Since U2, ours does too.
 
 | Feature | Figma | Ours | Status |
 | --- | --- | --- | --- |
-| Pages | "Pages" header, **search** and **+ (Add new page)** | "Pages" header with + (Add page) | Missing in ours (page search) |
+| Pages | "Pages" header, **search** and **+ (Add new page)** | "Pages" header with Find (magnifier) and + (Add new page) | Same (U5) |
 | Layers | "Layers" header with a layout/collapse toggle; thumbnails for frames | "Layers" header with "Show layer icons" toggle; "Layer thumbnails" in quick actions | Same |
-| Find | Find (magnifier) next to Pages; Edit > Find (Ctrl+F) | Find and replace… (Ctrl+F) in quick actions | Different name or place |
-| Assets | Left rail **Assets**: All libraries, Created in this file, UI kits (iOS and iPadOS, Material 3, Simple Design System), Add more libraries | **Assets** tab: Local components, Libraries | Different name or place (rail vs tab; no UI kits) |
-| Variables | Left rail **Variables** (collections) | "Variables" section in the right panel when nothing is selected → **Open variables**; Local variables (Ctrl+Alt+V) | Different name or place |
-| Tools | Left rail **Tools**: plugins, widgets, shaders, AI image tools | **Plugins** button in the top bar (built-in plugins, Write a plugin, Add from a URL/file) | Different name or place |
+| Find | Find (magnifier) next to Pages; Edit > Find (Ctrl+F) | Magnifier next to Pages opens Find and replace (Ctrl+F); also Edit menu and Actions | Same (U5) |
+| Assets | Left rail **Assets**: All libraries, Created in this file, UI kits (iOS and iPadOS, Material 3, Simple Design System), Add more libraries | Rail **Assets**: Local components, Libraries | Same place (U5); no UI kits |
+| Variables | Left rail **Variables** (collections) | Rail **Variables** opens the variables window; also Open variables in the right panel | Same (U5) |
+| Tools | Left rail **Tools**: plugins, widgets, shaders, AI image tools | Rail **Plugins**: built-in plugins, Write a plugin, Add from a URL / file | Different name (Plugins vs Tools) |
 | Agents | Left rail **Agents** (AI chat on the file) | — | Missing in ours |
 
 ## 5. Right panel: Design tab
@@ -191,14 +192,14 @@ Layer selected (frame / group):
 4. ~~**Zoom to 100% shortcut**~~ (done in U1): Ctrl+0 (Figma) instead of Shift+0; add Zoom to 50% / 200% to the zoom menu.
 5. ~~**Group the shape buttons into one "Shape tools" slot** (Rectangle, Line, Arrow, Ellipse, Polygon, Star, Image/video…) and **Pen + Pencil into "Creation tools"**. Our toolbar then has Figma's seven slots.~~ Done in U2.
 6. ~~**Code menu**~~ (done in U1 and U2): move "Code snippet" and "Annotate" out (Figma has Code and Spec only). Rename "Annotate" to **Annotation** with Shift+T.
-7. **Mode switcher order and names**: Draw, Design, Motion, Dev Mode; consider renaming the Inspect tab to Dev Mode, or keep Inspect and note the difference.
+7. ~~**Mode switcher order and names**~~ (done in U5): Draw, Design, Motion, Dev Mode; consider renaming the Inspect tab to Dev Mode, or keep Inspect and note the difference.
 8. ~~**Rename "quick actions" to Actions** and add an Actions button to the toolbar.~~ Done in U3.
 9. ~~**Add Selection colors** to the Design tab.~~ Done in U4.
 10. ~~**Restructure Position / Layout**~~ (done in U4): split X/Y/rotation and alignment into a **Position** section; put auto layout's Flow (Freeform / Vertical / Horizontal / Grid) and Dimensions into **Layout**.
-11. **Move the toolbar to the bottom centre** with the mode switcher at its right end, and put Present / Share / zoom at the top of the right panel. This is the biggest visual difference.
+11. ~~**Move the toolbar to the bottom centre**~~ (done in U5) with the mode switcher at its right end, and put Present / Share / zoom at the top of the right panel. This is the biggest visual difference.
 12. ~~**Add a main menu** (logo button)~~ Done in U3, except Flip, Outlines and Pixel preview: with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
 13. **Motion**: name the property section **Transform** (Position, Scale, Rotation) with ◇ buttons beside the normal fields, and add **Add motion** to the right-click menu.
-14. **Left navigation rail** (File, Assets, Variables): larger change; it moves Assets out of the left-panel tabs and Variables out of the right panel.
+14. ~~**Left navigation rail**~~ (done in U5) (File, Assets, Variables): larger change; it moves Assets out of the left-panel tabs and Variables out of the right panel.
 15. Dev Mode extras: Ready for dev, Compare changes, Measurement tool (Shift+M).
 
 Not worth copying: Figma's AI entries (Agents, Prototype with Agent, Actions AI prompts, Build this with code), Widgets, Publish library / branches (plan features).
