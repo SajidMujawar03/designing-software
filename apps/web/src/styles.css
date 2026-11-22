@@ -5151,3 +5151,262 @@ a.btn {
 .timeline-key:hover {
   background: var(--blue-soft);
 }
+
+/* Auto-keyframe: a red bar across the timeline and a red playhead (as in Figma Motion). */
+.timeline.autokey {
+  border-top: 2px solid #f24822;
+}
+.timeline.autokey .timeline-playhead {
+  border-left-color: #f24822;
+}
+.timeline.autokey .timeline-playhead::before {
+  border-top-color: #f24822;
+}
+.timeline-autokey.active {
+  color: #f24822;
+}
+.timeline-hint-text {
+  margin-left: 8px;
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline-key.selected {
+  background: var(--blue);
+}
+.timeline-bar {
+  cursor: grab;
+}
+.timeline-bar.selected {
+  background: rgba(13, 153, 255, 0.35);
+}
+.timeline-prop-name {
+  cursor: default;
+}
+.timeline-prop-name.selected {
+  color: var(--blue-text);
+}
+.timeline-segment {
+  top: 9px;
+  height: 6px;
+  background-clip: content-box;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.timeline-segment:hover,
+.timeline-segment.open {
+  opacity: 1;
+}
+.timeline-marquee {
+  position: absolute;
+  z-index: 6;
+  border: 1px solid var(--blue);
+  background: rgba(13, 153, 255, 0.08);
+  pointer-events: none;
+}
+.easing-popover {
+  position: absolute;
+  z-index: 30;
+  width: 372px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.easing-tabs,
+.spring-mode {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+.easing-tabs button,
+.spring-mode button {
+  flex: 1;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.easing-tabs button.active,
+.spring-mode button.active {
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.easing-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.easing-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  text-align: center;
+  cursor: pointer;
+}
+.easing-preset:hover {
+  background: var(--hover);
+}
+.easing-preset.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+.easing-curve {
+  color: var(--blue);
+  overflow: visible;
+}
+.easing-section-title {
+  margin: 10px 0 6px;
+  font-weight: 600;
+}
+.curve-editor {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.curve-editor svg {
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--panel-2);
+  touch-action: none;
+}
+.curve-box {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-dasharray: 3 3;
+}
+.curve-arm {
+  stroke: var(--muted);
+}
+.curve-line {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+}
+.curve-editor:not(.active) .curve-line {
+  stroke: var(--muted);
+}
+.curve-corner {
+  fill: var(--panel);
+  stroke: var(--muted);
+  cursor: pointer;
+}
+.curve-handle {
+  fill: var(--panel);
+  stroke: var(--blue);
+  stroke-width: 2;
+  cursor: grab;
+}
+.curve-text {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 10px;
+}
+.spring-slider {
+  display: grid;
+  grid-template-columns: 64px 1fr 48px;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.spring-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.spring-note {
+  margin: 4px 0;
+  color: var(--muted);
+}
+.spring-preview {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+/* The Animate section: a diamond beside each property. */
+.animate-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.animate-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.animate-row > :last-child {
+  flex: 1;
+  min-width: 0;
+}
+.key-diamond {
+  width: 10px;
+  height: 10px;
+  margin: 0 3px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1.5px solid var(--muted);
+  background: none;
+  transform: rotate(45deg);
+  cursor: pointer;
+}
+.key-diamond.animated {
+  border-color: var(--blue);
+  background: linear-gradient(135deg, transparent 50%, var(--blue) 50%);
+}
+.key-diamond.at {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+.animate-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+.animate-color-label {
+  width: 72px;
+  color: var(--muted);
+}
+.animate-color input[type='color'] {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+}
+.animate-hex {
+  font-variant-numeric: tabular-nums;
+}

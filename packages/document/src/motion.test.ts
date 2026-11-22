@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyMotionEdit,
+  copyKeyframes,
+  moveKeyframes,
+  pasteKeyframes,
+  removeKeyframes,
+  setKeyframe,
+  setKeyframeEasing,
+  toggleKeyframe,
+  animatableProperties,
   cubicBezier,
   DesignDocument,
   easeProgress,
@@ -182,5 +191,98 @@ describe('posed document', () => {
     expect(m[3]).toBe(0.5);
     expect(m[0] * 0 + m[4]).toBeCloseTo(10 - 50);
     expect(m[3] * 25 + m[5]).toBeCloseTo(35);
+  });
+});
+
+describe('editing keyframes', () => {
+  const setupLayer = () => {
+    const { doc, page } = setup();
+    const frame = doc.change(() => doc.createNode({ type: 'FRAME', parentId: page, width: 400, height: 400 }));
+    const id = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: frame, x: 10, y: 10, width: 100, height: 100, fills: [solid('#FF0000')] }));
+    return { doc, frame, id };
+  };
+  const times = (doc: DesignDocument, id: string, p: 'x' | 'opacity' = 'x') => doc.get(id)!.keyframes?.[p]?.map((k) => k.time);
+
+  it('adds keyframes (giving the frame a timeline), updates one at the same time, and toggles', () => {
+    const { doc, frame, id } = setupLayer();
+    expect(doc.get(frame)!.motion).toBeUndefined();
+    doc.change(() => setKeyframe(doc, id, 'x', 500, 200));
+    doc.change(() => setKeyframe(doc, id, 'x', 0, 10));
+    expect(doc.get(frame)!.motion).toEqual({ duration: 2000, playback: 'LOOP' });
+    expect(times(doc, id)).toEqual([0, 500]);
+    doc.change(() => setKeyframe(doc, id, 'x', 500.2, 250));
+    expect(doc.get(id)!.keyframes!.x!.map((k) => k.value)).toEqual([10, 250]);
+    // New segments ease in and out.
+    expect(doc.get(id)!.keyframes!.x![0].easing).toEqual({ type: 'EASE_IN_AND_OUT' });
+    // The diamond: adds a keyframe holding the current value, or removes the one here.
+    doc.change(() => toggleKeyframe(doc, id, 'opacity', 300));
+    expect(doc.get(id)!.keyframes!.opacity).toMatchObject([{ time: 300, value: 1 }]);
+    doc.change(() => toggleKeyframe(doc, id, 'opacity', 300));
+    expect(doc.get(id)!.keyframes!.opacity).toBeUndefined();
+    doc.change(() => toggleKeyframe(doc, id, 'x', 250));
+    expect(doc.get(id)!.keyframes!.x!.find((k) => k.time === 250)!.value).toBeCloseTo(130);
+  });
+
+  it('moves, replaces on landing, re-eases, removes, copies and pastes', () => {
+    const { doc, id } = setupLayer();
+    doc.change(() => [0, 500, 1000].forEach((t, i) => setKeyframe(doc, id, 'x', t, i * 100)));
+    const ref = (t: number) => ({ nodeId: id, prop: 'x' as const, id: doc.get(id)!.keyframes!.x!.find((k) => k.time === t)!.id });
+    doc.change(() => moveKeyframes(doc, [ref(500)], 200));
+    expect(times(doc, id)).toEqual([0, 700, 1000]);
+    // Dropped onto another keyframe: replaces it.
+    doc.change(() => moveKeyframes(doc, [ref(700)], 300));
+    expect(times(doc, id)).toEqual([0, 1000]);
+    expect(doc.get(id)!.keyframes!.x![1].value).toBe(100);
+    doc.change(() => moveKeyframes(doc, [ref(0)], -50));
+    expect(times(doc, id)).toEqual([0, 1000]);
+    doc.change(() => setKeyframeEasing(doc, [ref(0)], { type: 'HOLD' }));
+    expect(doc.get(id)!.keyframes!.x![0].easing).toEqual({ type: 'HOLD' });
+    const copied = copyKeyframes(doc, [ref(0), ref(1000)]);
+    let pasted: ReturnType<typeof pasteKeyframes> = [];
+    doc.change(() => (pasted = pasteKeyframes(doc, copied, 1500)));
+    expect(times(doc, id)).toEqual([0, 1000, 1500, 2500]);
+    expect(doc.get(id)!.keyframes!.x![2].easing).toEqual({ type: 'HOLD' });
+    doc.change(() => removeKeyframes(doc, pasted));
+    expect(times(doc, id)).toEqual([0, 1000]);
+    doc.change(() => removeKeyframes(doc, [ref(0), ref(1000)]));
+    expect(doc.get(id)!.keyframes ?? null).toBeNull();
+  });
+
+  it('follows the edit rules: auto-keyframe, a keyframe at the playhead, blocked, or design', () => {
+    const { doc, id } = setupLayer();
+    const posed = () => doc.get(id)!;
+    // Not animated, auto-keyframe off: a normal design change.
+    doc.change(() => applyMotionEdit(doc, posed(), { y: 50 }, 400, false));
+    expect(doc.get(id)!.y).toBe(50);
+    expect(doc.get(id)!.keyframes).toBeUndefined();
+    // Auto-keyframe on: records keyframes instead; the design value stays.
+    doc.change(() => applyMotionEdit(doc, posed(), { x: 300, fills: [solid('#0000FF')] }, 400, true));
+    expect(doc.get(id)!.x).toBe(10);
+    expect(doc.get(id)!.keyframes!.x).toMatchObject([{ time: 400, value: 300 }]);
+    expect(doc.get(id)!.keyframes!.fillColor).toMatchObject([{ time: 400, value: '0000FFFF' }]);
+    expect(doc.get(id)!.fills[0]).toMatchObject({ color: { r: 1, g: 0, b: 0 } });
+    // A keyframe at the playhead: updated even with auto-keyframe off.
+    doc.change(() => applyMotionEdit(doc, posed(), { x: 320 }, 400, false));
+    expect(doc.get(id)!.keyframes!.x![0].value).toBe(320);
+    // The same value again (a field committing twice) leaves the design value alone.
+    doc.change(() => applyMotionEdit(doc, { ...posed(), x: 320 }, { x: 320 }, 400, false));
+    expect(doc.get(id)!.x).toBe(10);
+    // Animated, no keyframe here, auto-keyframe off: blocked; other changes still apply.
+    let blocked: string[] = [];
+    doc.change(() => (blocked = applyMotionEdit(doc, posed(), { x: 999, name: 'Box' }, 900, false)));
+    expect(blocked).toEqual(['x']);
+    expect(doc.get(id)!.keyframes!.x).toHaveLength(1);
+    expect(doc.get(id)!.name).toBe('Box');
+    // Scale has no design value: it can only be keyframed.
+    doc.change(() => applyMotionEdit(doc, posed(), { motionScaleX: 2 }, 0, false));
+    expect(doc.get(id)!.motionScaleX).toBeUndefined();
+    doc.change(() => applyMotionEdit(doc, posed(), { motionScaleX: 2 }, 0, true));
+    expect(doc.get(id)!.keyframes!.scaleX).toMatchObject([{ time: 0, value: 2 }]);
+    expect(doc.get(id)!.motionScaleX).toBeUndefined();
+  });
+
+  it('only offers corner radius where there are corners', () => {
+    expect(animatableProperties({ type: 'ELLIPSE' } as SceneNode)).not.toContain('cornerRadius');
+    expect(animatableProperties({ type: 'RECTANGLE' } as SceneNode)).toContain('cornerRadius');
   });
 });

@@ -1,4 +1,23 @@
-import { DEFAULT_MOTION, motionFrameOf, playbackEnded, poseAt, posedDocument, timelineTime, type DesignDocument, type MotionTimeline, type NodeId, type SceneNode } from '@figma/document';
+import {
+  applyMotionEdit,
+  copyKeyframes,
+  DEFAULT_MOTION,
+  motionFrameOf,
+  pasteKeyframes,
+  playbackEnded,
+  poseAt,
+  posedDocument,
+  removeKeyframes,
+  timelineTime,
+  type CopiedKeys,
+  type DesignDocument,
+  type MotionProperty,
+  type MotionTimeline,
+  type NodeId,
+  type NodePatch,
+  type SceneNode,
+} from '@figma/document';
+import { fitText } from './transforms';
 import { editor } from './editor';
 import type { MotionUI } from './store';
 
@@ -142,4 +161,112 @@ export function parseTime(text: string, unit: MotionUI['unit']): number | null {
   const v = parseFloat(m[1]);
   const u = (m[2]?.toLowerCase() as MotionUI['unit'] | undefined) ?? unit;
   return u === 's' ? v * 1000 : v;
+}
+
+// ------------------------------------------------------------ editing in Motion mode
+
+/** Whether a layer is in the frame the timeline shows (so changes to it follow the Motion rules). */
+export function inMotionFrame(id: NodeId): boolean {
+  const f = editor.ui.motionMode ? motionFrame() : null;
+  return !!f && (f.id === id || editor.doc.isAncestor(f.id, id));
+}
+
+/** Shows a short message under the timeline header. */
+export function motionHint(text: string): void {
+  setMotion({ hint: { text, at: Date.now() } });
+}
+
+const PROP_NAMES: Record<MotionProperty, string> = {
+  x: 'X',
+  y: 'Y',
+  width: 'width',
+  height: 'height',
+  rotation: 'rotation',
+  scaleX: 'scale X',
+  scaleY: 'scale Y',
+  opacity: 'opacity',
+  cornerRadius: 'corner radius',
+  fillColor: 'fill',
+  strokeColor: 'stroke',
+  strokeWeight: 'stroke weight',
+  blur: 'blur',
+};
+
+/**
+ * Applies changes to layers, following the Motion rules for layers in the
+ * timeline's frame (keyframes at the playhead, or design values) and
+ * applying normally otherwise. Must run inside a document change.
+ */
+export function motionUpdate(patches: Array<[NodeId, NodePatch]>, opts?: { constraints?: boolean }): void {
+  const doc = editor.doc;
+  const view = drawnDocument();
+  const { time, autoKey } = editor.ui.motion;
+  const plain: Array<[NodeId, NodePatch]> = [];
+  const blocked = new Set<MotionProperty>();
+  for (const [id, patch] of patches) {
+    if (!inMotionFrame(id)) {
+      plain.push([id, patch]);
+      continue;
+    }
+    const posed = view.get(id);
+    if (!posed) continue;
+    for (const p of applyMotionEdit(doc, posed, patch, time, autoKey)) blocked.add(p);
+  }
+  if (plain.length) doc.updateNodes(plain, opts);
+  if (blocked.size) {
+    const names = [...blocked].map((p) => PROP_NAMES[p]).join(', ');
+    motionHint(`${names[0].toUpperCase()}${names.slice(1)} ${blocked.size > 1 ? 'are' : 'is'} animated: add a keyframe here or turn on auto-keyframe to change it.`);
+  }
+}
+
+/** The Properties panel's way to change layers: Motion rules in Motion mode, then text refits. */
+export function motionApply(ids: NodeId[], patch: NodePatch | ((n: SceneNode) => NodePatch), live = false): void {
+  const doc = editor.doc;
+  const run = () => {
+    const view = drawnDocument();
+    motionUpdate(ids.flatMap((id) => {
+      const n = view.get(id);
+      return n ? [[id, typeof patch === 'function' ? patch(n) : patch] as [NodeId, NodePatch]] : [];
+    }));
+    for (const id of ids) fitText(doc, id);
+  };
+  if (live) run();
+  else doc.change(run);
+}
+
+export const toggleAutoKey = (): void => setMotion({ autoKey: !editor.ui.motion.autoKey });
+
+// ------------------------------------------------------------ keyframe selection
+
+export function selectKeys(keys: MotionUI['selectedKeys']): void {
+  setMotion({ selectedKeys: keys });
+}
+
+export function deleteSelectedKeys(): boolean {
+  const keys = editor.ui.motion.selectedKeys;
+  if (!keys.length) return false;
+  editor.doc.change(() => removeKeyframes(editor.doc, keys));
+  selectKeys([]);
+  return true;
+}
+
+/** What the system clipboard holds while keyframes are copied (the keyframes themselves stay in the app). */
+export const KEYFRAMES_CLIPBOARD = 'Design Clone keyframes';
+
+let clipboard: CopiedKeys | null = null;
+
+export function copySelectedKeys(): boolean {
+  const keys = editor.ui.motion.selectedKeys;
+  if (!keys.length) return false;
+  clipboard = copyKeyframes(editor.doc, keys);
+  return true;
+}
+
+/** Pastes copied keyframes at the playhead. */
+export function pasteKeys(): boolean {
+  if (!clipboard?.items.length || !editor.ui.motionMode) return false;
+  let added: MotionUI['selectedKeys'] = [];
+  editor.doc.change(() => (added = pasteKeyframes(editor.doc, clipboard!, editor.ui.motion.time)));
+  selectKeys(added);
+  return true;
 }

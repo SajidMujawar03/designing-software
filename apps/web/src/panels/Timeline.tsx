@@ -1,10 +1,11 @@
-import { animatedLayers, MOTION_PROPERTIES, type Keyframe, type MotionProperty, type SceneNode } from '@figma/document';
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Pause, Play, Repeat, Repeat1, ArrowRightLeft } from 'lucide-react';
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { animatedLayers, MOTION_PROPERTIES, moveKeyframes, setKeyframeEasing, type Keyframe, type KeyRef, type MotionEasing, type MotionProperty, type SceneNode } from '@figma/document';
+import { ArrowRightLeft, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleDot, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
-import { followSelection, formatTime, motionFrame, parseTime, PLAYBACK_ORDER, seek, setTimeline, timelineOf, togglePlay } from '../editor/motion';
+import { followSelection, formatTime, motionFrame, parseTime, PLAYBACK_ORDER, seek, selectKeys, setTimeline, timelineOf, toggleAutoKey, togglePlay } from '../editor/motion';
 import { useUI, type MotionUI } from '../editor/store';
+import { EasingEditor } from './EasingEditor';
 
 /** Names of Motion properties as the timeline lists them. */
 export const PROPERTY_LABELS: Record<MotionProperty, string> = {
@@ -28,10 +29,18 @@ const PLAYBACK_ICON = { LOOP: Repeat, ONCE: Repeat1, PING_PONG: ArrowRightLeft }
 
 /** Left padding of the lanes, so the 0 mark and keyframes at 0 aren't cut off. */
 const PAD = 12;
+/** Width of the names column. */
+const NAMES_W = 180;
+const ROW_H = 24;
 const MIN_PX_PER_SEC = 40;
 const MAX_PX_PER_SEC = 2400;
+/** Snapping distance (px) for keyframes dragged near the playhead or other keyframes. */
+const SNAP_PX = 6;
+/** How long a hint stays (ms). */
+const HINT_MS = 4000;
 
 const setMotion = (patch: Partial<MotionUI>) => editor.setUI({ motion: { ...editor.ui.motion, ...patch } });
+const sameKey = (a: KeyRef, b: KeyRef) => a.nodeId === b.nodeId && a.prop === b.prop && a.id === b.id;
 
 /** Ruler steps (ms) for a zoom: labelled ticks at least ~64px apart. */
 function rulerStep(pxPerSec: number): number {
@@ -80,6 +89,10 @@ function TimeField({ label, value, unit, onCommit }: { label: string; value: num
 /** The keyframes of a property, in time order. */
 const sorted = (ks: Keyframe[]) => [...ks].sort((a, b) => a.time - b.time);
 
+/** Keyframes of a layer (all properties), as refs. */
+const keysOf = (n: SceneNode, only?: MotionProperty): KeyRef[] =>
+  MOTION_PROPERTIES.filter((p) => !only || p === only).flatMap((p) => (n.keyframes?.[p] ?? []).map((k) => ({ nodeId: n.id, prop: p, id: k.id })));
+
 /** Motion mode's timeline (as in Figma Motion), docked under the canvas. */
 export function Timeline() {
   const motionMode = useUI((s) => s.motionMode);
@@ -87,32 +100,73 @@ export function Timeline() {
   return <TimelinePanel />;
 }
 
+interface Drag {
+  /** Keyframes being moved, and how far (ms) so far. */
+  keys: KeyRef[];
+  delta: number;
+}
+
+interface Marquee {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** The easing popover: which segment (its first keyframe), and where. */
+interface EasingAt {
+  key: KeyRef;
+  segmentMs: number;
+  x: number;
+  y: number;
+}
+
 function TimelinePanel() {
   useDocVersion();
   const motion = useUI((s) => s.motion);
   const selection = useUI((s) => s.selection);
-  const lanesRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const [marquee, setMarquee] = useState<Marquee | null>(null);
+  const [easingAt, setEasingAt] = useState<EasingAt | null>(null);
 
   // The timeline follows the frame holding the selection.
   useEffect(() => followSelection(), [selection]);
 
+  // Hints fade after a few seconds.
+  useEffect(() => {
+    if (!motion.hint) return;
+    const t = setTimeout(() => {
+      if (editor.ui.motion.hint?.at === motion.hint!.at) setMotion({ hint: null });
+    }, HINT_MS);
+    return () => clearTimeout(t);
+  }, [motion.hint]);
+
   const frame = motionFrame();
   const tl = timelineOf(frame);
-  const { unit, pxPerSec, time, playing, collapsed, height } = motion;
+  const { unit, pxPerSec, time, playing, collapsed, height, autoKey, selectedKeys } = motion;
   const xOf = (ms: number) => PAD + (ms / 1000) * pxPerSec;
+  /** Time (ms) under a screen x. */
   const msAt = (clientX: number) => {
-    const el = lanesRef.current!;
+    const el = bodyRef.current!;
     const r = el.getBoundingClientRect();
     return ((clientX - r.left + el.scrollLeft - PAD - NAMES_W) / pxPerSec) * 1000;
+  };
+  /** A screen point in the grid's coordinates. */
+  const gridPoint = (clientX: number, clientY: number) => {
+    const r = gridRef.current!.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
   };
   const layers = frame ? animatedLayers(editor.doc, frame.id) : [];
   const allCollapsed = layers.length > 0 && layers.every((l) => collapsed.includes(l.id));
   const PlaybackIcon = PLAYBACK_ICON[tl.playback];
   const lanesWidth = xOf(tl.duration) + 48;
+  const isSelected = (r: KeyRef) => selectedKeys.some((s) => sameKey(s, r));
 
   // Ctrl/Cmd + wheel zooms the timeline around the pointer.
   useEffect(() => {
-    const el = lanesRef.current;
+    const el = bodyRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
@@ -122,41 +176,40 @@ function TimelinePanel() {
       const next = Math.max(MIN_PX_PER_SEC, Math.min(MAX_PX_PER_SEC, m.pxPerSec * Math.exp(-e.deltaY * 0.002)));
       setMotion({ pxPerSec: next });
       // Keep the time under the pointer in place.
-      el.scrollLeft += ((at / 1000) * (next - m.pxPerSec));
+      el.scrollLeft += (at / 1000) * (next - m.pxPerSec);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   });
 
-  /** Drag on the ruler (or empty lane space) to scrub. */
+  /** Follows the pointer until it's released. */
+  const track = (move: (ev: PointerEvent) => void, up?: (ev: PointerEvent) => void) => {
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', onUp);
+      up?.(ev);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  /** Drag on the ruler to scrub. */
   const scrub = (e: ReactPointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
     seek(msAt(e.clientX));
-    const move = (ev: PointerEvent) => seek(msAt(ev.clientX));
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    track((ev) => seek(msAt(ev.clientX)));
   };
 
   /** Drag the handle at the end of the ruler to change the duration. */
   const dragDuration = (e: ReactPointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const move = (ev: PointerEvent) => {
-      const ms = Math.round(msAt(ev.clientX) / 50) * 50;
-      setTimeline({ duration: Math.max(100, ms) });
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      editor.doc.endGesture();
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    editor.doc.endGesture();
+    track(
+      (ev) => setTimeline({ duration: Math.max(100, Math.round(msAt(ev.clientX) / 50) * 50) }),
+      () => editor.doc.endGesture(),
+    );
   };
 
   /** Drag the top edge to resize the panel. */
@@ -164,27 +217,121 @@ function TimelinePanel() {
     e.preventDefault();
     const y0 = e.clientY;
     const h0 = height;
-    const move = (ev: PointerEvent) => setMotion({ height: Math.max(96, Math.min(window.innerHeight * 0.6, h0 + y0 - ev.clientY)) });
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    track((ev) => setMotion({ height: Math.max(96, Math.min(window.innerHeight * 0.6, h0 + y0 - ev.clientY)) }));
+  };
+
+  /** Empty lane space: drag a marquee around keyframes; a click clears the selection and moves the playhead. */
+  const laneDown = (e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setEasingAt(null);
+    const start = gridPoint(e.clientX, e.clientY);
+    const base = e.shiftKey ? selectedKeys : [];
+    let moved = false;
+    track(
+      (ev) => {
+        const p = gridPoint(ev.clientX, ev.clientY);
+        if (!moved && Math.hypot(p.x - start.x, p.y - start.y) < 3) return;
+        moved = true;
+        const m = { x0: Math.min(start.x, p.x), y0: Math.min(start.y, p.y), x1: Math.max(start.x, p.x), y1: Math.max(start.y, p.y) };
+        setMarquee(m);
+        // Keyframes whose diamonds are inside.
+        const inside: KeyRef[] = [];
+        for (const el of gridRef.current!.querySelectorAll<HTMLElement>('.timeline-key')) {
+          const r = el.getBoundingClientRect();
+          const c = gridPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (c.x >= m.x0 && c.x <= m.x1 && c.y >= m.y0 && c.y <= m.y1) inside.push(JSON.parse(el.dataset.key!));
+        }
+        selectKeys([...base, ...inside.filter((k) => !base.some((b) => sameKey(b, k)))]);
+      },
+      (ev) => {
+        setMarquee(null);
+        if (!moved) {
+          if (!e.shiftKey) selectKeys([]);
+          seek(msAt(ev.clientX));
+        }
+      },
+    );
+  };
+
+  /** Snaps a dragged time to the playhead or other keyframes nearby (Shift: always to the playhead). */
+  const snapTime = (t: number, keys: KeyRef[], toPlayhead: boolean): number => {
+    if (toPlayhead) return time;
+    const tol = (SNAP_PX / pxPerSec) * 1000;
+    const targets = [time, 0, tl.duration];
+    for (const n of layers) for (const r of keysOf(n)) if (!keys.some((k) => sameKey(k, r))) targets.push(n.keyframes![r.prop]!.find((k) => k.id === r.id)!.time);
+    let best = t;
+    let dist = tol;
+    for (const s of targets) if (Math.abs(s - t) < dist) [best, dist] = [s, Math.abs(s - t)];
+    return best === t ? Math.round(t / 10) * 10 : best;
+  };
+
+  /** Press a keyframe (or a track bar): select, then drag to move the selection. */
+  const keyDown = (e: ReactPointerEvent, ref: KeyRef | KeyRef[], anchorTime: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setEasingAt(null);
+    const refs = Array.isArray(ref) ? ref : [ref];
+    let keys = selectedKeys;
+    if (e.shiftKey && !Array.isArray(ref)) keys = isSelected(ref) ? keys.filter((k) => !sameKey(k, ref)) : [...keys, ref];
+    else if (!refs.every(isSelected)) keys = refs;
+    selectKeys(keys);
+    if (!keys.length) return;
+    const x0 = e.clientX;
+    let delta = 0;
+    track(
+      (ev) => {
+        if (Math.abs(ev.clientX - x0) < 3 && !delta) return;
+        const raw = anchorTime + ((ev.clientX - x0) / pxPerSec) * 1000;
+        const earliest = Math.min(...keys.map((k) => editor.doc.get(k.nodeId)!.keyframes![k.prop]!.find((x) => x.id === k.id)!.time));
+        // Not before 0.
+        delta = Math.max(-earliest, snapTime(raw, keys, ev.shiftKey) - anchorTime);
+        setDrag({ keys, delta });
+      },
+      () => {
+        setDrag(null);
+        if (delta) editor.doc.change(() => moveKeyframes(editor.doc, keys, delta));
+      },
+    );
+  };
+
+  /** Click a segment: its easing menu. */
+  const segmentDown = (e: ReactPointerEvent, key: KeyRef, segmentMs: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const body = bodyRef.current!.closest('.timeline')!.getBoundingClientRect();
+    editor.doc.endGesture();
+    setEasingAt({ key, segmentMs, x: Math.min(e.clientX - body.left, body.width - 380), y: e.clientY - body.top });
   };
 
   const toggleCollapsed = (id: string) => setMotion({ collapsed: collapsed.includes(id) ? collapsed.filter((c) => c !== id) : [...collapsed, id] });
 
+  /** Where a keyframe is drawn: moved along while it's being dragged. */
+  const shownTime = (r: KeyRef, t: number) => (drag && drag.keys.some((k) => sameKey(k, r)) ? Math.max(0, t + drag.delta) : t);
+
   const step = rulerStep(pxPerSec);
   const ticks: number[] = [];
   for (let t = 0; t <= tl.duration + step; t += step / 5) ticks.push(Math.round(t * 1000) / 1000);
+  const hint = motion.hint && Date.now() - motion.hint.at < HINT_MS ? motion.hint.text : null;
 
   return (
-    <section className="timeline" style={{ height }} aria-label="Timeline" onPointerDown={(e) => e.stopPropagation()}>
+    <section className={`timeline${autoKey ? ' autokey' : ''}`} style={{ height }} aria-label="Timeline" onPointerDown={(e) => e.stopPropagation()}>
       <div className="timeline-resize" onPointerDown={resize} title="Drag to resize the timeline" />
       <header className="timeline-header">
         <button type="button" className="tool-btn" onClick={togglePlay} disabled={!frame} title={playing ? 'Pause (Space)' : 'Play (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
           {playing ? <Pause size={15} /> : <Play size={15} />}
+        </button>
+        <button
+          type="button"
+          className={`tool-btn timeline-autokey${autoKey ? ' active' : ''}`}
+          onClick={toggleAutoKey}
+          aria-pressed={autoKey}
+          title={autoKey ? 'Auto-keyframe is on: changes record keyframes at the playhead' : 'Auto-keyframe: record changes as keyframes at the playhead'}
+          aria-label="Auto-keyframe"
+        >
+          <CircleDot size={15} />
         </button>
         <TimeField label="Current time" value={time} unit={unit} onCommit={seek} />
         <span className="timeline-sep">/</span>
@@ -202,7 +349,13 @@ function TimelinePanel() {
         >
           <PlaybackIcon size={15} />
         </button>
-        <span className="timeline-frame">{frame ? frame.name : ''}</span>
+        {hint ? (
+          <span className="timeline-hint-text" role="status">
+            {hint}
+          </span>
+        ) : (
+          <span className="timeline-frame">{frame ? frame.name : ''}</span>
+        )}
         <span className="spacer" />
         <button
           type="button"
@@ -230,8 +383,8 @@ function TimelinePanel() {
       {!frame ? (
         <div className="timeline-empty">Select a top-level frame to animate it.</div>
       ) : (
-        <div className="timeline-body" ref={lanesRef}>
-          <div className="timeline-grid" style={{ width: NAMES_W + lanesWidth }}>
+        <div className="timeline-body" ref={bodyRef}>
+          <div className="timeline-grid" ref={gridRef} style={{ width: NAMES_W + lanesWidth }}>
             {/* Ruler */}
             <div className="timeline-row timeline-ruler-row">
               <div className="timeline-name timeline-corner" />
@@ -252,97 +405,155 @@ function TimelinePanel() {
             {layers.length === 0 && (
               <div className="timeline-row">
                 <div className="timeline-name" />
-                <div className="timeline-lane timeline-hint" style={{ width: lanesWidth }} onPointerDown={scrub}>
-                  No animated layers in this frame yet.
+                <div className="timeline-lane timeline-hint" style={{ width: lanesWidth }} onPointerDown={laneDown}>
+                  Select a layer and click a diamond in the Animate section (or turn on auto-keyframe) to add keyframes.
                 </div>
               </div>
             )}
 
-            {layers.map((n) => (
-              <LayerTrack key={n.id} n={n} xOf={xOf} width={lanesWidth} open={!collapsed.includes(n.id)} onToggle={() => toggleCollapsed(n.id)} scrub={scrub} />
-            ))}
+            {layers.map((n) => {
+              const open = !collapsed.includes(n.id);
+              const props = MOTION_PROPERTIES.filter((p) => n.keyframes?.[p]?.length);
+              const all = keysOf(n);
+              const times = all.map((r) => shownTime(r, n.keyframes![r.prop]!.find((k) => k.id === r.id)!.time));
+              const first = Math.min(...times);
+              const last = Math.max(...times);
+              const layerSelected = selection.includes(n.id);
+              return (
+                <Fragment key={n.id}>
+                  <div className={`timeline-row timeline-track${layerSelected ? ' selected' : ''}`}>
+                    <div
+                      className="timeline-name"
+                      onClick={() => {
+                        // A layer: selects it and all its keyframes.
+                        editor.select([n.id]);
+                        selectKeys(all);
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="timeline-chevron"
+                        aria-label={open ? 'Collapse' : 'Expand'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCollapsed(n.id);
+                        }}
+                      >
+                        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      </button>
+                      <span className="timeline-label">{n.name}</span>
+                    </div>
+                    <div className="timeline-lane" style={{ width: lanesWidth }} onPointerDown={laneDown}>
+                      <div
+                        className={`timeline-bar${all.every(isSelected) ? ' selected' : ''}`}
+                        style={{ left: xOf(first), width: Math.max(2, xOf(last) - xOf(first)) }}
+                        title="Drag to move all of this layer's keyframes"
+                        onPointerDown={(e) => keyDown(e, all, first)}
+                      />
+                    </div>
+                  </div>
+                  {open &&
+                    props.map((p) => {
+                      const ks = sorted(n.keyframes![p]!);
+                      const rowKeys = keysOf(n, p);
+                      return (
+                        <div key={p} className="timeline-row timeline-prop">
+                          <div
+                            className={`timeline-name timeline-prop-name${rowKeys.every(isSelected) ? ' selected' : ''}`}
+                            title="Select this property's keyframes (Delete removes them)"
+                            onClick={() => selectKeys(rowKeys)}
+                          >
+                            {PROPERTY_LABELS[p]}
+                          </div>
+                          <div className="timeline-lane" style={{ width: lanesWidth }} onPointerDown={laneDown}>
+                            {ks.slice(0, -1).map((k, i) => {
+                              const ref = { nodeId: n.id, prop: p, id: k.id };
+                              const next = { nodeId: n.id, prop: p, id: ks[i + 1].id };
+                              const a = shownTime(ref, k.time);
+                              const b = shownTime(next, ks[i + 1].time);
+                              return (
+                                <div
+                                  key={k.id}
+                                  className={`timeline-segment${k.easing.type === 'HOLD' ? ' hold' : ''}${easingAt && sameKey(easingAt.key, ref) ? ' open' : ''}`}
+                                  style={{ left: xOf(Math.min(a, b)), width: Math.max(0, Math.abs(xOf(b) - xOf(a))) }}
+                                  title={`${easingLabel(k.easing)}: click to change the easing`}
+                                  onPointerDown={(e) => segmentDown(e, ref, ks[i + 1].time - k.time)}
+                                />
+                              );
+                            })}
+                            {ks.map((k) => {
+                              const ref = { nodeId: n.id, prop: p, id: k.id };
+                              const t = shownTime(ref, k.time);
+                              return (
+                                <button
+                                  key={k.id}
+                                  type="button"
+                                  data-key={JSON.stringify(ref)}
+                                  className={`timeline-key${isSelected(ref) ? ' selected' : ''}`}
+                                  style={{ left: xOf(t) }}
+                                  title={`${PROPERTY_LABELS[p]} ${typeof k.value === 'number' ? round(k.value) : `#${k.value}`} at ${formatTime(k.time, unit)}`}
+                                  aria-label={`${PROPERTY_LABELS[p]} keyframe at ${Math.round(k.time)} ms`}
+                                  aria-pressed={isSelected(ref)}
+                                  onPointerDown={(e) => keyDown(e, ref, k.time)}
+                                  onDoubleClick={() => seek(k.time)}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </Fragment>
+              );
+            })}
 
-            {/* Past the end of the timeline, and the playhead over everything. */}
-            <div className="timeline-after" style={{ left: NAMES_W + xOf(tl.duration), width: Math.max(0, lanesWidth - xOf(tl.duration)) }} />
+            {/* Past the end of the timeline, the marquee, and the playhead over everything. */}
+            <div className="timeline-after" style={{ left: NAMES_W + xOf(tl.duration), width: Math.max(0, lanesWidth - xOf(tl.duration)), top: ROW_H }} />
+            {marquee && <div className="timeline-marquee" style={{ left: marquee.x0, top: marquee.y0, width: marquee.x1 - marquee.x0, height: marquee.y1 - marquee.y0 }} />}
             <div className={`timeline-playhead${playing ? ' playing' : ''}`} style={{ left: NAMES_W + xOf(time) }} />
           </div>
         </div>
       )}
+      {easingAt && <EasingPopover at={easingAt} onClose={() => setEasingAt(null)} />}
     </section>
   );
 }
 
-/** Width of the names column. */
-const NAMES_W = 180;
-
-function LayerTrack({ n, xOf, width, open, onToggle, scrub }: { n: SceneNode; xOf: (ms: number) => number; width: number; open: boolean; onToggle: () => void; scrub: (e: ReactPointerEvent) => void }) {
-  const selected = useUI((s) => s.selection.includes(n.id));
-  const props = MOTION_PROPERTIES.filter((p) => n.keyframes?.[p]?.length);
-  const times = props.flatMap((p) => n.keyframes![p]!.map((k) => k.time));
-  const first = Math.min(...times);
-  const last = Math.max(...times);
+/** The easing menu for a segment; it also applies to other selected segments when this one is selected. */
+function EasingPopover({ at, onClose }: { at: EasingAt; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = useUI((s) => s.motion.selectedKeys);
+  const n = editor.doc.get(at.key.nodeId);
+  const k = n?.keyframes?.[at.key.prop]?.find((x) => x.id === at.key.id);
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('keydown', key);
+      editor.doc.endGesture();
+    };
+  }, [onClose]);
+  if (!k) return null;
+  const targets = selected.some((s) => sameKey(s, at.key)) ? selected : [at.key];
+  // Changes while dragging handles or sliders merge into one undo step (ended when the menu closes).
+  const change = (e: MotionEasing) => setKeyframeEasing(editor.doc, targets, e);
   return (
-    <>
-      <div className={`timeline-row timeline-track${selected ? ' selected' : ''}`}>
-        <div className="timeline-name" onClick={() => editor.select([n.id])}>
-          <button
-            type="button"
-            className="timeline-chevron"
-            aria-label={open ? 'Collapse' : 'Expand'}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-          >
-            {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </button>
-          <span className="timeline-label">{n.name}</span>
-        </div>
-        <div className="timeline-lane" style={{ width }} onPointerDown={scrub}>
-          <div className="timeline-bar" style={{ left: xOf(first), width: Math.max(2, xOf(last) - xOf(first)) }} />
-        </div>
-      </div>
-      {open &&
-        props.map((p) => {
-          const ks = sorted(n.keyframes![p]!);
-          return (
-            <div key={p} className="timeline-row timeline-prop">
-              <div className="timeline-name timeline-prop-name">{PROPERTY_LABELS[p]}</div>
-              <div className="timeline-lane" style={{ width }} onPointerDown={scrub}>
-                {ks.slice(0, -1).map((k, i) => (
-                  <div
-                    key={k.id}
-                    className={`timeline-segment${k.easing.type === 'HOLD' ? ' hold' : ''}`}
-                    style={{ left: xOf(k.time), width: Math.max(0, xOf(ks[i + 1].time) - xOf(k.time)) }}
-                    title={easingLabel(k)}
-                  />
-                ))}
-                {ks.map((k) => (
-                  <button
-                    key={k.id}
-                    type="button"
-                    className="timeline-key"
-                    style={{ left: xOf(k.time) }}
-                    title={`${PROPERTY_LABELS[p]} ${typeof k.value === 'number' ? round(k.value) : `#${k.value}`} at ${formatTime(k.time, editor.ui.motion.unit)}`}
-                    aria-label={`${PROPERTY_LABELS[p]} keyframe at ${Math.round(k.time)} ms`}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onDoubleClick={() => seek(k.time)}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-    </>
+    <div ref={ref} className="easing-popover" style={{ left: Math.max(8, at.x), bottom: 8 }} role="dialog" aria-label="Easing">
+      <EasingEditor easing={k.easing} segmentMs={at.segmentMs} onChange={change} />
+    </div>
   );
 }
 
 const round = (v: number) => Math.round(v * 100) / 100;
 
-function easingLabel(k: Keyframe): string {
-  const e = k.easing;
+export function easingLabel(e: MotionEasing): string {
   if (e.type === 'BEZIER') return `cubic-bezier(${e.x1}, ${e.y1}, ${e.x2}, ${e.y2})`;
-  if (e.type === 'SPRING') return `Spring${e.preset ? ` (${e.preset.toLowerCase()})` : ''}`;
+  if (e.type === 'SPRING') return e.preset ? `Spring (${e.preset.toLowerCase()})` : e.mode === 'TIME' ? 'Spring (time-based)' : 'Spring (physics-based)';
   return e.type
     .toLowerCase()
     .split('_')
