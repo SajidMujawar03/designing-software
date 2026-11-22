@@ -13,6 +13,8 @@ import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pa
 import {
   canPickColor,
   copyProperties,
+  convertContainer,
+  convertTargets,
   distributeSelection,
   flipSelection,
   hasCopiedProperties,
@@ -215,6 +217,18 @@ export const COMMANDS: Command[] = [
     label: 'Wrap in new section',
     run: () => editor.frameSelection('SECTION'),
     enabled: () => editor.topLevelSelection().length > 0 && editor.selectedNodes().every((n) => editor.doc.get(n.parentId)?.type === 'PAGE'),
+  },
+  {
+    id: 'convert-to-frame',
+    label: 'Convert to frame',
+    run: () => convertContainer(editor, editor.ui.selection[0], 'FRAME'),
+    enabled: () => editor.ui.selection.length === 1 && convertTargets(editor, editor.ui.selection[0]).includes('FRAME'),
+  },
+  {
+    id: 'convert-to-section',
+    label: 'Convert to section',
+    run: () => convertContainer(editor, editor.ui.selection[0], 'SECTION'),
+    enabled: () => editor.ui.selection.length === 1 && convertTargets(editor, editor.ui.selection[0]).includes('SECTION'),
   },
   { id: 'flip-h', label: 'Flip horizontal', shortcut: 'Shift+H', run: () => flipSelection(editor, 'x'), enabled: hasSelection },
   { id: 'flip-v', label: 'Flip vertical', shortcut: 'Shift+V', run: () => flipSelection(editor, 'y'), enabled: hasSelection },

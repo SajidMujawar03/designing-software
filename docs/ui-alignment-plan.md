@@ -290,4 +290,4 @@ U1–U7 left these differences from Figma. Same rules as section 2; one branch a
 | **V7** Compare changes per layer | In account files, Compare changes lists the selected layer's property differences against a chosen version (from version history). | 2 days |
 | **V8** Audio in Motion | An Audio section and track on the timeline: an uploaded sound, its start and volume, played with the timeline and mixed into video export. | 3–4 days |
 
-V1 (flip) is done on branch `ui-flip`.
+V1 (flip) is done on branch `ui-flip`. V2 (convert layer type) is done on branch `ui-convert-type`: the header's type dropdown and Object > Convert to section / Convert to frame.

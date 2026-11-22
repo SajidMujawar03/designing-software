@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { solid } from '@figma/document';
 import { editor } from './editor';
 import {
+  convertContainer,
+  convertTargets,
   copyProperties,
   flipSelection,
   hideOtherLayers,
@@ -75,6 +77,40 @@ describe('object commands', () => {
     flipSelection(editor, 'y');
     expect(doc.get(ids[1])!.flipY).toBe(true);
     expect(doc.get(ids[1])!.y).toBeCloseTo(0);
+  });
+
+  it('converts frames, groups and sections, keeping children and place', () => {
+    const { doc, ids } = page([
+      [10, 10, '#FF0000'],
+      [70, 30, '#00FF00'],
+    ]);
+    editor.select(ids);
+    editor.frameSelection();
+    const frame = editor.ui.selection[0];
+    doc.change(() => doc.updateNode(frame, { name: 'Frame 4', fills: [solid('#0000FF')], cornerRadius: 8 }));
+    expect(convertTargets(editor, frame)).toEqual(['GROUP', 'SECTION']);
+
+    const section = convertContainer(editor, frame, 'SECTION')!;
+    expect(doc.has(frame)).toBe(false);
+    const s = doc.get(section)!;
+    expect(s.type).toBe('SECTION');
+    expect(s.name).toBe('Section 4');
+    expect([s.x, s.y, s.width, s.height]).toEqual([10, 10, 100, 40]);
+    expect(doc.childIds(section)).toEqual(ids);
+    expect(s.fills[0]).toMatchObject({ color: { r: 0, g: 0, b: 1 } });
+
+    const group = convertContainer(editor, section, 'GROUP')!;
+    expect(doc.get(group)!.type).toBe('GROUP');
+    expect(doc.childIds(group)).toEqual(ids);
+    // Children stay where they were.
+    expect(doc.get(ids[1])!.x).toBeCloseTo(70);
+
+    const back = convertContainer(editor, group, 'FRAME')!;
+    const f = doc.get(back)!;
+    expect(f.type).toBe('FRAME');
+    expect([f.x, f.y, f.width, f.height]).toEqual([10, 10, 100, 40]);
+    expect(f.name).toBe('Frame 4');
+    expect(doc.get(ids[1])!.x).toBeCloseTo(60);
   });
 
   it('removes and swaps fills and strokes', () => {

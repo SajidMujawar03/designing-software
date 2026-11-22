@@ -3,7 +3,7 @@ import { applyToPoint, rotation, type Rect } from '@figma/geometry';
 import type { Editor } from './editor';
 import { distributeEdge, pack, tidyUp, type Edge, type Point } from './arrange';
 import { toggle as toggleInEditor } from './textEditing';
-import { boundsOf, fitText, leafIds, moveByWorld, placementIn, worldCenter, worldRotation } from './transforms';
+import { boundsOf, fitText, leafIds, moveByWorld, placementIn, reparentKeepingPosition, worldCenter, worldRotation } from './transforms';
 
 /**
  * Commands from Figma's Edit, Object, Arrange and View menus that aren't
@@ -261,4 +261,70 @@ export async function pasteHere(ed: Editor): Promise<void> {
   const b = boundsOf(ed.doc, ids);
   if (!at || !b) return;
   ed.doc.change(() => moveByWorld(ed.doc, ids, Math.round(at.x - b.x), Math.round(at.y - b.y)), { merge: true });
+}
+
+// ------------------------------------------------------------ convert frame / group / section
+
+export type ContainerType = 'FRAME' | 'GROUP' | 'SECTION';
+const CONTAINER_NAMES: Record<ContainerType, string> = { FRAME: 'Frame', GROUP: 'Group', SECTION: 'Section' };
+
+/** What a layer can be converted to (Figma's type dropdown in the panel header): frames, groups and sections, not inside instances. */
+export function convertTargets(ed: Editor, id: NodeId): ContainerType[] {
+  const doc = ed.doc;
+  const n = doc.get(id);
+  if (!n || isInInstance(doc, id) || !['FRAME', 'GROUP', 'SECTION'].includes(n.type)) return [];
+  const parent = doc.get(n.parentId);
+  // Sections live on the page or inside other sections; groups need children.
+  const sectionOk = parent?.type === 'PAGE' || parent?.type === 'SECTION';
+  const hasKids = doc.childIds(id).length > 0;
+  return (['FRAME', 'GROUP', 'SECTION'] as const).filter((t) => t !== n.type && (t !== 'SECTION' || sectionOk) && (t !== 'GROUP' || hasKids));
+}
+
+/**
+ * Converts a frame, group or section to another of the three: a new layer of
+ * that type takes its place, name, box and children. Fills, strokes,
+ * effects, corner radius and clipping carry over where the new type has
+ * them (a group has no fills of its own, as in Figma).
+ */
+export function convertContainer(ed: Editor, id: NodeId, to: ContainerType): NodeId | null {
+  const doc = ed.doc;
+  const n = doc.get(id);
+  if (!n || !convertTargets(ed, id).includes(to)) return null;
+  const parentId = n.parentId!;
+  const from = n.type as ContainerType;
+  // "Frame 3" becomes "Group 3"; other names stay.
+  const m = /^(Frame|Group|Section)( \d+)?$/.exec(n.name);
+  const name = m ? `${CONTAINER_NAMES[to]}${m[2] ?? ''}` : n.name;
+  const newId = doc.change(() => {
+    const look: NodePatch =
+      to === 'GROUP'
+        ? { opacity: n.opacity, blendMode: n.blendMode, effects: n.effects }
+        : {
+            fills: from === 'GROUP' ? (to === 'SECTION' ? undefined : []) : n.fills,
+            strokes: from === 'GROUP' ? undefined : n.strokes,
+            strokeWeight: from === 'GROUP' ? undefined : n.strokeWeight,
+            effects: n.effects,
+            opacity: n.opacity,
+            blendMode: n.blendMode,
+            ...(to === 'FRAME' ? { cornerRadius: n.cornerRadius, clipsContent: from === 'FRAME' ? n.clipsContent : false } : {}),
+          };
+    const clean = Object.fromEntries(Object.entries(look).filter(([, v]) => v !== undefined)) as NodePatch;
+    const created = doc.createNode({ type: to, parentId, aboveId: id, name, ...(to === 'GROUP' ? { width: 0, height: 0 } : {}), ...clean });
+    if (to !== 'GROUP') {
+      // A group has no box: the new frame or section covers its children; frames and sections keep theirs.
+      const box =
+        from === 'GROUP'
+          ? (() => {
+              const b = worldBounds(doc, id);
+              return placementIn(doc, parentId, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, worldRotation(doc, parentId), b.width, b.height);
+            })()
+          : { x: n.x, y: n.y, width: n.width, height: n.height, rotation: n.rotation };
+      doc.updateNode(created, box);
+    }
+    for (const child of doc.childIds(id)) reparentKeepingPosition(doc, child, created);
+    if (doc.has(id)) doc.deleteNodes([id]);
+    return created;
+  });
+  ed.select([newId]);
+  return newId;
 }

@@ -87,7 +87,7 @@ Layer selected (frame / group):
 
 | Figma section → contents | Ours | Status |
 | --- | --- | --- |
-| Header: layer type with dropdown ("Frame ▾", "Group ▾"), quick buttons (component, mask, …) | Type ("Frame", "Group", or "Mixed" with a layer count) and quick buttons: Create component, Use as mask, Boolean groups (with Flatten and Outline stroke) | Same (U4); no convert-type dropdown |
+| Header: layer type with dropdown ("Frame ▾", "Group ▾"), quick buttons (component, mask, …) | Type ("Frame", "Group", or "Mixed" with a layer count) and quick buttons: Create component, Use as mask, Boolean groups (with Flatten and Outline stroke) | Same (U4, V2): the type is a dropdown (Frame / Group / Section) that converts the layer |
 | **Position**: Alignment, Position X/Y, Rotation (with flip buttons), constraints | **Position**: alignment and distribute, X/Y, Rotation with Rotate 90° and Flip buttons, then Constraints for layers in a frame | Same (U4, V1) |
 | **Layout**: auto layout toggle; Flow: **Freeform / Vertical / Horizontal / Grid**; Dimensions W/H, lock aspect ratio, Clip content | **Layout**: + / − adds or removes auto layout; Flow: Freeform / Vertical / Horizontal (with Wrap) / Grid (disabled); W/H and sizing; Clip content; then gap, alignment and padding | Same (U4); no grid auto layout or lock aspect ratio |
 | **Appearance**: Opacity, Corner radius, Hide (eye), Blend mode | **Appearance**: Opacity, Corner radius, Blend mode, eye button (hide); polygon/star Count and Ratio | Same (U4) |
