@@ -262,6 +262,8 @@ export interface SceneNode {
   /** Mirrored across the box's vertical axis (Flip horizontal, Shift+H) or horizontal axis (Flip vertical, Shift+V), after rotating. */
   flipX?: boolean;
   flipY?: boolean;
+  /** Lock aspect ratio: W/H edits and resizing keep the width-to-height ratio. */
+  constrainProportions?: boolean;
 
   opacity: number;
   blendMode?: BlendMode;

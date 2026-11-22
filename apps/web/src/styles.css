@@ -6133,3 +6133,7 @@ a.btn {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.grid2.with-lock {
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+}
