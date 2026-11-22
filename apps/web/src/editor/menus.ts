@@ -12,7 +12,7 @@ export interface Menu {
 }
 
 /** File menu items the web and desktop share (the desktop adds its disk actions before them). */
-export const FILE_ITEMS: MenuEntry[] = ['place-image', 'export-selection', 'export-json', '-', 'version-history', 'share'];
+export const FILE_ITEMS: MenuEntry[] = ['add-page', 'place-image', '-', 'export-selection', 'export-json', '-', 'version-history', 'share'];
 
 /** Edit through Help, as in Figma's Main menu. */
 export const EDITOR_MENUS = (): Menu[] => [
@@ -45,6 +45,7 @@ export const EDITOR_MENUS = (): Menu[] => [
     label: 'View',
     items: [
       'layout-grids',
+      'clear-guides',
       'rulers',
       'show-annotations',
       'multiplayer-cursors',

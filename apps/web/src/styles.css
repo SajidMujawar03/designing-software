@@ -5760,3 +5760,256 @@ a.btn {
   outline: 2px solid var(--blue);
   outline-offset: 1px;
 }
+
+/* ---------- Figma's layout: navigation rail, panel heads, floating toolbar ---------- */
+
+.nav-rail {
+  width: 56px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  user-select: none;
+}
+.nav-rail .main-menu {
+  margin: 0;
+}
+.nav-rail .logo-btn:hover,
+.nav-rail .logo-btn[aria-expanded='true'] {
+  background: var(--hover);
+}
+.rail-sep {
+  width: 28px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+.rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 48px;
+  padding: 6px 0 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.rail-btn:hover {
+  background: var(--hover);
+}
+.rail-btn.active svg {
+  color: var(--blue);
+}
+.rail-btn.active {
+  background: var(--hover);
+}
+
+.sidebar.left,
+.sidebar.right {
+  display: flex;
+  flex-direction: column;
+}
+.left-head,
+.right-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 44px;
+  padding: 6px 8px 6px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.left-head .file-menu {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.left-head .file-menu .file-name {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.left-head .file-menu .file-name:hover {
+  background: var(--hover);
+}
+.left-head .file-menu-pop {
+  left: 0;
+  transform: none;
+}
+.right-head .tool-btn {
+  width: 32px;
+  height: 32px;
+  color: var(--text);
+}
+.right-head .tool-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+.right-head .avatar-btn {
+  box-shadow: 0 0 0 2px var(--panel);
+}
+.right-tabs-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.right-tabs-row .side-tabs {
+  flex: 1;
+  border-bottom: 0;
+}
+.right-tabs-row .mode-label {
+  flex: 1;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+.right-tabs-row .zoom-btn {
+  color: var(--text);
+  min-width: 48px;
+  font-size: 11px;
+}
+.right-tabs-row .zoom-btn:hover {
+  background: var(--hover);
+}
+.right-tabs-row .zoom .menu {
+  top: 34px;
+}
+.sidebar.left > .layers,
+.sidebar.right > :not(.right-head):not(.right-tabs-row) {
+  min-height: 0;
+}
+.sidebar.left > .layers {
+  flex: 1;
+  overflow-y: auto;
+}
+.sidebar.right {
+  overflow-y: auto;
+}
+
+.floating-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--timeline-h, 0px) + 12px);
+  z-index: 25;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--toolbar);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  white-space: nowrap;
+}
+.floating-toolbar .tool-btn {
+  width: 34px;
+  height: 34px;
+}
+.floating-toolbar .tool-menu {
+  top: auto;
+  bottom: 44px;
+}
+.floating-toolbar .divider {
+  height: 22px;
+}
+.floating-toolbar .mode-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.floating-toolbar .mode-switch button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ddd;
+  cursor: pointer;
+}
+.floating-toolbar .mode-switch button:hover {
+  background: var(--toolbar-hover);
+}
+.floating-toolbar .mode-switch button.active {
+  background: #fff;
+  color: #1e1e1e;
+}
+
+.help-button {
+  position: absolute;
+  right: 12px;
+  bottom: calc(var(--timeline-h, 0px) + 12px);
+  z-index: 25;
+}
+.help-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+.help-menu {
+  top: auto;
+  bottom: 40px;
+  right: 0;
+}
+
+.panel-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Minimize UI keeps the rail and the floating toolbar; Show/Hide UI leaves only the canvas. */
+.ui-hidden .nav-rail,
+.ui-hidden .floating-toolbar,
+.ui-hidden .help-button {
+  display: none;
+}
+
+.panel-header .props-type {
+  text-transform: none;
+}
+.sidebar.right {
+  overflow-x: hidden;
+}
+.right-tabs-row .side-tabs {
+  gap: 0;
+  padding: 8px 4px 4px 8px;
+  min-width: 0;
+}
+.right-tabs-row .side-tabs button {
+  padding: 4px 6px;
+}
+.right-tabs-row .zoom {
+  flex-shrink: 0;
+}
+.right-tabs-row .zoom-btn {
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+/* After the sidebar layout rules above, so Minimize UI and Show/Hide UI still win. */
+.ui-minimized .sidebar,
+.ui-hidden .sidebar {
+  display: none;
+}

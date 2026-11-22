@@ -942,8 +942,8 @@ function PanelHeader({ nodes }: { nodes: SceneNode[] }) {
   return (
     <div className="props-title panel-header">
       <span className="panel-header-name" title={single?.name}>
-        <b>{typeName}</b>
-        {nodes.length > 1 && <span className="props-type">{nodes.length} layers</span>}
+        <b>{single ? single.name : typeName}</b>
+        <span className="props-type">{single ? typeName : `${nodes.length} layers`}</span>
       </span>
       <span className="panel-header-actions">
         <IconButton title="Create component (Ctrl+Alt+K)" disabled={!canComponent} onClick={() => command('create-component').run()}>
