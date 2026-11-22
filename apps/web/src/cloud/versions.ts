@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { DesignDocument } from '@figma/document';
 import { create } from 'zustand';
 import { editor } from '../editor/editor';
 import { api, ApiError, type CloudUser } from './api';
@@ -71,4 +72,23 @@ export async function startVersionPreview(versionId: string): Promise<void> {
   editor.doc.readOnly = true;
   await loadVersions().catch(() => {});
   useVersions.setState({ previewing: useVersions.getState().versions.find((v) => v.id === versionId) ?? null });
+}
+
+const versionDocs = new Map<string, Promise<DesignDocument>>();
+
+/** A saved version as its own read-only document (for Compare changes); the editor's document is untouched. */
+export function loadVersionDocument(versionId: string): Promise<DesignDocument> {
+  let p = versionDocs.get(versionId);
+  if (!p) {
+    p = fetch(`/api/versions/${versionId}/state`, { credentials: 'same-origin' }).then(async (res) => {
+      if (!res.ok) throw new ApiError(res.status === 404 ? 'That version no longer exists.' : 'This version could not be opened.', res.status);
+      const doc = new DesignDocument();
+      Y.applyUpdate(doc.ydoc, new Uint8Array(await res.arrayBuffer()));
+      doc.readOnly = true;
+      return doc;
+    });
+    p.catch(() => versionDocs.delete(versionId));
+    versionDocs.set(versionId, p);
+  }
+  return p;
 }

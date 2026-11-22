@@ -8,6 +8,7 @@ import { exportLayers, saveFiles, constraintLabel } from '../editor/export';
 import { useDocVersion } from '../editor/hooks';
 import { useUI } from '../editor/store';
 import { Section } from './controls';
+import { CompareChangesDialog } from './CompareChanges';
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -69,11 +70,14 @@ const VIEW_KEY = 'figma-clone:inspect-view';
 
 /** Ready for dev (Mark as ready for dev, as in Figma's Dev Mode) and, in account files, Compare changes. */
 function DevStatusBar({ n }: { n: SceneNode }) {
+  const [comparing, setComparing] = useState(false);
   const cloud = location.pathname.startsWith('/file/');
   const can = canHaveDevStatus(n);
   if (!can && !cloud) return null;
   const ready = n.devStatus === 'READY_FOR_DEV';
   return (
+    <>
+    {comparing && <CompareChangesDialog nodeId={n.id} onClose={() => setComparing(false)} />}
     <div className="dev-status-bar">
       {can &&
         (ready ? (
@@ -91,11 +95,12 @@ function DevStatusBar({ n }: { n: SceneNode }) {
           </button>
         ))}
       {cloud && (
-        <button type="button" className="btn small" title="Opens version history, to compare this file with earlier versions" onClick={() => editor.setUI({ historyOpen: true })}>
+        <button type="button" className="btn small" title="What changed in this layer since an earlier version" onClick={() => setComparing(true)}>
           Compare changes
         </button>
       )}
     </div>
+    </>
   );
 }
 

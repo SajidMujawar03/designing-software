@@ -24,4 +24,5 @@ export * from './motion';
 export * from './motionPresets';
 export * from './selectionColors';
 export * from './devMode';
+export * from './compare';
 export { computeAutoLayout, defaultGrid, gridSpans, gridLines, gridSnapEdges, DEFAULT_CONSTRAINTS } from '@figma/layout';
