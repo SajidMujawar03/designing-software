@@ -9,7 +9,7 @@ describe('view settings', () => {
   });
 
   it('keeps valid stored values', () => {
-    const stored = { snapToPixel: false, showCursors: false, nudge: 2, bigNudge: 8, layerThumbnails: false, showAnnotations: false, brushes: DEFAULT_BRUSHES, sampleHintClosed: true, ui: 'minimized', keepToolSelected: true, highlightHover: false };
+    const stored = { snapToPixel: false, showCursors: false, nudge: 2, bigNudge: 8, layerThumbnails: false, showAnnotations: false, brushes: DEFAULT_BRUSHES, sampleHintClosed: true, ui: 'minimized', keepToolSelected: true, highlightHover: false, outlines: false, pixelPreview: false, pixelGrid: false, showSlices: true };
     expect(parsePrefs(JSON.stringify(stored))).toEqual(stored);
   });
 

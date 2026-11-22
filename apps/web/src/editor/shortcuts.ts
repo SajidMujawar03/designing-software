@@ -101,6 +101,7 @@ export function installShortcuts(): () => void {
     }
     if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') return run(() => void flattenSelection(editor));
     if (mod && e.shiftKey && !e.altKey && e.code === 'KeyA') return run(() => selectInverse(editor));
+    if (mod && e.shiftKey && !e.altKey && e.code === 'KeyP') return run(() => setPrefs({ pixelPreview: !prefs().pixelPreview }));
     // Text > Bold / Italic / Underline (Ctrl+B / I / U) and Strikethrough (Ctrl+Shift+X) on selected text layers.
     const textSelected = editor.selectedNodes().some((n) => n.type === 'TEXT');
     if (mod && !e.altKey && textSelected) {

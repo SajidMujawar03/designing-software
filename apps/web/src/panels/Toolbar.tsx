@@ -15,7 +15,7 @@ import { command } from '../editor/commands';
 import { toggleMinimizedUI } from '../editor/prefs';
 
 /** View settings listed under the zoom levels, as in Figma's zoom/view options menu. */
-const VIEW_TOGGLES = ['snap-pixel', 'layout-grids', 'rulers', 'multiplayer-cursors', 'show-annotations'];
+const VIEW_TOGGLES = ['pixel-preview', 'pixel-grid', 'snap-pixel', 'layout-grids', 'rulers', 'outlines', 'multiplayer-cursors', 'show-annotations'];
 
 interface ToolDef {
   /** A tool, or (with `run`) a command listed in a slot's menu, like Image/video…. */
