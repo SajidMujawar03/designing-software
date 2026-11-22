@@ -173,12 +173,12 @@ The Export panel gets an **Animated** tab when a top-level frame with `motion` i
 
 **Pipeline:**
 1. Draw each frame offscreen with the renderer at `pose = poseAt(t)`.
-2. Pass it to `VideoEncoder` (WebCodecs; Chrome and Electron): **H.264** for MP4 via `mp4-muxer`, **VP9** for WebM via `webm-muxer`. GIF uses `gifenc`, which handles palette quantisation.
+2. Pass it to `VideoEncoder` (WebCodecs; Chrome and Electron): **H.264** for MP4 and **VP9** for WebM, both via **Mediabunny** (`mp4-muxer` and `webm-muxer` are deprecated in its favour, same author). GIF uses `gifenc`, which handles palette quantisation.
 3. Run it in a progress dialog that can be cancelled.
 
 The desktop app uses the same code (Electron is Chromium) and saves through the existing save dialog. If `VideoEncoder` is missing, MP4 and WebM are disabled with an explanation, and GIF still works.
 
-**New dependencies** (small, MIT, pure JS): `mp4-muxer`, `webm-muxer`, `gifenc`.
+**New dependencies** (pure JS): `mediabunny` (MPL-2.0, used unmodified) and `gifenc` (MIT). GIFs play at most 50 fps, since browsers slow down shorter GIF frames.
 
 ## 7. Handoff and prototypes
 

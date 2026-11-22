@@ -13,6 +13,7 @@ import {
   saveFiles,
 } from '../editor/export';
 import { IconButton, Section } from './controls';
+import { AnimatedExport } from './AnimatedExport';
 
 const FORMATS: ExportFormat[] = ['PNG', 'JPG', 'SVG', 'PDF'];
 
@@ -62,6 +63,9 @@ export function ExportSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[
   const list = current === 'mixed' ? [] : current;
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  // A top-level frame with a Motion timeline also exports as video or GIF (the Animated tab).
+  const animated = nodes.length === 1 && nodes[0].type === 'FRAME' && !!nodes[0].motion && editor.doc.get(nodes[0].parentId)?.type === 'PAGE';
+  const [tab, setTab] = useState<'static' | 'animated'>('static');
   const update = (i: number, patch: Partial<ExportSetting>) => setAll(ids, list.map((s, j) => (j === i ? { ...s, ...patch } : s)));
 
   // A small preview of the first export of a single layer.
@@ -105,6 +109,19 @@ export function ExportSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[
           <option key={s} value={s} />
         ))}
       </datalist>
+      {animated && (
+        <div className="export-tabs" role="tablist">
+          {(['static', 'animated'] as const).map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+              {t === 'static' ? 'Static' : 'Animated'}
+            </button>
+          ))}
+        </div>
+      )}
+      {animated && tab === 'animated' ? (
+        <AnimatedExport frame={nodes[0]} />
+      ) : (
+      <>
       {current === 'mixed' && <div className="hint">The selected layers have different export settings. Adding one replaces them.</div>}
       {list.map((s, i) => (
         <div key={i} className="export-row">
@@ -133,6 +150,8 @@ export function ExportSection({ ids, nodes }: { ids: NodeId[]; nodes: SceneNode[
         <div className="export-preview">
           <img src={preview} alt="Export preview" />
         </div>
+      )}
+      </>
       )}
     </Section>
   );
