@@ -131,6 +131,11 @@ jobs:
           pattern: design-clone-*
           path: files
           merge-multiple: true
+      # Only the release notes are needed from the repository.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: apps/desktop/release-notes
+          path: repo
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -138,7 +143,13 @@ jobs:
         run: |
           version=${GITHUB_REF_NAME#desktop-v}
           ls -la files
-          cat > notes.md <<EOF
+          # What's new in this version (apps/desktop/release-notes/<version>.md), when there is a file for it.
+          : > notes.md
+          if [ -f "repo/apps/desktop/release-notes/$version.md" ]; then
+            cat "repo/apps/desktop/release-notes/$version.md" >> notes.md
+            printf '\n---\n\n' >> notes.md
+          fi
+          cat >> notes.md <<EOF
           **Windows:** Design-Clone-Setup-$version.exe installs it (or use the portable .exe).
           **macOS:** the .dmg for your Mac (arm64 for Apple silicon, x64 for Intel).
           **Linux:** the .AppImage, or the .deb for Debian and Ubuntu.
