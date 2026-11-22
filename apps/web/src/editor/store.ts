@@ -158,7 +158,7 @@ export interface UIState {
   rendererPref: 'canvaskit' | 'canvas2d';
   /** Renderer actually drawing the canvas. */
   activeRenderer: 'canvaskit' | 'canvas2d' | null;
-  /** Ctrl+Shift+4: draw frames' layout grids. */
+  /** Shift+G (and Ctrl+Shift+4): draw frames' layout guides. */
   showLayoutGrids: boolean;
   /** Where a dragged layer will land in an auto layout frame (canvas coords). */
   dropLine: [Vec2, Vec2] | null;

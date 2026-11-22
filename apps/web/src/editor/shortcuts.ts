@@ -102,6 +102,7 @@ export function installShortcuts(): () => void {
     if (e.altKey && !mod) {
       const k = e.code.replace('Key', '').toLowerCase();
       if (e.shiftKey && k === 'a') return run(() => removeAutoLayout(editor));
+      if (e.shiftKey && k === 'f') return run(() => void flattenSelection(editor));
       if (e.shiftKey && k === 'h') return run(() => editor.distribute('x'));
       if (e.shiftKey && k === 'v') return run(() => editor.distribute('y'));
       const map: Record<string, Parameters<typeof editor.align>[0]> = {
@@ -130,6 +131,8 @@ export function installShortcuts(): () => void {
       if (key === '=' || key === '+') return run(() => editor.zoomIn());
       if (key === '-') return run(() => editor.zoomOut());
       if (key === '0') return run(() => editor.zoomTo(1));
+      // Ctrl+Backspace: ungroup, as in Figma (Ctrl+Shift+G still works).
+      if (e.key === 'Backspace' && !e.shiftKey && !e.altKey) return run(() => editor.ungroupSelection());
       if (e.shiftKey && key === 'h') return run(() => editor.toggleVisible());
       if (e.shiftKey && e.code === 'Digit4') return run(() => editor.setUI({ showLayoutGrids: !ui.showLayoutGrids }));
       if (e.shiftKey && key === 'l') return run(() => editor.toggleLocked());
@@ -142,7 +145,9 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyR') return run(() => editor.setUI({ showRulers: !ui.showRulers }));
       if (e.code === 'KeyA') return run(() => addAutoLayout(editor));
       if (e.code === 'KeyP') return run(() => editor.setTool('pencil'));
-      if (e.code === 'KeyG') return run(() => editor.setTool('polygon'));
+      // Shift+G: layout guides, as in Figma (Polygon has no shortcut there).
+      if (e.code === 'KeyG') return run(() => editor.setUI({ showLayoutGrids: !ui.showLayoutGrids }));
+      if (e.code === 'KeyT') return run(() => editor.setTool('annotate'));
       if (e.code === 'KeyS') return run(() => editor.setTool('section'));
       if (e.code === 'KeyL') return run(() => editor.setTool('arrow'));
       if (e.code === 'KeyY') return run(() => setPrefs({ showAnnotations: !prefs().showAnnotations }));
@@ -159,6 +164,9 @@ export function installShortcuts(): () => void {
       if (e.key === 'Delete' || e.key === 'Backspace') return run(() => void deleteSelectedKeys());
       if (e.key === 'Escape') return run(() => selectKeys([]));
     }
+
+    // ] and [: bring to front and send to back, as in Figma (Ctrl+Shift+] and [ still work).
+    if (!mod && !e.altKey && (e.key === ']' || e.key === '[')) return run(() => editor.reorder(e.key === ']' ? 'front' : 'back'));
 
     switch (e.key) {
       case 'Delete':

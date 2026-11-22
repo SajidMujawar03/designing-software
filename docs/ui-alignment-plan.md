@@ -38,7 +38,7 @@ Renames only; no layout changes.
 - `textPath`: "Text on a path" → **Text on path**.
 - `hand`: "Hand" → **Hand tool**.
 - `annotate`: "Annotate" → **Annotation**, shortcut **Shift+T** (new key in `shortcuts.ts`; check nothing else uses it).
-- `polygon`: drop the **Shift+G** shortcut (Figma's Polygon has none, and Shift+G is Figma's Layout guides, U2). Keep it as an alias until U2 takes the key.
+- `polygon`: drop the **Shift+G** shortcut (Figma's Polygon has none); Shift+G becomes Layout guides in this phase.
 
 **2. Right-panel section names**
 - `PropertiesPanel.tsx:218` "Layer" → **Appearance**.
@@ -93,7 +93,6 @@ Actions         (U3)
 **2. Draw mode toolbar** (`DRAW_TOOLS`)
 - Move tools, **Pen / Brush / Pencil**, then Region, Shape, Type and Code slots, Comment, Actions, as in Figma Draw.
 
-**3. Layout guides toggle on Shift+G** (from U1's alias).
 
 Tests: toolbar unit test for slot contents and the remembered last tool per slot; check the tour still points at the right buttons.
 

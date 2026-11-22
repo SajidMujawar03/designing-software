@@ -215,7 +215,7 @@ export function PropertiesPanel() {
 
       <ShapeSection ids={ids} nodes={nodes} />
 
-      <Section title="Layer">
+      <Section title="Appearance">
         <div className="grid2">
           <NumberField
             label="Opacity"
@@ -616,11 +616,7 @@ function PageProperties() {
   const bg = page.fills[0] ?? solid('#F5F5F5');
   return (
     <div className="props">
-      <div className="props-title">
-        {page.name}
-        <span className="props-type">page</span>
-      </div>
-      <Section title="Background">
+      <Section title="Page">
         <PaintRow
           paint={bg}
           open={paintEdit?.ids[0] === page.id}

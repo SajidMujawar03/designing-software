@@ -11,6 +11,10 @@ import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { useUI, type ToolId } from '../editor/store';
 import { setMotionMode } from '../editor/motion';
+import { command } from '../editor/commands';
+
+/** View settings listed under the zoom levels, as in Figma's zoom/view options menu. */
+const VIEW_TOGGLES = ['snap-pixel', 'layout-grids', 'rulers', 'multiplayer-cursors', 'show-annotations'];
 
 interface ToolDef {
   id: ToolId;
@@ -27,7 +31,7 @@ const T = {
   slice: { id: 'slice', label: 'Slice', key: 'S', Icon: Slice },
   rectangle: { id: 'rectangle', label: 'Rectangle', key: 'R', Icon: Square },
   ellipse: { id: 'ellipse', label: 'Ellipse', key: 'O', Icon: Circle },
-  polygon: { id: 'polygon', label: 'Polygon', key: 'Shift+G', Icon: Triangle },
+  polygon: { id: 'polygon', label: 'Polygon', key: '', Icon: Triangle },
   star: { id: 'star', label: 'Star', key: '', Icon: Star },
   line: { id: 'line', label: 'Line', key: 'L', Icon: Minus },
   arrow: { id: 'arrow', label: 'Arrow', key: 'Shift+L', Icon: ArrowUpRight },
@@ -35,12 +39,12 @@ const T = {
   pencil: { id: 'pencil', label: 'Pencil', key: 'Shift+P', Icon: Pencil },
   brush: { id: 'brush', label: 'Brush', key: '', Icon: Brush },
   text: { id: 'text', label: 'Text', key: 'T', Icon: Type },
-  textPath: { id: 'textPath', label: 'Text on a path', key: '', Icon: Spline },
+  textPath: { id: 'textPath', label: 'Text on path', key: '', Icon: Spline },
   code: { id: 'code', label: 'Code', key: 'B', Icon: SquareCode },
   spec: { id: 'spec', label: 'Spec', key: 'D', Icon: FileText },
   snippet: { id: 'snippet', label: 'Code snippet', key: '', Icon: Braces },
-  annotate: { id: 'annotate', label: 'Annotate', key: '', Icon: NotebookPen },
-  hand: { id: 'hand', label: 'Hand', key: 'H', Icon: Hand },
+  annotate: { id: 'annotate', label: 'Annotation', key: 'Shift+T', Icon: NotebookPen },
+  hand: { id: 'hand', label: 'Hand tool', key: 'H', Icon: Hand },
   comment: { id: 'comment', label: 'Comment', key: 'C', Icon: MessageCircle },
 } satisfies Record<string, ToolDef>;
 
@@ -211,7 +215,7 @@ function ZoomMenu({ zoom }: { zoom: number }) {
       }}
     >
       <span>{label}</span>
-      <kbd>{hint}</kbd>
+      {hint && <kbd>{hint}</kbd>}
     </button>
   );
 
@@ -226,7 +230,33 @@ function ZoomMenu({ zoom }: { zoom: number }) {
           {item('Zoom out', 'Ctrl −', () => editor.zoomOut())}
           {item('Zoom to fit', 'Shift 1', () => editor.zoomToFit())}
           {item('Zoom to selection', 'Shift 2', () => editor.zoomToSelection())}
-          {item('Zoom to 100%', 'Shift 0', () => editor.zoomTo(1))}
+          {item('Zoom to 50%', '', () => editor.zoomTo(0.5))}
+          {item('Zoom to 100%', 'Ctrl 0', () => editor.zoomTo(1))}
+          {item('Zoom to 200%', '', () => editor.zoomTo(2))}
+          <div className="menu-divider" />
+          {VIEW_TOGGLES.map((id) => {
+            const c = command(id);
+            const on = c.checked?.() ?? false;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={on}
+                className="menu-item"
+                onClick={() => {
+                  c.run();
+                  setOpen(false);
+                }}
+              >
+                <span className="tool-menu-label">
+                  <span className={`palette-check${on ? ' on' : ''}`} aria-hidden />
+                  {c.label}
+                </span>
+                {c.shortcut && <kbd>{c.shortcut.replace(/\+/g, ' ')}</kbd>}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

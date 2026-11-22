@@ -35,16 +35,16 @@ Figma groups the tools into seven slots with dropdowns. Ours shows most of them 
 
 | Figma slot → tools (shortcut) | Ours | Status |
 | --- | --- | --- |
-| **Move tools**: Move (V), **Hand tool** (H), Scale (K) | Move menu: Move (V), Scale (K). Hand is a separate button at the end of the toolbar, named "Hand" | Different name or place (Hand) |
+| **Move tools**: Move (V), **Hand tool** (H), Scale (K) | Move menu: Move (V), Scale (K). Hand tool (H) is a separate button at the end of the toolbar | Different name or place (Hand tool's place; U2) |
 | **Region tools**: Frame (F), Section (Shift+S), Slice (S) | Frame menu: Frame (F), Section (Shift+S), Slice (S) | Same (our menu has no "Region tools" name) |
 | **Shape tools**: Rectangle (R), Line (L), Arrow (Shift+L), Ellipse (O), Polygon, Star, **Image/video…** (Ctrl+Shift+K) | Six separate buttons: Rectangle, Ellipse, Polygon, Star, Line, Arrow (in that order). Place image… is in quick actions | Different name or place |
 | Image/video… | "Place image…" (quick actions, Ctrl+Shift+K); no video | Different name or place |
 | **Creation tools**: Pen (P), Pencil (Shift+P) | Separate Pen and Pencil buttons | Different name or place |
-| **Type tools**: Text (T), **Text on path** | Text menu: Text (T), **Text on a path** | Different name (one word) |
-| **Code tools**: Code (B), Spec (D) | Code menu: Code (B), Spec (D), **Code snippet**, **Annotate** | Extra in ours (Code snippet, Annotate in this menu) |
+| **Type tools**: Text (T), **Text on path** | Text menu: Text (T), Text on path | Same (U1) |
+| **Code tools**: Code (B), Spec (D) | Code menu: Code (B), Spec (D), **Code snippet**, **Annotation** (Shift+T) | Extra in ours (Code snippet, Annotation in this menu; U2) |
 | **Comment** (C) | Comment (C) *(cloud files only)* | Same |
 | **Actions** (grid icon, Ctrl+K): AI prompts plus the command list | Quick actions (Ctrl+/ and Ctrl+K), no button | Different name or place |
-| Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | "Annotate" under the Code menu, no shortcut; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
+| Annotation (Shift+T), Measurement (Shift+M) *(docs; not shown on the Free plan's Design toolbar)* | Annotation (Shift+T) under the Code menu; no Measurement tool (Alt-hover shows distances) | Different name or place / Missing in ours (Measurement) |
 | Frame presets (right panel while the Frame tool is on) | Frame presets in the right panel (Phone, …) | Same |
 | Measurement is Shift+M in Figma *(docs)* | Shift+M is our Shape builder (vector edit bar, quick actions) | Different shortcut (clash if Measurement is added) |
 
@@ -77,8 +77,8 @@ Nothing selected:
 
 | Figma | Ours | Status |
 | --- | --- | --- |
-| **Page** (background colour, opacity, eye) | "Page 1 · Page", **Background** (colour, opacity, Hide, Remove, Show in exports) | Different name ("Page" vs "Background") |
-| **Styles** with + : Text styles, Color styles, Effect styles, **Layout guide styles** | **Local styles** (hint text until a style exists) | Different name or place |
+| **Page** (background colour, opacity, eye) | **Page** (colour, opacity, Hide, Remove, Show in exports) | Same (U1) |
+| **Styles** with + : Text styles, Color styles, Effect styles, **Layout guide styles** | **Styles** (hint text until a style exists), groups Text / Color / Effect styles | Same (U1; no Layout guide styles yet) |
 | Export | Export (Layers on this page / all pages, Export files) | Same |
 | — | **File → Export file as JSON** | Extra in ours |
 
@@ -89,10 +89,10 @@ Layer selected (frame / group):
 | Header: layer type with dropdown ("Frame ▾", "Group ▾"), quick buttons (component, mask, …) | Name + type text ("Frame 1 · Frame") | Different name or place |
 | **Position**: Alignment, Position X/Y, Rotation (with flip buttons), constraints | Alignment buttons at the top, X/Y and rotation in **Layout**; **Constraints** section on children | Different name or place |
 | **Layout**: auto layout toggle; Flow: **Freeform / Vertical / Horizontal / Grid**; Dimensions W/H, lock aspect ratio, Clip content | **Layout** (X, Y, W, H, rotation, corner radius, Clip content) + separate **Auto layout** section with + | Different name or place |
-| **Appearance**: Opacity, Corner radius, Hide (eye), Blend mode | **Layer**: Opacity, blend mode list | Different name |
+| **Appearance**: Opacity, Corner radius, Hide (eye), Blend mode | **Appearance**: Opacity, blend mode list | Same name (U1); layout differs (U4) |
 | Fill, Stroke, Effects | Fill, Stroke, Effects | Same |
 | **Selection colors** | — | Missing in ours |
-| **Layout guide** | **Layout grid** | Different name |
+| **Layout guide** | **Layout guide** | Same (U1) |
 | Export | Export | Same |
 | — | **Shape** (Flatten, Outline) | Extra in ours |
 | — | **Annotations** section in the Design tab | Extra in ours (Figma puts annotations on the canvas / Dev Mode) |
@@ -123,7 +123,7 @@ Layer selected (frame / group):
 | **Layer properties** with **Code / List** toggle | Layout (W, H, X, Y), Fill, Typography as lists | Different name or place |
 | Code: language dropdown (CSS, iOS, Android, plugins) | **Code**: CSS, SwiftUI, Compose | Same |
 | Colors, Assets (icon detection, downloads), Export | Fill colours; Export is in the Design tab | Different name or place |
-| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Annotate (Code menu), Spec tool; Show annotations (Shift+Y) | Different name or place |
+| Annotation (Shift+T) and Measurement (Shift+M) tools *(docs)* | Annotation (Shift+T, Code menu), Spec tool; Annotations (Shift+Y) | Different name or place |
 
 ## 8. Motion
 
@@ -164,10 +164,10 @@ Layer selected (frame / group):
 
 | Figma (View menu and zoom/view options) | Ours | Status |
 | --- | --- | --- |
-| Zoom in/out, Zoom to fit, **Zoom to 50% / 100% / 200%**, Zoom to selection | Zoom in/out, Zoom to fit, Zoom to selection, Zoom to 100% | Missing in ours (50%, 200%) |
-| Zoom to 100% = **Ctrl+0** | Zoom to 100% = **Shift+0** | Different shortcut |
+| Zoom in/out, Zoom to fit, **Zoom to 50% / 100% / 200%**, Zoom to selection | Zoom in/out, Zoom to fit, Zoom to selection, Zoom to 50% / 100% / 200%, then view toggles | Same (U1) |
+| Zoom to 100% = **Ctrl+0** | Zoom to 100% = **Ctrl+0** (Shift+0 also works) | Same (U1) |
 | Pixel grid, Snap to pixel grid, **Pixel preview** | Snap to pixel grid (quick actions) | Missing in ours (Pixel grid toggle, Pixel preview) |
-| **Layout guides** (Shift+G) | "Show/Hide layout grids" (Ctrl+Shift+4) | Different name and shortcut |
+| **Layout guides** (Shift+G) | **Layout guides** (Shift+G; Ctrl+Shift+4 also works) | Same (U1) |
 | Rulers (Shift+R) | Show rulers (Shift+R) | Same |
 | **Outlines**, Mask outlines, Frame outlines | — | Missing in ours |
 | Show slices, Comments (Shift+C), Annotations (Shift+Y), Additional labels, Multiplayer cursors | Show annotations (Shift+Y), Multiplayer cursors | Missing in ours (Show slices, Additional labels) |
@@ -186,10 +186,10 @@ Layer selected (frame / group):
 
 ## Prioritized fixes (smallest and most visible first)
 
-1. **"Text on a path" → "Text on path"** in the Text menu. One string.
-2. **Rename "Hand" to "Hand tool" and move it into the Move menu** (Move, Hand tool, Scale), dropping the separate Hand button.
-3. **Rename right-panel sections**: "Layer" → **Appearance**, "Layout grid" → **Layout guide** (and "Show/Hide layout grids" → **Layout guides**, Shift+G), "Background" → **Page**, "Local styles" → **Styles**.
-4. **Zoom to 100% shortcut**: Ctrl+0 (Figma) instead of Shift+0; add Zoom to 50% / 200% to the zoom menu.
+1. ~~**"Text on a path" → "Text on path"** in the Text menu.~~ Done in U1.
+2. **Rename "Hand" to "Hand tool"** (done in U1) **and move it into the Move menu** (Move, Hand tool, Scale), dropping the separate Hand button.
+3. ~~**Rename right-panel sections**~~ (done in U1): "Layer" → **Appearance**, "Layout grid" → **Layout guide** (and "Show/Hide layout grids" → **Layout guides**, Shift+G), "Background" → **Page**, "Local styles" → **Styles**.
+4. ~~**Zoom to 100% shortcut**~~ (done in U1): Ctrl+0 (Figma) instead of Shift+0; add Zoom to 50% / 200% to the zoom menu.
 5. **Group the shape buttons into one "Shape tools" slot** (Rectangle, Line, Arrow, Ellipse, Polygon, Star, Image/video…) and **Pen + Pencil into "Creation tools"**. Our toolbar then has Figma's seven slots.
 6. **Code menu**: move "Code snippet" and "Annotate" out (Figma has Code and Spec only). Rename "Annotate" to **Annotation** with Shift+T.
 7. **Mode switcher order and names**: Draw, Design, Motion, Dev Mode; consider renaming the Inspect tab to Dev Mode, or keep Inspect and note the difference.

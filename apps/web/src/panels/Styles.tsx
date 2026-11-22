@@ -175,7 +175,7 @@ export function LocalStyles() {
   ];
   if (!styles.length) {
     return (
-      <Section title="Local styles">
+      <Section title="Styles">
         <div className="hint">Select a layer and use the four-dots button on Fill, Text or Effects to create a style.</div>
       </Section>
     );
