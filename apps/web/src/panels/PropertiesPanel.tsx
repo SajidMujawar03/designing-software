@@ -1,6 +1,8 @@
 import { replaceSelectionColor, selectionColors, isAutoLayout, textStyleValues, baseTextStyle, defaultEffect, hexToRgb, isFrameLike, isGroupLike, paintColor, rgbaCss, rgbToHex, solid, styledSegments, type TextAlignVertical, type TextCase, type TextStyleProps, type BlendMode, type BooleanOperation, type Effect, type NodeId, type NodePatch, type Paint, type SceneNode, type StrokeMarker, type TextAlign, type TextAutoResize } from '@figma/document';
 import {
   FlipVertical2,
+  Link2,
+  Unlink2,
   ChevronDown,
   FlipHorizontal2,
   RotateCwSquare,
@@ -123,6 +125,7 @@ export function PropertiesPanel() {
   const plainBoxes = nodes.some((n) => n.type === 'SECTION' || n.type === 'SLICE' || n.type === 'CODE_SNIPPET' || n.type === 'SPEC');
   // Groups have no box of their own: position and size come from their bounds.
   const groups = nodes.some((n) => isGroupLike(n));
+  const lockedRatio = nodes.every((n) => n.constrainProportions);
   // Motion mode, one layer: fields get a ◇ keyframe button and Transform replaces Position.
   const keyed = motionMode && nodes.length === 1 && inMotionFrame(nodes[0].id) && !isLockedForMotion(nodes[0].id) ? nodes[0] : null;
 
@@ -200,7 +203,7 @@ export function PropertiesPanel() {
         {groups ? (
           <BoxFields ids={ids} part="size" />
         ) : (
-          <div className="grid2">
+          <div className={`grid2${!isLine ? ' with-lock' : ''}`}>
             <Keyed keyed={keyed} p="width">
             <NumberField
               label="W"
@@ -211,6 +214,8 @@ export function PropertiesPanel() {
                   ids,
                   (n) => ({
                     width: v,
+                    // Lock aspect ratio: the height follows.
+                    ...(n.constrainProportions && n.width > 0 && n.height > 0 ? { height: Math.round(((n.height * v) / n.width) * 100) / 100 } : {}),
                     ...(n.layoutSizingHorizontal && n.layoutSizingHorizontal !== 'FIXED' ? { layoutSizingHorizontal: 'FIXED' as const } : {}),
                     ...(n.type === 'TEXT' ? { textAutoResize: n.textAutoResize === 'NONE' ? 'NONE' : 'HEIGHT' } : {}),
                   }),
@@ -230,6 +235,7 @@ export function PropertiesPanel() {
                     ids,
                     (n) => ({
                       height: v,
+                      ...(n.constrainProportions && n.width > 0 && n.height > 0 ? { width: Math.round(((n.width * v) / n.height) * 100) / 100 } : {}),
                       ...(n.layoutSizingVertical && n.layoutSizingVertical !== 'FIXED' ? { layoutSizingVertical: 'FIXED' as const } : {}),
                       ...(n.type === 'TEXT' ? { textAutoResize: 'NONE' } : {}),
                     }),
@@ -238,6 +244,15 @@ export function PropertiesPanel() {
                 }
               />
               </Keyed>
+            )}
+            {!isLine && (
+              <IconButton
+                title={lockedRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                active={lockedRatio}
+                onClick={() => apply(ids, { constrainProportions: !lockedRatio || null } as NodePatch)}
+              >
+                {lockedRatio ? <Link2 size={13} /> : <Unlink2 size={13} />}
+              </IconButton>
             )}
           </div>
         )}

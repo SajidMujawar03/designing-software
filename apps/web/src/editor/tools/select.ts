@@ -316,8 +316,8 @@ export class SelectTool implements Tool {
 
   private resize(g: Extract<Gesture, { kind: 'resize' }>, e: ToolEvent): void {
     const { frame } = g;
-    // The scale tool always keeps proportions.
-    if (g.originals) e = { ...e, shift: true };
+    // The scale tool always keeps proportions, and so do layers with Lock aspect ratio on.
+    if (g.originals || frame.ids.every((id) => this.doc.get(id)?.constrainProportions)) e = { ...e, shift: true };
     const w = frame.width || 1;
     const h = frame.height || 1;
     const u = HANDLES[g.handle];
