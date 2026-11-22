@@ -107,7 +107,7 @@ Layer selected (frame / group):
 | Flow starting point (on frames) | Flow starting point ("Start a prototype here") | Same |
 | Interactions (+) | Interactions | Same |
 | Scroll behavior → **Position** (Scroll with parent…) and Overflow | Scroll behavior → Overflow (No scrolling, Vertical, Horizontal, Both directions); "Position when scrolling" | Same |
-| **Show prototype settings** (device, background, starting frame) | — | Missing in ours |
+| **Show prototype settings** (device, background, starting frame), hidden behind a link | **Device** and **Flows** sections shown directly when nothing is selected | Different name or place |
 | Present ▷ + **Prototype view** dropdown | Present ▷ | Missing in ours (Prototype view dropdown) |
 
 ## 7. Inspect / Dev Mode
@@ -150,7 +150,7 @@ Layer selected (frame / group):
 | Edit file menu (chevron by file name): Show version history, Publish library…, Export…, Add to sidebar, Create branch…, File color profile, Duplicate, Rename, Move file…, Move to trash | File-name menu: Rename file, Your account's files, New file, Libraries…, Theme, Files in this browser | Different name or place |
 | Edit menu: Copy properties / Paste properties, Pick color (I), Select matching layers, Select inverse, Paste to replace, Paste over selection | — (copy as PNG/SVG exists) | Missing in ours |
 | Object menu: Wrap in new section, Flip horizontal/vertical, Rotate 90°/180°, Remove fill/stroke, Swap fill and stroke, Boolean groups | Boolean ops, Flatten, Outline stroke, mask, auto layout (context menu); no flip/rotate commands | Missing in ours (flip, rotate, fill/stroke commands) |
-| Arrange menu: Tidy up, Pack, Distribute… | Align ×6 only | Missing in ours (Tidy up, Distribute, Pack) |
+| Arrange menu: Tidy up, Pack, Distribute horizontal/vertical spacing, Distribute left/centers/right/top/bottom | Align ×6 and Distribute horizontal/vertical (quick actions; desktop Arrange menu) | Missing in ours (Tidy up, Pack, edge distributes) |
 | Vector menu: Join, Smooth join, Delete and heal, Split, Simplify, Offset | Vector edit actions (F6) | Same (not compared item by item) |
 | Text menu: Bold, Italic, Underline, Strikethrough, Create link, Bulleted / Numbered list | — | Missing in ours (as a menu) |
 | Right-click: Copy, **Paste here**, **Paste to replace**, **Copy/Paste as**, Build this with code, **Add motion**, **Select layer**, **Move to page**, order, group, Flatten, Outline stroke, mask, auto layout, Create component, Plugins, Widgets, Show/Hide, Lock/Unlock, **Flip** | Copy, Copy as PNG/SVG, Paste, Duplicate, Delete, order ×4, group, component, variants, instance commands, frame, auto layout, mask, boolean ×4, Flatten, Outline stroke, Show/Hide, Lock/Unlock, Zoom to selection | Different name or place |
@@ -197,7 +197,7 @@ Layer selected (frame / group):
 9. **Add Selection colors** to the Design tab (Figma shows it for any multi-colour selection).
 10. **Restructure Position / Layout**: split X/Y/rotation and alignment into a **Position** section; put auto layout's Flow (Freeform / Vertical / Horizontal / Grid) and Dimensions into **Layout**.
 11. **Move the toolbar to the bottom centre** with the mode switcher at its right end, and put Present / Share / zoom at the top of the right panel. This is the biggest visual difference.
-12. **Add a main menu** (logo button) with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Distribute, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
+12. **Add a main menu** (logo button) with File / Edit / View / Object / Text / Arrange / Vector / Preferences. That gives a home to missing commands: Tidy up, Flip, Rotate, Copy/Paste properties, Select matching layers, Outlines, Pixel preview.
 13. **Motion**: name the property section **Transform** (Position, Scale, Rotation) with ◇ buttons beside the normal fields, and add **Add motion** to the right-click menu.
 14. **Left navigation rail** (File, Assets, Variables): larger change; it moves Assets out of the left-panel tabs and Variables out of the right panel.
 15. Dev Mode extras: Ready for dev, Compare changes, Measurement tool (Shift+M).
