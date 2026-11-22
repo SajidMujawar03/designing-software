@@ -9,6 +9,7 @@ import {
 } from '@figma/document';
 import { Grid2x2, Pencil, Plus, Trash2, Unlink } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useFloating } from './floating';
 import { editor } from '../editor/editor';
 import { useDocVersion } from '../editor/hooks';
 import { fitText } from '../editor/transforms';
@@ -72,6 +73,9 @@ export function StyleMenu(props: { type: StyleType; onPick: (id: string) => void
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // In window coordinates, so the right panel's scrolling doesn't cut it off; it closes if the panel scrolls.
+  const place = useFloating(ref, listRef, open, 'bottom-end');
   useEffect(() => {
     if (!open) return;
     const close = (e: PointerEvent) => {
@@ -80,8 +84,15 @@ export function StyleMenu(props: { type: StyleType; onPick: (id: string) => void
         setCreating(false);
       }
     };
+    const scrolled = (e: Event) => {
+      if (!listRef.current?.contains(e.target as Node)) setOpen(false);
+    };
     window.addEventListener('pointerdown', close, true);
-    return () => window.removeEventListener('pointerdown', close, true);
+    window.addEventListener('scroll', scrolled, true);
+    return () => {
+      window.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('scroll', scrolled, true);
+    };
   }, [open]);
   const styles = editor.doc.styles().filter((s) => s.type === props.type);
 
@@ -91,7 +102,7 @@ export function StyleMenu(props: { type: StyleType; onPick: (id: string) => void
         <Grid2x2 size={13} />
       </IconButton>
       {open && (
-        <div className="style-list" role="listbox">
+        <div className="style-list" role="listbox" ref={listRef} style={place}>
           {styles.length === 0 && !creating && <div className="hint pad">No styles yet.</div>}
           {grouped(styles).map(([folder, list]) => (
             <div key={folder}>
