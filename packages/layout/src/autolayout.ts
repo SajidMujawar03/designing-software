@@ -232,3 +232,70 @@ export function computeAutoLayout(c: LayoutContainer, children: LayoutItem[]): L
     ? { width: r2(containerMain), height: r2(containerCross), items: out }
     : { width: r2(containerCross), height: r2(containerMain), items: out };
 }
+
+/** Grid auto layout: a container laid out in columns and rows (Figma's Flow > Grid). */
+export interface GridContainer extends LayoutItem {
+  columns: number;
+  /** At least this many rows; more are added when the children need them. */
+  rows: number;
+  padding: Padding;
+  columnGap: number;
+  rowGap: number;
+  /** Where a child smaller than its cell sits in it, across and down. */
+  alignX: CounterAlign;
+  alignY: CounterAlign;
+}
+
+/**
+ * Places children in order, left to right then top to bottom, one per cell.
+ * Columns share the width equally (a hugging grid makes them as wide as the
+ * widest child); rows share the height equally when the grid's height is
+ * fixed, and are as tall as their tallest child when it hugs. FILL children
+ * stretch to their cell.
+ */
+export function computeGridLayout(c: GridContainer, children: LayoutItem[]): LayoutResult {
+  const cols = Math.max(1, Math.round(c.columns));
+  const rows = Math.max(1, Math.round(c.rows), Math.ceil(children.length / cols));
+  const p = c.padding;
+  const hugW = c.sizingH === 'HUG';
+  const hugH = c.sizingV === 'HUG';
+  const own = (it: LayoutItem, axis: 'w' | 'h') =>
+    axis === 'w' ? clamp(it.width, it.minWidth ?? 0, it.maxWidth ?? Infinity) : clamp(it.height, it.minHeight ?? 0, it.maxHeight ?? Infinity);
+
+  // Column width.
+  const colW = hugW
+    ? Math.max(0, ...children.filter((k) => k.sizingH !== 'FILL').map((k) => own(k, 'w')))
+    : Math.max(0, (c.width - p.left - p.right - c.columnGap * (cols - 1)) / cols);
+  // Row heights.
+  const rowH: number[] = [];
+  for (let r = 0; r < rows; r++) {
+    if (!hugH) rowH.push(Math.max(0, (c.height - p.top - p.bottom - c.rowGap * (rows - 1)) / rows));
+    else {
+      const inRow = children.slice(r * cols, r * cols + cols).filter((k) => k.sizingV !== 'FILL');
+      rowH.push(Math.max(0, ...inRow.map((k) => own(k, 'h'))));
+    }
+  }
+  const width = clamp(hugW ? p.left + p.right + cols * colW + c.columnGap * (cols - 1) : c.width, c.minWidth ?? 0, c.maxWidth ?? Infinity);
+  const height = clamp(hugH ? p.top + p.bottom + rowH.reduce((s, v) => s + v, 0) + c.rowGap * (rows - 1) : c.height, c.minHeight ?? 0, c.maxHeight ?? Infinity);
+
+  const rowTop: number[] = [];
+  let y = p.top;
+  for (let r = 0; r < rows; r++) {
+    rowTop.push(y);
+    y += rowH[r] + c.rowGap;
+  }
+  const items: Box[] = children.map((k, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cellX = p.left + col * (colW + c.columnGap);
+    const w = k.sizingH === 'FILL' ? clamp(colW, k.minWidth ?? 0, k.maxWidth ?? Infinity) : own(k, 'w');
+    const h = k.sizingV === 'FILL' ? clamp(rowH[row], k.minHeight ?? 0, k.maxHeight ?? Infinity) : own(k, 'h');
+    return {
+      x: r2(cellX + (colW - w) * ALIGN[c.alignX]),
+      y: r2(rowTop[row] + (rowH[row] - h) * ALIGN[c.alignY]),
+      width: r2(w),
+      height: r2(h),
+    };
+  });
+  return { width: r2(width), height: r2(height), items };
+}

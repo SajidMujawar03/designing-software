@@ -37,7 +37,7 @@ const paints = (list: Paint[]) => {
 /** The measurements that make sense for a kind of layer, used for new annotations. */
 export function defaultAnnotationProperties(n: SceneNode): AnnotationProperty[] {
   if (n.type === 'TEXT') return ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight'];
-  if (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL') return ['width', 'height', 'padding', 'itemSpacing'];
+  if (n.layoutMode === 'HORIZONTAL' || n.layoutMode === 'VERTICAL' || n.layoutMode === 'GRID') return ['width', 'height', 'padding', 'itemSpacing'];
   return ['width', 'height', 'fills', 'cornerRadius'];
 }
 

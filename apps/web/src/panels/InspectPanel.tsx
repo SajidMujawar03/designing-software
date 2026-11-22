@@ -227,7 +227,7 @@ export function InspectPanel() {
       </Section>
       {isAutoLayout(n) && (
         <Section title="Auto layout">
-          <Row label="Direction" value={n.layoutMode === 'VERTICAL' ? 'Vertical' : 'Horizontal'} />
+          <Row label="Direction" value={n.layoutMode === 'VERTICAL' ? 'Vertical' : n.layoutMode === 'GRID' ? `Grid · ${n.gridColumnCount ?? 2} columns` : 'Horizontal'} />
           <Row label="Gap" value={n.primaryAxisAlignItems === 'SPACE_BETWEEN' ? 'Auto' : `${r2(n.itemSpacing ?? 0)}px`} />
           <Row label="Padding" value={[n.paddingTop, n.paddingRight, n.paddingBottom, n.paddingLeft].map((v) => `${r2(v ?? 0)}`).join(' ')} />
         </Section>
