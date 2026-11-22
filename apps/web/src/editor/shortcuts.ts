@@ -10,7 +10,7 @@ import { editor } from './editor';
 import { importImages, pickImageFiles } from './images';
 import { booleanSelection, flattenSelection, outlineStrokeSelection } from './pathCommands';
 import type { ToolId } from './store';
-import { copyProperties, pasteProperties, pickColor, removeFill, selectInverse, selectMatchingLayers, stepFrame, stepPage, swapFillAndStroke, tidyUpSelection, toggleTextStyle } from './objectCommands';
+import { flipSelection, copyProperties, pasteProperties, pickColor, removeFill, selectInverse, selectMatchingLayers, stepFrame, stepPage, swapFillAndStroke, tidyUpSelection, toggleTextStyle } from './objectCommands';
 import { prefs, setPrefs, toggleHiddenUI, toggleMinimizedUI } from './prefs';
 
 const TOOL_KEYS: Record<string, ToolId> = {
@@ -165,6 +165,8 @@ export function installShortcuts(): () => void {
       if (e.code === 'KeyG') return run(() => editor.setUI({ showLayoutGrids: !ui.showLayoutGrids }));
       if (e.code === 'KeyT') return run(() => editor.setTool('annotate'));
       if (e.code === 'KeyX') return run(() => swapFillAndStroke(editor));
+      if (e.code === 'KeyH') return run(() => flipSelection(editor, 'x'));
+      if (e.code === 'KeyV') return run(() => flipSelection(editor, 'y'));
       if (e.code === 'KeyN') return run(() => stepFrame(editor, -1));
       if (e.code === 'KeyS') return run(() => editor.setTool('section'));
       if (e.code === 'KeyL') return run(() => editor.setTool('arrow'));

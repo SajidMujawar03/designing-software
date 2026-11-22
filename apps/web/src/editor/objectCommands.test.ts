@@ -3,6 +3,7 @@ import { solid } from '@figma/document';
 import { editor } from './editor';
 import {
   copyProperties,
+  flipSelection,
   hideOtherLayers,
   pasteProperties,
   removeFill,
@@ -47,6 +48,33 @@ describe('object commands', () => {
     // The selection is 100 wide: the layers swap places.
     expect(doc.get(ids[0])!.x).toBeCloseTo(60);
     expect(doc.get(ids[1])!.x).toBeCloseTo(0);
+  });
+
+  it('flips layers across the selection center', () => {
+    const { doc, ids } = page([
+      [0, 0, '#FF0000'],
+      [60, 0, '#00FF00'],
+    ]);
+    editor.select(ids);
+    flipSelection(editor, 'x');
+    // The pair swaps sides and each is mirrored.
+    expect(doc.get(ids[0])!.x).toBeCloseTo(60);
+    expect(doc.get(ids[1])!.x).toBeCloseTo(0);
+    expect(doc.get(ids[0])!.flipX).toBe(true);
+    // Flipping back clears it.
+    flipSelection(editor, 'x');
+    expect(doc.get(ids[0])!.flipX).toBeFalsy();
+    expect(doc.get(ids[0])!.x).toBeCloseTo(0);
+    // A rotated layer keeps its place (it's the whole selection) and its rotation is reversed.
+    doc.change(() => doc.updateNode(ids[0], { rotation: 30 }));
+    editor.select([ids[0]]);
+    flipSelection(editor, 'x');
+    expect(doc.get(ids[0])!.rotation).toBeCloseTo(-30);
+    expect(doc.get(ids[0])!.x).toBeCloseTo(0);
+    editor.select([ids[1]]);
+    flipSelection(editor, 'y');
+    expect(doc.get(ids[1])!.flipY).toBe(true);
+    expect(doc.get(ids[1])!.y).toBeCloseTo(0);
   });
 
   it('removes and swaps fills and strokes', () => {

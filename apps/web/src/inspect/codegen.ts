@@ -97,7 +97,8 @@ export function cssFor(doc: DesignDocument, n: SceneNode): Array<[string, string
     out.push(['left', px(n.x)]);
     out.push(['top', px(n.y)]);
   }
-  if (n.rotation) out.push(['transform', `rotate(${r2(-n.rotation)}deg)`]);
+  const transforms = [n.rotation ? `rotate(${r2(-n.rotation)}deg)` : '', n.flipX || n.flipY ? `scale(${n.flipX ? -1 : 1}, ${n.flipY ? -1 : 1})` : ''].filter(Boolean);
+  if (transforms.length) out.push(['transform', transforms.join(' ')]);
 
   // Text.
   if (n.type === 'TEXT') {
@@ -208,6 +209,7 @@ export function swiftUIText(doc: DesignDocument, n: SceneNode): string {
   }
   if (n.opacity < 1) mods.push(`.opacity(${r2(n.opacity)})`);
   if (n.rotation) mods.push(`.rotationEffect(.degrees(${r2(-n.rotation)}))`);
+  if (n.flipX || n.flipY) mods.push(`.scaleEffect(x: ${n.flipX ? -1 : 1}, y: ${n.flipY ? -1 : 1})`);
   void doc;
   return [`// ${n.name}`, ...lines, ...mods.map((m) => `  ${m}`)].join('\n');
 }
@@ -225,6 +227,7 @@ export function composeText(doc: DesignDocument, n: SceneNode): string {
   if (!(hug(n.layoutSizingHorizontal) && isAutoLayout(n))) mod.push(`.width(${r2(n.width)}.dp)`);
   if (!(hug(n.layoutSizingVertical) && isAutoLayout(n)) && n.type !== 'TEXT') mod.push(`.height(${r2(n.height)}.dp)`);
   if (n.rotation) mod.push(`.rotate(${r2(-n.rotation)}f)`);
+  if (n.flipX || n.flipY) mod.push(`.scale(scaleX = ${n.flipX ? -1 : 1}f, scaleY = ${n.flipY ? -1 : 1}f)`);
   for (const e of (n.effects ?? []).filter((x) => x.visible !== false)) {
     if (e.type === 'DROP_SHADOW') mod.push(`.shadow(elevation = ${r2(e.radius / 2)}.dp, shape = ${shape})`);
   }

@@ -259,6 +259,9 @@ export interface SceneNode {
   height: number;
   /** Degrees, clockwise, around the box center. */
   rotation: number;
+  /** Mirrored across the box's vertical axis (Flip horizontal, Shift+H) or horizontal axis (Flip vertical, Shift+V), after rotating. */
+  flipX?: boolean;
+  flipY?: boolean;
 
   opacity: number;
   blendMode?: BlendMode;

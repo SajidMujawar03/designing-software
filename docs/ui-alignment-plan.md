@@ -274,3 +274,20 @@ About 14–18 days in all. U2, U3 and U4 can run in parallel after U1 (they touc
 
 - Every phase: `pnpm test`, type check, the desktop smoke test, and a pass through the changed UI in the browser (Playwright MCP) at `/local` and on a cloud file.
 - After U5 and at the end: re-run the comparison walk-through from `ui-comparison.md` and update its status column and screenshots.
+
+## 7. Follow-ups: what's still different (phases V1–V7)
+
+U1–U7 left these differences from Figma. Same rules as section 2; one branch and pull request per phase, smallest first.
+
+| Phase | What | Size |
+| --- | --- | --- |
+| **V1** Flip | `flipX` / `flipY` on layers (a mirror around the box centre in `localTransform`, so every renderer, hit testing and bounds follow; SVG export and codegen too). Flip horizontal (Shift+H) / vertical (Shift+V) in Object, the right-click menu, and buttons next to rotation in Position. | ½ day |
+| **V2** Convert layer type | The header's type dropdown: Frame ↔ Group ↔ Section, as Figma's "Frame ▾". Also Object > Convert to frame / Convert to section. A new container takes the old one's place and children; fills, strokes and effects carry over where the new type has them. | 1 day |
+| **V3** View modes | Outlines (Ctrl+Y): every layer drawn as a 1px outline, no fills (CanvasKit and Canvas 2D). Pixel preview: the canvas drawn at 1× and scaled up without smoothing. Pixel grid toggle (Shift+'), Show slices. | 2 days |
+| **V4** Lock aspect ratio | `constrainProportions` on layers; the lock button next to W/H; W/H edits and resize handles keep the ratio while it's on. | ½ day |
+| **V5** Motion position as the centre | Transform's Position shows and edits the layer's centre (as Figma's anchor); keyframes keep storing x/y, so it's a conversion in the panel only. | ½ day |
+| **V6** Grid auto layout | Flow > Grid: `layoutMode: 'GRID'` with row and column counts and gaps, children placed in order into cells (`packages/layout`), shown in the canvas and exported. | 3 days |
+| **V7** Compare changes per layer | In account files, Compare changes lists the selected layer's property differences against a chosen version (from version history). | 2 days |
+| **V8** Audio in Motion | An Audio section and track on the timeline: an uploaded sound, its start and volume, played with the timeline and mixed into video export. | 3–4 days |
+
+V1 (flip) is done on branch `ui-flip`.

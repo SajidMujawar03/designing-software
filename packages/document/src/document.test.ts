@@ -187,3 +187,18 @@ describe('subtree versions (for render caches)', () => {
     expect(doc.subtreeVersion(b)).toBeGreaterThan(vb);
   });
 });
+
+describe('flip', () => {
+  it('mirrors a layer around its box center', async () => {
+    const { localTransform } = await import('./scene');
+    const { applyToPoint } = await import('@figma/geometry');
+    const doc = new DesignDocument();
+    doc.ensureInitialized();
+    const page = doc.pages()[0].id;
+    const id = doc.change(() => doc.createNode({ type: 'RECTANGLE', parentId: page, x: 10, y: 20, width: 100, height: 40, flipX: true } as never));
+    const m = localTransform(doc.get(id)!);
+    // The box's left edge lands on its right edge; vertical positions stay.
+    expect(applyToPoint(m, { x: 0, y: 0 })).toEqual({ x: 110, y: 20 });
+    expect(applyToPoint(m, { x: 100, y: 40 })).toEqual({ x: 10, y: 60 });
+  });
+});

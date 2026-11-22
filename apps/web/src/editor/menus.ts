@@ -93,6 +93,8 @@ export const EDITOR_MENUS = (): Menu[] => [
       'backward',
       'back',
       '-',
+      'flip-h',
+      'flip-v',
       'rotate-180',
       'rotate-left',
       'rotate-right',
